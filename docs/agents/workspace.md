@@ -78,7 +78,9 @@ If you keep the template checkout at `~/new-code/narduk-nuxt-template`, the
 What the sync flow does:
 
 1. Uses the local template checkout as the source of truth.
-2. Copies managed files into the downstream app.
+2. Copies managed files into the downstream app (including auth-bridge surfaces
+   such as `apps/web/app/layouts/auth.vue` and `blank.vue` from
+   `tools/sync-manifest.ts`).
 3. Rewrites the vendored layer `repository.url` to match the downstream app.
 4. Applies canonical pnpm config.
 5. Runs `pnpm install`.

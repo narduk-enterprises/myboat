@@ -49,6 +49,8 @@ export const AUTH_BRIDGE_SYNC_FILES = [
   'apps/web/app/composables/useAuthApi.ts',
   'apps/web/app/middleware/auth.ts',
   'apps/web/app/middleware/guest.ts',
+  'apps/web/app/layouts/auth.vue',
+  'apps/web/app/layouts/blank.vue',
   'apps/web/app/pages/auth/callback.vue',
   'apps/web/app/pages/auth/confirm.vue',
   'apps/web/app/pages/logout.vue',
