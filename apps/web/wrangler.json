@@ -90,5 +90,12 @@
       "pattern": "mybo.at",
       "custom_domain": true
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "d8dbd41a19e34995bcabe46b8d8dd9c3",
+      "preview_id": "cedfd02fe30a45829086c188937059b0"
+    }
   ]
 }

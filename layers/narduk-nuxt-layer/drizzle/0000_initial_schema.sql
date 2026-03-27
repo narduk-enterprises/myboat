@@ -11,23 +11,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   `created_at` text NOT NULL,
   `updated_at` text NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE `users` ADD COLUMN `name` text;
---> statement-breakpoint
-ALTER TABLE `users` ADD COLUMN `apple_id` text;
---> statement-breakpoint
-ALTER TABLE `users` ADD COLUMN `is_admin` integer DEFAULT false;
---> statement-breakpoint
-ALTER TABLE `users` ADD COLUMN `updated_at` text;
---> statement-breakpoint
-UPDATE `users`
-SET `updated_at` = COALESCE(`updated_at`, `created_at`, datetime('now'));
---> statement-breakpoint
 
 CREATE UNIQUE INDEX IF NOT EXISTS `users_email_unique` ON `users` (`email`);
---> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS `users_apple_id_unique` ON `users` (`apple_id`);
---> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS `sessions` (
   `id` text PRIMARY KEY NOT NULL,
@@ -35,7 +21,6 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   `expires_at` integer NOT NULL,
   `created_at` text NOT NULL
 );
---> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS `todos` (
   `id` integer PRIMARY KEY AUTOINCREMENT,
