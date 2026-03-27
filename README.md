@@ -76,6 +76,7 @@ pnpm run test:e2e:web
 - [SPEC.md](/Users/narduk/Downloads/myboat-main/SPEC.md)
 - [UI_PLAN.md](/Users/narduk/Downloads/myboat-main/UI_PLAN.md)
 - [CONTRACT.md](/Users/narduk/Downloads/myboat-main/CONTRACT.md)
+- [Architecture](/Users/narduk/new-code/template-apps/myboat/docs/architecture.md)
 
 ## Template Maintenance
 

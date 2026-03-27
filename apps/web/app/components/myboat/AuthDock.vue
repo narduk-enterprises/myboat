@@ -15,7 +15,7 @@ withDefaults(
 <template>
   <div
     data-testid="auth-dock-shell"
-    class="marine-auth-shell grid min-h-[calc(100vh-9rem)] lg:grid-cols-[0.98fr_1.02fr]"
+    class="marine-auth-shell grid min-h-[100dvh] w-full lg:grid-cols-[0.98fr_1.02fr]"
   >
     <div data-testid="auth-dock-aside" class="marine-auth-aside hidden lg:block">
       <div class="relative z-10 flex h-full items-center p-8 xl:p-10">

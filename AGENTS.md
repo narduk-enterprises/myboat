@@ -51,6 +51,11 @@ without first checking the workspace guide.
 - If the app extends the database schema, create and use `useAppDatabase(event)`
   in `apps/web/server/utils/database.ts`. Do not shadow the layer's
   `useDatabase`.
+- When downstream work reveals a likely defect or docs gap in the template,
+  shared layer, `.template-reference`, or sync tooling, use
+  [$narduk-template-issues](layers/narduk-nuxt-layer/.agents/skills/narduk-template-issues/SKILL.md)
+  to search for an existing GitHub issue and file or update the upstream issue
+  in `narduk-enterprises/narduk-nuxt-template`.
 - Doppler is the source of truth for secrets. Do not add `.env` files.
 - Zero warnings is policy. Do not hide problems with `eslint-disable`,
   `@ts-ignore`, or similar suppressions unless the exception is explicitly

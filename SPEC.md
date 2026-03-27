@@ -1,6 +1,6 @@
-Status: LOCKED
-
 # MyBoat Product Spec
+
+Status: UNLOCKED
 
 ## Product definition
 
@@ -17,7 +17,22 @@ home for:
 This repo is the canonical successor to the earlier `loganrenz/myboat` starter
 work. The product now lives in one Nuxt 4 application at `apps/web/`, backed by
 the Narduk Nuxt layer for auth, D1, SEO, analytics, and Cloudflare-safe runtime
-conventions.
+conventions. Identity is anchored to the shared Narduk auth authority, and the
+app remains the canonical product surface for owner, public, and telemetry
+views.
+
+## Runtime architecture
+
+- `https://mybo.at` is the canonical MyBoat app on Cloudflare Workers
+- app-owned operational state lives in D1
+- identity authority lives outside the app at `https://auth.nard.uk/auth/v1`
+- `https://vps.nard.uk/auth/v1` remains the staging and rollback auth origin
+- MyBoat keeps first-party app sessions and vessel data in its own app storage
+- historical telemetry is intended to land in Influx on `narduk`
+- Cloudflare Queues is the intended message backlog between ingest and
+  downstream telemetry processing
+- owner and public live views should consume a MyBoat-managed live stream, not
+  raw browser connections to boat-local SignalK or raw Influx endpoints
 
 ## Target users
 
@@ -72,6 +87,10 @@ credentials, and internal telemetry views.
 - snapshot fields include fix, heading, speed, wind, depth, water temperature,
   battery voltage, and engine RPM
 - snapshots are updated through `/api/ingest/v1/delta`
+- owner and public pages can subscribe to low-latency live updates sourced by
+  MyBoat-managed fanout
+- browsers must not depend on direct connections to a vessel's private SignalK
+  websocket
 
 ### 4. Install management
 
@@ -79,6 +98,25 @@ credentials, and internal telemetry views.
 - installs hold hostnames, SignalK stream URLs, connectivity state, event
   counts, and last-seen timestamps
 - install pages can issue ingest keys tied to the install
+- installs may use either:
+  - a direct SignalK stream URL configured by the owner
+  - a MyBoat edge agent delivered as a Docker image or Raspberry Pi image
+
+### 7. Telemetry transport and storage
+
+- a single collector path should normalize SignalK data before fanout or
+  storage
+- live viewer updates and historical ingest should happen in parallel from the
+  same normalized stream
+- historical telemetry should be batched before queue submission instead of
+  enqueueing every raw sensor tick as its own message
+- queue payload sizing should optimize for both latency and Cloudflare's `64 KB`
+  billing boundary, with time-based flushes as a hard cap
+- D1 stores latest vessel state, install heartbeat, sharing flags, and other
+  app-facing derived state
+- Influx stores time-series history and rollups
+- public and dashboard clients read telemetry through MyBoat APIs and managed
+  live channels, not through raw SignalK or raw Influx browser access
 
 ### 5. Passages
 
@@ -122,6 +160,9 @@ credentials, and internal telemetry views.
 3. Copy the collector command template.
 4. Point a collector or bridge service at `/api/ingest/v1/delta`.
 5. Confirm live snapshot and last-seen updates on dashboard and vessel pages.
+6. Allow the same normalized telemetry stream to feed both:
+   - low-latency live viewing
+   - batched historical storage
 
 ### Public sharing
 
@@ -171,6 +212,9 @@ credentials, and internal telemetry views.
 - source repo product concepts are represented in the destination app
 - Narduk auth, D1, mutation helpers, API-key hashing, SEO, and app shell
   conventions are canonical
+- the spec reflects the external Narduk auth authority and rollback hostname
+- the spec reflects Cloudflare Queues as the telemetry backlog and Influx as
+  historical time-series storage
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
 - no placeholder home/about/contact scaffold remains
 - docs describe the real migrated product, not the provision brief

@@ -32,6 +32,7 @@
     "clean": "find . -type d \\( -name node_modules -o -name .nuxt -o -name .output -o -name .nitro -o -name .wrangler -o -name .turbo -o -name .data -o -name dist \\) -not -path './.git/*' -prune -exec rm -rf {} +",
     "clean:install": "pnpm run clean && pnpm install && pnpm --filter web run db:ready",
     "db:migrate": "pnpm --filter web run db:migrate",
+    "db:seed": "pnpm --filter web run db:seed",
     "dev:kill": "sh scripts/dev-kill.sh",
     "cleanup:node-leaks": "sh scripts/cleanup-node-leaks.sh",
     "test:e2e": "playwright test",

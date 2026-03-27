@@ -5,6 +5,8 @@ const config = useRuntimeConfig()
 const route = useRoute()
 const { user, changePassword, requestPasswordReset } = useAuth()
 
+definePageMeta({ layout: 'auth' })
+
 useSeo({
   title: 'Reset Password',
   description: 'Request a password reset link or set a new password after recovery.',
@@ -129,7 +131,7 @@ function toUserFacingError(error: unknown, fallback: string) {
 
 <template>
   <div
-    class="mx-auto flex min-h-[calc(100vh-8rem)] max-w-xl items-center justify-center px-4 py-12"
+    class="mx-auto flex min-h-[100dvh] max-w-xl items-center justify-center px-4 py-12"
   >
     <UCard class="w-full">
       <template #header>
