@@ -7,7 +7,10 @@ const localNuxtPort = Number(process.env.NUXT_PORT || 3000)
 const localSiteUrl = `http://localhost:${Number.isFinite(localNuxtPort) ? localNuxtPort : 3000}`
 const canonicalSiteUrl = process.env.SITE_URL || 'https://mybo.at'
 const publicAppUrl = process.env.SITE_URL || localSiteUrl
-const relayCspConnectSrc = [process.env.CSP_CONNECT_SRC || '', resolveSignalKRelayOrigin(publicAppUrl)]
+const relayCspConnectSrc = [
+  process.env.CSP_CONNECT_SRC || '',
+  resolveSignalKRelayOrigin(publicAppUrl),
+]
   .filter(Boolean)
   .join(', ')
 

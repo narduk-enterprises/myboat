@@ -223,9 +223,9 @@ async function onSubmit() {
         <div>
           <p class="text-sm font-medium text-default">Telemetry install</p>
           <p class="mt-1 text-xs text-muted">
-            SignalK and edge install metadata for the first live feed. Use a direct websocket URL
-            if you want the collector to talk straight to Signal K, or keep the MyBoat relay URL if
-            you want the relay path instead.
+            SignalK and edge install metadata for the first live feed. Use a direct websocket URL if
+            you want the collector to talk straight to Signal K, or keep the MyBoat relay URL if you
+            want the relay path instead.
           </p>
         </div>
 
