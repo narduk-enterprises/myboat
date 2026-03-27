@@ -48,15 +48,15 @@ the next best target clearly named.
 - 2026-03-27: Updated the loop so the next cycle does a light branch review,
   runs a dedicated smoke test, and ships only after the audit plus smoke are
   green.
-- 2026-03-27: Auth surfaces received a second polish pass with a clearer
-  captain briefing, stronger route-level hierarchy, and a mobile pre-form
-  summary card. The critical auth-aside crop stayed green and improved its
-  visual variance from the initial washed-out state.
+- 2026-03-27: Auth surfaces received a second polish pass with a clearer captain
+  briefing, stronger route-level hierarchy, and a mobile pre-form summary card.
+  The critical auth-aside crop stayed green and improved its visual variance
+  from the initial washed-out state.
 - 2026-03-27: Dashboard hero and map surfaces received a focused polish pass.
   The owner dashboard now opens with a denser captain briefing, clearer public
-  route and edge posture cues, richer stat-card hints, and a calmer map
-  fallback state that no longer exposes raw MapKit configuration language in
-  the UI screenshots.
+  route and edge posture cues, richer stat-card hints, and a calmer map fallback
+  state that no longer exposes raw MapKit configuration language in the UI
+  screenshots.
 
 ## Next Target
 

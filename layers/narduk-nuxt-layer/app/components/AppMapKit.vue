@@ -856,7 +856,9 @@ defineExpose({ scrollIntoView, setRegion, zoomToFit })
       >
         <UIcon name="i-lucide-loader-2" class="mx-auto size-8 animate-spin text-primary" />
         <p class="mt-3 text-sm font-medium text-default">Loading map surface</p>
-        <p class="mt-1 text-xs text-muted">Current fixes, anchorages, and route lines are on the way.</p>
+        <p class="mt-1 text-xs text-muted">
+          Current fixes, anchorages, and route lines are on the way.
+        </p>
       </div>
     </div>
 
