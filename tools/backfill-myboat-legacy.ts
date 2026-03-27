@@ -215,7 +215,7 @@ WHERE ingest_keys.revoked_at IS NULL;`)
     return
   }
 
-  const sql = ['BEGIN', ...statements, 'COMMIT'].join(';\n')
+  const sql = statements.map((statement) => statement.trim().replace(/;+\s*$/, '')).join(';\n')
   console.log(`Backfilling legacy MyBoat data (${location})...`)
   executeSql(dbName, location, sql, cwd)
 }
