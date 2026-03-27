@@ -38,6 +38,9 @@ export default defineNuxtConfig({
   modules: ['nitro-cloudflare-dev'],
 
   nitro: {
+    experimental: {
+      websocket: true,
+    },
     cloudflareDev: {
       configPath: resolve(__dirname, 'wrangler.json'),
       ...(process.env.NUXT_WRANGLER_ENVIRONMENT
@@ -60,6 +63,12 @@ export default defineNuxtConfig({
     authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',
     authServiceRoleKey: process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || '',
     authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',
+    signalkRelayUpstreamUrl:
+      process.env.SIGNALK_RELAY_UPSTREAM_URL ||
+      'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none',
+    signalkRelayOwnerAppleId: process.env.SIGNALK_RELAY_OWNER_APPLE_ID || '',
+    signalkRelayOwnerEmail: process.env.SIGNALK_RELAY_OWNER_EMAIL || '',
+    signalkRelayOwnerUserId: process.env.SIGNALK_RELAY_OWNER_USER_ID || '',
     turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
     posthogOwnerDistinctId: process.env.POSTHOG_OWNER_DISTINCT_ID || '',
     // Server-only (admin API routes)

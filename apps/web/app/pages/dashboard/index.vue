@@ -60,7 +60,10 @@ watchEffect(() => {
     </template>
 
     <template v-else-if="overview">
-      <section class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8">
+      <section
+        data-testid="dashboard-hero"
+        class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8"
+      >
         <div class="relative z-10 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
           <div class="space-y-5">
             <div class="marine-kicker w-fit">Owner dashboard</div>
@@ -173,7 +176,7 @@ watchEffect(() => {
 
       <section class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div class="space-y-6">
-          <div class="grid gap-5 lg:grid-cols-2">
+          <div data-testid="dashboard-vessel-grid" class="grid gap-5 lg:grid-cols-2">
             <VesselSummaryCard
               v-for="vessel in overview.vessels"
               :key="vessel.id"
@@ -192,7 +195,7 @@ watchEffect(() => {
         </div>
 
         <div class="space-y-6">
-          <UCard class="chart-surface rounded-[1.75rem]">
+          <UCard data-testid="dashboard-install-readiness" class="chart-surface rounded-[1.75rem]">
             <template #header>
               <div>
                 <h3 class="font-display text-xl text-default">Install readiness</h3>
@@ -258,7 +261,7 @@ watchEffect(() => {
             </MarineEmptyState>
           </UCard>
 
-          <UCard class="chart-surface rounded-[1.75rem]">
+          <UCard data-testid="dashboard-recent-moments" class="chart-surface rounded-[1.75rem]">
             <template #header>
               <div>
                 <h3 class="font-display text-xl text-default">Recent public moments</h3>

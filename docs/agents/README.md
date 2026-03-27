@@ -16,6 +16,8 @@ handbook file that matches the work you are doing.
   access
 - `recipes.md` - opt-in implementation recipes for testing, auth, analytics,
   content, linting, UI, and forms
+- `ui-overnight-loop.md` - overnight screenshot-audit loop, proof logging, and
+  bounded UI cluster workflow
 - `../e2e-testing.md` - shared Playwright baseline, fixtures, and extension
   guidance
 

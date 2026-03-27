@@ -84,11 +84,7 @@ async function archiveInstallation() {
     <template v-if="pending">
       <USkeleton class="h-44 rounded-[2rem]" />
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <USkeleton
-          v-for="item in 4"
-          :key="item"
-          class="h-32 rounded-[1.5rem]"
-        />
+        <USkeleton v-for="item in 4" :key="item" class="h-32 rounded-[1.5rem]" />
       </div>
       <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <USkeleton class="h-[34rem] rounded-[1.75rem]" />
@@ -97,110 +93,117 @@ async function archiveInstallation() {
     </template>
 
     <template v-else-if="detail">
-    <UPageHero
-      :title="detail.installation.label"
-      :description="`Linked to ${detail.installation.vesselName}. Issue ingest keys and stage your collector command here.`"
-    >
-      <template #links>
-        <UButton
-          :to="`/dashboard/vessels/${detail.installation.vesselSlug}`"
-          color="neutral"
-          variant="soft"
-          icon="i-lucide-arrow-left"
+      <div data-testid="installation-hero">
+        <UPageHero
+          :title="detail.installation.label"
+          :description="`Linked to ${detail.installation.vesselName}. Issue ingest keys and stage your collector command here.`"
         >
-          Back to vessel
-        </UButton>
-      </template>
-    </UPageHero>
+          <template #links>
+            <UButton
+              :to="`/dashboard/vessels/${detail.installation.vesselSlug}`"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-arrow-left"
+            >
+              Back to vessel
+            </UButton>
+          </template>
+        </UPageHero>
+      </div>
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <MarineMetricCard
-        label="Installation type"
-        :value="detail.installation.installationType"
-        icon="i-lucide-cpu"
-      />
-      <MarineMetricCard
-        label="Primary live source"
-        :value="detail.installation.isPrimary ? 'Yes' : 'No'"
-        icon="i-lucide-radio"
-      />
-      <MarineMetricCard
-        label="Connection state"
-        :value="detail.installation.connectionState"
-        icon="i-lucide-activity"
-      />
-      <MarineMetricCard
-        label="Events received"
-        :value="String(detail.installation.eventCount)"
-        icon="i-lucide-waypoints"
-      />
-    </section>
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MarineMetricCard
+          label="Installation type"
+          :value="detail.installation.installationType"
+          icon="i-lucide-cpu"
+        />
+        <MarineMetricCard
+          label="Primary live source"
+          :value="detail.installation.isPrimary ? 'Yes' : 'No'"
+          icon="i-lucide-radio"
+        />
+        <MarineMetricCard
+          label="Connection state"
+          :value="detail.installation.connectionState"
+          icon="i-lucide-activity"
+        />
+        <MarineMetricCard
+          label="Events received"
+          :value="String(detail.installation.eventCount)"
+          icon="i-lucide-waypoints"
+        />
+      </section>
 
-    <UCard class="border-default/80 bg-default/90 shadow-card">
-      <template #header>
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 class="font-display text-2xl text-default">Install control plane</h2>
-            <p class="mt-1 text-sm text-muted">
-              Choose the canonical live source and retire installations without losing vessel history.
+      <UCard class="border-default/80 bg-default/90 shadow-card">
+        <template #header>
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 class="font-display text-2xl text-default">Install control plane</h2>
+              <p class="mt-1 text-sm text-muted">
+                Choose the canonical live source and retire installations without losing vessel
+                history.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <UButton
+                color="primary"
+                variant="soft"
+                icon="i-lucide-badge-check"
+                :disabled="detail.installation.isPrimary"
+                :loading="actionPending === 'primary'"
+                @click="makePrimary"
+              >
+                {{ detail.installation.isPrimary ? 'Primary source' : 'Make primary source' }}
+              </UButton>
+              <UButton
+                color="error"
+                variant="soft"
+                icon="i-lucide-archive"
+                :loading="actionPending === 'archive'"
+                @click="archiveInstallation"
+              >
+                Archive installation
+              </UButton>
+            </div>
+          </div>
+        </template>
+
+        <div class="grid gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Connection target</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{
+                detail.installation.edgeHostname ||
+                detail.installation.signalKUrl ||
+                'No hostname or SignalK endpoint recorded yet'
+              }}
             </p>
           </div>
-
-          <div class="flex flex-wrap gap-3">
-            <UButton
-              color="primary"
-              variant="soft"
-              icon="i-lucide-badge-check"
-              :disabled="detail.installation.isPrimary"
-              :loading="actionPending === 'primary'"
-              @click="makePrimary"
-            >
-              {{ detail.installation.isPrimary ? 'Primary source' : 'Make primary source' }}
-            </UButton>
-            <UButton
-              color="error"
-              variant="soft"
-              icon="i-lucide-archive"
-              :loading="actionPending === 'archive'"
-              @click="archiveInstallation"
-            >
-              Archive installation
-            </UButton>
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Primary state</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{
+                detail.installation.isPrimary
+                  ? 'This installation defines the vessel live snapshot.'
+                  : 'This installation can stay active without driving the primary live state.'
+              }}
+            </p>
+          </div>
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Archive behavior</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              Archiving removes this install from active routing and promotes another install if
+              needed.
+            </p>
           </div>
         </div>
-      </template>
+      </UCard>
 
-      <div class="grid gap-4 lg:grid-cols-3">
-        <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-          <p class="text-xs uppercase tracking-wide text-muted">Connection target</p>
-          <p class="mt-2 text-sm font-medium text-default">
-            {{
-              detail.installation.edgeHostname ||
-              detail.installation.signalKUrl ||
-              'No hostname or SignalK endpoint recorded yet'
-            }}
-          </p>
-        </div>
-        <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-          <p class="text-xs uppercase tracking-wide text-muted">Primary state</p>
-          <p class="mt-2 text-sm font-medium text-default">
-            {{
-              detail.installation.isPrimary
-                ? 'This installation defines the vessel live snapshot.'
-                : 'This installation can stay active without driving the primary live state.'
-            }}
-          </p>
-        </div>
-        <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-          <p class="text-xs uppercase tracking-wide text-muted">Archive behavior</p>
-          <p class="mt-2 text-sm font-medium text-default">
-            Archiving removes this install from active routing and promotes another install if needed.
-          </p>
-        </div>
-      </div>
-    </UCard>
-
-    <InstallationCredentialPanel :installation="detail.installation" :initial-keys="detail.keys" />
+      <InstallationCredentialPanel
+        :installation="detail.installation"
+        :initial-keys="detail.keys"
+      />
     </template>
 
     <UAlert

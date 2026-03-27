@@ -1,4 +1,5 @@
-import { expect, test, waitForBaseUrlReady, waitForHydration, warmUpApp } from './fixtures'
+import { expect, test, waitForBaseUrlReady, warmUpApp } from './fixtures'
+import { gotoAndHydrate } from './helpers'
 
 test.describe('web smoke', () => {
   test.beforeAll(async ({ browser, baseURL }) => {
@@ -10,11 +11,12 @@ test.describe('web smoke', () => {
     await warmUpApp(browser, baseURL)
   })
 
-  test('home page renders the coming soon hero', async ({ page }) => {
-    await page.goto('/')
-    await waitForHydration(page)
-    await expect(page.getByText('Coming Soon').first()).toBeVisible()
-    await expect(page.getByText('Something amazing is on the way').first()).toBeVisible()
-    await expect(page).toHaveTitle(/Coming Soon/)
+  test('home page renders the MyBoat hero and primary actions', async ({ page }) => {
+    await gotoAndHydrate(page, '/')
+    await expect(page.getByRole('heading', { name: /Know where the boat is/i })).toBeVisible()
+    await expect(page.getByText('Bluewater vessel intelligence')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Create account' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Sign in' }).first()).toBeVisible()
+    await expect(page).toHaveTitle(/MyBoat/)
   })
 })

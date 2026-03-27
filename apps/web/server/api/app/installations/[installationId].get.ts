@@ -1,5 +1,6 @@
 import { requireAuth } from '#layer/server/utils/auth'
 import { getInstallationDetail } from '#server/utils/myboat'
+import { applySignalKRelayDefault } from '#server/utils/signalkRelay'
 
 export default defineEventHandler(async (event) => {
   const user = await requireAuth(event)
@@ -15,5 +16,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Installation not found.' })
   }
 
-  return detail
+  return {
+    ...detail,
+    installation: await applySignalKRelayDefault(event, user, detail.installation),
+  }
 })

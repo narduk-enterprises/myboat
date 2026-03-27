@@ -115,7 +115,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <UCard class="chart-surface rounded-[1.9rem] shadow-card">
+  <UCard data-testid="onboarding-form" class="chart-surface rounded-[1.9rem] shadow-card">
     <template #header>
       <div>
         <h2 class="font-display text-2xl text-default">Lock the boat profile</h2>
@@ -242,7 +242,9 @@ async function onSubmit() {
         </div>
       </section>
 
-      <div class="flex flex-wrap items-center justify-between gap-4 rounded-[1.35rem] border border-default/70 bg-default/60 px-4 py-4">
+      <div
+        class="flex flex-wrap items-center justify-between gap-4 rounded-[1.35rem] border border-default/70 bg-default/60 px-4 py-4"
+      >
         <p class="max-w-2xl text-sm leading-6 text-muted">
           Save once to establish the captain profile, primary vessel identity, and the first live
           install that all other controls build from.

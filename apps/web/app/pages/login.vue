@@ -14,6 +14,8 @@ useWebPageSchema({
 
 definePageMeta({ layout: 'auth', middleware: ['guest'] })
 
+const showDemoLogin = import.meta.dev
+
 const dockChecklist = [
   'Review the live vessel board without exposing private install controls.',
   'Issue ingest keys, inspect SignalK posture, and keep the edge path healthy.',
@@ -31,6 +33,7 @@ const dockChecklist = [
     <AuthLoginCard
       title="Welcome back aboard"
       subtitle="Sign in to reach your dashboard, telemetry posture, and installation controls."
+      :show-demo-login="showDemoLogin"
     >
       <template #logo>
         <AppBrandMark />

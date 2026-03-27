@@ -36,6 +36,9 @@
     "cleanup:node-leaks": "sh scripts/cleanup-node-leaks.sh",
     "test:e2e": "playwright test",
     "test:e2e:web": "pnpm --filter web test:e2e",
+    "test:e2e:smoke": "pnpm --filter web test:e2e:smoke",
+    "test:e2e:ui": "pnpm --filter web test:e2e:ui",
+    "test:e2e:ui:analyze": "node tools/playwright/analyze-ui-quality.mjs output/playwright/ui-quality",
     "generate:favicons": "pnpm exec tsx tools/generate-favicons.ts",
     "format": "prettier --write \"**/*.{ts,mts,vue,js,mjs,json,yaml,yml,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,mts,vue,js,mjs,json,yaml,yml,css,md}\""

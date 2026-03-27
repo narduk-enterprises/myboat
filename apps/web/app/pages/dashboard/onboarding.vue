@@ -57,7 +57,10 @@ async function handleComplete(redirectTo: string) {
           </div>
         </section>
 
-        <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+        <UCard
+          data-testid="onboarding-explainer"
+          class="chart-surface rounded-[1.75rem] shadow-card"
+        >
           <template #header>
             <div>
               <h2 class="font-display text-2xl text-default">What this setup controls</h2>
@@ -68,8 +71,13 @@ async function handleComplete(redirectTo: string) {
           </template>
 
           <div class="space-y-4 text-sm leading-6 text-muted">
-            <p>Your public handle becomes the URL for your captain profile and shared vessel pages.</p>
-            <p>Your primary vessel powers the live map, passages, media memories, and voyage timeline.</p>
+            <p>
+              Your public handle becomes the URL for your captain profile and shared vessel pages.
+            </p>
+            <p>
+              Your primary vessel powers the live map, passages, media memories, and voyage
+              timeline.
+            </p>
             <p>
               Your first onboard install is where ingest keys, SignalK details, and device metadata
               are managed.
@@ -90,7 +98,7 @@ async function handleComplete(redirectTo: string) {
           summary: data?.vessels?.[0]?.summary || '',
           installationLabel: data?.installations?.[0]?.label || '',
           edgeHostname: data?.installations?.[0]?.edgeHostname || '',
-          signalKUrl: data?.installations?.[0]?.signalKUrl || '',
+          signalKUrl: data?.installations?.[0]?.signalKUrl || data?.defaultSignalKUrl || '',
         }"
         @complete="handleComplete"
       />

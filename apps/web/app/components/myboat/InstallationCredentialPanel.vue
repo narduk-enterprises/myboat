@@ -49,7 +49,10 @@ async function copyValue(value: string, message: string) {
 </script>
 
 <template>
-  <UCard class="border-default/80 bg-default/90 shadow-card">
+  <UCard
+    data-testid="installation-credential-panel"
+    class="border-default/80 bg-default/90 shadow-card"
+  >
     <template #header>
       <div class="flex items-start justify-between gap-4">
         <div>

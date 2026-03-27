@@ -109,6 +109,7 @@ export interface DashboardOverview {
   profile: PublicProfileSummary | null
   vessels: VesselCardSummary[]
   installations: InstallationSummary[]
+  defaultSignalKUrl?: string | null
   recentPassages: PassageSummary[]
   recentMedia: MediaItemSummary[]
   stats: {

@@ -35,7 +35,10 @@ useWebPageSchema({
 <template>
   <div class="space-y-8">
     <template v-if="profile">
-      <section class="public-hero px-6 py-10 shadow-overlay sm:px-10">
+      <section
+        data-testid="public-profile-hero"
+        class="public-hero px-6 py-10 shadow-overlay sm:px-10"
+      >
         <div class="relative z-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div class="space-y-4">
             <div class="marine-kicker w-fit">Public captain log</div>
@@ -92,7 +95,7 @@ useWebPageSchema({
         height-class="h-[28rem]"
       />
 
-      <section class="grid gap-5 lg:grid-cols-2">
+      <section data-testid="public-vessel-grid" class="grid gap-5 lg:grid-cols-2">
         <VesselSummaryCard
           v-for="vessel in profile.vessels"
           :key="vessel.id"
@@ -101,7 +104,10 @@ useWebPageSchema({
         />
       </section>
 
-      <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+      <UCard
+        data-testid="public-live-readiness"
+        class="chart-surface rounded-[1.75rem] shadow-card"
+      >
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Live readiness</h2>

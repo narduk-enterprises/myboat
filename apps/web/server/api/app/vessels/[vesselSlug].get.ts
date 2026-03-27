@@ -10,6 +10,7 @@ import {
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
+import { applySignalKRelayDefaults } from '#server/utils/signalkRelay'
 
 export default defineEventHandler(async (event) => {
   const user = await requireAuth(event)
@@ -48,11 +49,14 @@ export default defineEventHandler(async (event) => {
     mediaRows,
     waypointRows,
   )
+  const resolvedInstallations = await applySignalKRelayDefaults(event, user, installations)
 
   return {
     profile: toCaptainProfileSummary(profileRow),
     vessel: vesselCards[0]!,
-    installations: installations.filter((installation) => installation.vesselId === vessel.id),
+    installations: resolvedInstallations.filter(
+      (installation) => installation.vesselId === vessel.id,
+    ),
     passages: passageRows,
     media: mediaRows.map((item) => ({
       id: item.id,

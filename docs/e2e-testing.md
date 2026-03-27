@@ -36,6 +36,35 @@ The split is intentional:
 
 - Full starter suite: `pnpm test:e2e`
 - App-only entrypoint: `pnpm test:e2e:web`
+- Small smoke pass: `pnpm test:e2e:smoke`
+- Visual audit capture: `pnpm test:e2e:ui`
+- Visual audit analysis: `pnpm test:e2e:ui:analyze`
+
+## Screenshot Audit Loop
+
+MyBoat adds a route-by-route screenshot audit for public and private product
+surfaces.
+
+- screenshots write to `output/playwright/ui-quality/`
+- `manifest.json` records the audited routes plus minimum screenshot thresholds
+- `summary.json` and `summary.md` are produced by the analyzer and act as the
+  machine-readable gate for overnight UI polish runs
+- private route screenshots use the dev-only `login-test` and `seed-sample`
+  endpoints so the same captain, vessel, installation, and media state render on
+  every run
+
+The screenshot loop is intended for iterative visual cleanup:
+
+1. Review the latest screenshot folder and analyzer summary.
+2. Do a light review of any already-open branch changes before starting a new
+   polish pass.
+3. Pick one bounded UI cluster.
+4. Make the change.
+5. Re-run `pnpm test:e2e:ui` and `pnpm test:e2e:ui:analyze`.
+6. Run `pnpm test:e2e:smoke`.
+7. Ship with `pnpm run ship`.
+8. Re-run `pnpm test:e2e:smoke`.
+9. Update the dated proof README under `docs/build-proofs/`.
 
 ## Agent Expectations
 

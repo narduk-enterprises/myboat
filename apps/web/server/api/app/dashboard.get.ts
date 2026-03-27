@@ -1,4 +1,5 @@
 import { requireAuth } from '#layer/server/utils/auth'
+import { applySignalKRelayDefaults, getDefaultSignalKUrlForUser } from '#server/utils/signalkRelay'
 import {
   getCaptainProfileByUserId,
   getInstallationsForUser,
@@ -18,6 +19,10 @@ export default defineEventHandler(async (event) => {
     getCaptainProfileByUserId(event, user.id),
     getUserVessels(event, user.id),
     getInstallationsForUser(event, user.id),
+  ])
+  const [resolvedInstallations, defaultSignalKUrl] = await Promise.all([
+    applySignalKRelayDefaults(event, user, installations),
+    getDefaultSignalKUrlForUser(event, user),
   ])
 
   const vesselIds = vesselRows.map((vessel) => vessel.id)
@@ -39,7 +44,8 @@ export default defineEventHandler(async (event) => {
   return {
     profile: profileRow ? toCaptainProfileSummary(profileRow) : null,
     vessels: vesselCards,
-    installations,
+    installations: resolvedInstallations,
+    defaultSignalKUrl,
     recentPassages: passageRows.slice(0, 3),
     recentMedia: mediaRows.slice(0, 6).map((item) => ({
       id: item.id,
@@ -52,10 +58,10 @@ export default defineEventHandler(async (event) => {
     })),
     stats: {
       vesselCount: vesselRows.length,
-      installationCount: installations.length,
+      installationCount: resolvedInstallations.length,
       passageCount: passageRows.length,
       mediaCount: mediaRows.length,
-      liveInstallationCount: installations.filter(
+      liveInstallationCount: resolvedInstallations.filter(
         (installation) => installation.connectionState === 'live',
       ).length,
     },

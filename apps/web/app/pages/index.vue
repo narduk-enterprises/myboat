@@ -87,7 +87,7 @@ const productSurfaces = [
 <template>
   <div class="space-y-16 pb-16 lg:space-y-24 lg:pb-24">
     <section class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
-      <div class="marine-hero px-6 py-10 sm:px-10 lg:px-12 lg:py-16">
+      <div data-testid="landing-hero" class="marine-hero px-6 py-10 sm:px-10 lg:px-12 lg:py-16">
         <div class="relative z-10 grid gap-10 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
           <div class="space-y-8">
             <div class="marine-kicker w-fit">Bluewater vessel intelligence</div>
@@ -124,7 +124,7 @@ const productSurfaces = [
               </UButton>
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-3">
+            <div data-testid="landing-quick-signals" class="grid gap-3 sm:grid-cols-3">
               <div
                 v-for="signal in quickSignals"
                 :key="signal.label"
@@ -138,7 +138,10 @@ const productSurfaces = [
           </div>
 
           <div class="space-y-4">
-            <UCard class="chart-surface-strong rounded-[2rem]">
+            <UCard
+              data-testid="landing-operational-board"
+              class="chart-surface-strong rounded-[2rem]"
+            >
               <template #header>
                 <div class="relative z-10 flex items-center justify-between">
                   <div>
@@ -242,7 +245,7 @@ const productSurfaces = [
         </div>
       </UCard>
 
-      <UCard class="chart-surface rounded-[1.75rem]">
+      <UCard data-testid="landing-surface-grid" class="chart-surface rounded-[1.75rem]">
         <template #header>
           <div>
             <p class="font-display text-2xl text-default">Three surfaces, one system</p>

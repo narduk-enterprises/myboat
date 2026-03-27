@@ -34,6 +34,7 @@ logs
 
 # Test artifacts
 coverage/
+output/
 playwright-report/
 test-results/
 .playwright-mcp/
