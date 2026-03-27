@@ -27,26 +27,27 @@ async function handleComplete(redirectTo: string) {
   <div class="space-y-8">
     <UPageHero
       title="Boat setup"
-      description="Replace template residue with the real captain, vessel, and install model that the rest of the product depends on."
+      description="Create your public captain profile, choose the vessel you publish, and register the first onboard install for live data."
     />
 
     <div class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <UCard class="border-default/80 bg-default/90 shadow-card">
         <template #header>
           <div>
-            <h2 class="font-display text-2xl text-default">What gets locked here</h2>
+            <h2 class="font-display text-2xl text-default">What this setup controls</h2>
             <p class="mt-2 text-sm text-muted">
-              This is the canonical product setup surface, not a demo wizard.
+              These choices become the foundation for your dashboard, public profile, and ingest
+              pipeline.
             </p>
           </div>
         </template>
 
         <div class="space-y-4 text-sm text-muted">
-          <p>The public handle becomes the captain-facing URL.</p>
-          <p>The primary vessel anchors live telemetry, passages, media, and public sharing.</p>
+          <p>Your public handle becomes the URL for your captain profile and shared boat pages.</p>
+          <p>Your primary vessel powers the live map, passages, media memories, and timeline.</p>
           <p>
-            The first install becomes the place where ingest keys and SignalK connection metadata
-            live.
+            Your first onboard install is where ingest keys, SignalK details, and device metadata
+            are managed.
           </p>
         </div>
       </UCard>
