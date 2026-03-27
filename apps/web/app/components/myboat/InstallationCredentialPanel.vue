@@ -62,8 +62,12 @@ async function copyValue(value: string, message: string) {
             </UBadge>
           </div>
           <p class="mt-1 text-sm text-muted">
-            {{ installation.edgeHostname || 'Hostname pending' }}
-            <span v-if="installation.signalKUrl"> · {{ installation.signalKUrl }}</span>
+            {{
+              installation.edgeHostname || installation.signalKUrl || 'Connection target pending'
+            }}
+            <span v-if="installation.edgeHostname && installation.signalKUrl">
+              · {{ installation.signalKUrl }}
+            </span>
           </p>
         </div>
 

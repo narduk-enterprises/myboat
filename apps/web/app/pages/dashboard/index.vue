@@ -41,21 +41,13 @@ watchEffect(() => {
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
-            <USkeleton
-              v-for="item in 4"
-              :key="item"
-              class="h-36 rounded-[1.5rem]"
-            />
+            <USkeleton v-for="item in 4" :key="item" class="h-36 rounded-[1.5rem]" />
           </div>
         </div>
       </section>
 
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <USkeleton
-          v-for="item in 5"
-          :key="item"
-          class="h-32 rounded-[1.5rem]"
-        />
+        <USkeleton v-for="item in 5" :key="item" class="h-32 rounded-[1.5rem]" />
       </div>
 
       <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -221,7 +213,11 @@ watchEffect(() => {
                     <p class="font-medium text-default">{{ installation.label }}</p>
                     <p class="mt-1 text-sm text-muted">
                       {{ installation.vesselName }} ·
-                      {{ installation.edgeHostname || 'Hostname pending' }}
+                      {{
+                        installation.edgeHostname ||
+                        installation.signalKUrl ||
+                        'Connection target pending'
+                      }}
                     </p>
                   </div>
                   <UBadge

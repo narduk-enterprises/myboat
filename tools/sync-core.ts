@@ -725,11 +725,11 @@ function patchWebNuxtConfig(
   if (!content.includes('function parseAuthProviders(value: string | undefined)')) {
     const anchor = '// https://nuxt.com/docs/api/configuration/nuxt-config'
     const authSetupBlock = [
-      "const configuredAuthBackend = process.env.AUTH_BACKEND",
-      "const authBackend =",
+      'const configuredAuthBackend = process.env.AUTH_BACKEND',
+      'const authBackend =',
       "  configuredAuthBackend === 'supabase' || configuredAuthBackend === 'local'",
       '    ? configuredAuthBackend',
-      "    : process.env.AUTH_AUTHORITY_URL && process.env.SUPABASE_AUTH_ANON_KEY",
+      '    : process.env.AUTH_AUTHORITY_URL && process.env.SUPABASE_AUTH_ANON_KEY',
       "      ? 'supabase'",
       "      : 'local'",
       "const authAuthorityUrl = process.env.AUTH_AUTHORITY_URL || ''",
@@ -737,7 +737,7 @@ function patchWebNuxtConfig(
       'function parseAuthProviders(value: string | undefined) {',
       "  return (value || 'apple,email')",
       "    .split(',')",
-      "    .map((provider) => provider.trim().toLowerCase())",
+      '    .map((provider) => provider.trim().toLowerCase())',
       '    .filter((provider, index, providers) => provider && providers.indexOf(provider) === index)',
       '}',
       '',
@@ -887,7 +887,16 @@ function patchWebPackage(
           const layerDrizzleDir =
             'node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle'
           const expectedMigrate = `bash ../../tools/db-migrate.sh ${databaseName} --local --dir ${layerDrizzleDir} --dir drizzle`
-          const expectedSeed = `wrangler d1 execute ${databaseName} --local --file=node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle/seed.sql`
+          const appSeedPath = join(appDir, 'apps/web/drizzle/seed.sql')
+          const expectedSeedCommands = [
+            `wrangler d1 execute ${databaseName} --local --file=node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle/seed.sql`,
+          ]
+          if (existsSync(appSeedPath)) {
+            expectedSeedCommands.push(
+              `wrangler d1 execute ${databaseName} --local --file=drizzle/seed.sql`,
+            )
+          }
+          const expectedSeed = expectedSeedCommands.join(' && ')
           const expectedReset = `bash ../../tools/db-migrate.sh ${databaseName} --local --dir ${layerDrizzleDir} --dir drizzle --reset && pnpm run db:seed`
           const expectedReady = 'pnpm run db:migrate && pnpm run db:seed'
           const expectedVerify =
