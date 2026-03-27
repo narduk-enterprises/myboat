@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const nuxtPort = Number(process.env.NUXT_PORT || 3000)
+const nuxtPort = Number(process.env.NUXT_PORT || process.env.PLAYWRIGHT_NUXT_PORT || 3400)
 const baseURL = `http://localhost:${Number.isFinite(nuxtPort) ? nuxtPort : 3000}`
 
 /**
@@ -22,10 +22,10 @@ export default defineConfig({
     navigationTimeout: 15_000,
   },
   webServer: {
-    command: 'pnpm run dev',
+    command: `pnpm --filter web run db:ready && cd apps/web && NUXT_PORT=${nuxtPort} nuxt dev`,
     url: baseURL,
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 120_000,
   },
   projects: [
     {

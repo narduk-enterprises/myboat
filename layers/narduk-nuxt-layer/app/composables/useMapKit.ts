@@ -5,7 +5,7 @@
  * 1. runtimeConfig.public.mapkitToken (MAPKIT_TOKEN) if set
  * 2. Else GET /api/mapkit-token — server signs a JWT for this origin (localhost or production)
  *
- * For local dev without a 7-day portal token: set APPLE_SECRET_KEY, APPLE_TEAM_ID, APPLE_KEY_ID
+ * For local dev without a 7-day portal token: set APPLE_PRIVATE_KEY, APPLE_TEAM_ID, APPLE_KEY_ID
  * (same as Server API). Create a Maps identifier and key with MapKit JS in Apple Developer.
  */
 
@@ -62,7 +62,7 @@ function mapkitTokenFetchErrorMessage(e: unknown): string {
   }
   const status = maybeError?.statusCode ?? maybeError?.status
   if (status === 503) {
-    return 'MapKit is not configured. Set MAPKIT_TOKEN or APPLE_MAPKIT_TOKEN, or APPLE_SECRET_KEY + APPLE_TEAM_ID + APPLE_KEY_ID.'
+    return 'MapKit is not configured. Set MAPKIT_TOKEN or APPLE_MAPKIT_TOKEN, or APPLE_PRIVATE_KEY + APPLE_TEAM_ID + APPLE_KEY_ID.'
   }
   return maybeError?.data?.message || maybeError?.message || 'Failed to load MapKit token'
 }
@@ -71,7 +71,8 @@ export function useMapKit() {
   const ready = ref(false)
   const error = ref<string | null>(null)
   const runtimeConfig = useRuntimeConfig()
-  const staticToken = (runtimeConfig.public.mapkitToken as string) || ''
+  const staticToken = runtimeConfig.public.mapkitToken || ''
+  const mapkitEnabled = runtimeConfig.public.mapkitEnabled
 
   const mapkitReady = readonly(ready)
   const mapkitError = readonly(error)
@@ -82,6 +83,12 @@ export function useMapKit() {
 
   if (!initPromise) {
     initPromise = loadScript().then(async () => {
+      if (!mapkitEnabled && !staticToken) {
+        error.value =
+          'MapKit is not configured. Set MAPKIT_TOKEN or APPLE_MAPKIT_TOKEN, or APPLE_PRIVATE_KEY + APPLE_TEAM_ID + APPLE_KEY_ID.'
+        throw new Error(error.value)
+      }
+
       let lastIssuedToken = ''
 
       if (staticToken && !isJwtExpired(staticToken)) {
@@ -136,7 +143,7 @@ export function useMapKit() {
         document.documentElement.dataset.mapkitLoaded = 'true'
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'MapKit JS init failed'
+      error.value = error.value || (err instanceof Error ? err.message : 'MapKit JS init failed')
     }
   })()
 

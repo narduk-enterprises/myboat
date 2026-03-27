@@ -818,7 +818,7 @@ defineExpose({ scrollIntoView, setRegion, zoomToFit })
       v-if="mapkitError"
       class="mapkit-status absolute inset-0 flex flex-col items-center justify-center z-10 bg-muted/20 backdrop-blur-sm"
     >
-      <UIcon name="i-lucide-map-off" class="size-10 text-warning mb-3" />
+      <UIcon name="i-lucide-map" class="size-10 text-warning mb-3" />
       <h3 class="text-lg font-bold font-display mb-1">Map Unavailable</h3>
       <p class="text-sm text-muted">{{ mapkitError }}</p>
     </div>

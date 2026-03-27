@@ -23,6 +23,8 @@ declare module 'nuxt/schema' {
     appUrl: string
     appName: string
     appVersion: string
+    mapkitToken: string
+    mapkitEnabled: boolean
     controlPlaneUrl: string
     posthogPublicKey: string
     posthogHost: string
