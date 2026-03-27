@@ -46,17 +46,21 @@ function tokenizeCommand(command: string): string[] {
   })
 }
 
-function parseMigrateCommand(rawCommand: string): string[] {
-  if (/[;&|`$<>]/.test(rawCommand)) {
+function parseMigrateCommands(rawCommand: string): string[][] {
+  if (/[;|`$<>]/.test(rawCommand) || /(^|[^&])&([^&]|$)/.test(rawCommand)) {
     throw new Error(`Unsafe db:migrate script: ${rawCommand}`)
   }
 
-  const tokens = tokenizeCommand(rawCommand)
-  if (tokens.length === 0) {
+  const commands = rawCommand
+    .split(/\s*&&\s*/)
+    .map((segment) => tokenizeCommand(segment))
+    .filter((tokens) => tokens.length > 0)
+
+  if (commands.length === 0) {
     throw new Error('Empty db:migrate script.')
   }
 
-  return tokens
+  return commands
 }
 
 function buildFleetSyncUrl(baseUrl: string, appName: string): string | null {
@@ -242,8 +246,10 @@ async function shipApp(appTarget: string) {
   if (hasMigrate && pkg) {
     console.log(`\n🗄️ Running remote D1 migrations for ${appTarget}...`)
     const migrateCmd = pkg.scripts['db:migrate'].replaceAll('--local', '--remote')
-    const migrateArgs = parseMigrateCommand(migrateCmd)
-    run('doppler', ['run', '--', ...migrateArgs], appDir)
+    const migrateCommands = parseMigrateCommands(migrateCmd)
+    for (const migrateArgs of migrateCommands) {
+      run('doppler', ['run', '--', ...migrateArgs], appDir)
+    }
   }
 
   // 4. Deploy
