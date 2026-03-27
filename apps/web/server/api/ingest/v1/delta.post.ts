@@ -156,6 +156,8 @@ export default defineWebhookMutation(
         apiKeyId: apiKeys.id,
         installationId: vesselInstallationApiKeys.installationId,
         vesselId: vesselInstallations.vesselId,
+        installationType: vesselInstallations.installationType,
+        isPrimary: vesselInstallations.isPrimary,
       })
       .from(apiKeys)
       .innerJoin(vesselInstallationApiKeys, eq(apiKeys.id, vesselInstallationApiKeys.apiKeyId))
@@ -179,30 +181,14 @@ export default defineWebhookMutation(
       body.timestamp ||
       body.delta.updates.find((update) => update.timestamp)?.timestamp ||
       new Date().toISOString()
+    const now = new Date().toISOString()
 
-    await db
-      .insert(vesselLiveSnapshots)
-      .values({
-        vesselId: installationBinding.vesselId,
-        source: 'signal-k',
-        observedAt,
-        positionLat: snapshot.positionLat,
-        positionLng: snapshot.positionLng,
-        headingMagnetic: snapshot.headingMagnetic,
-        speedOverGround: snapshot.speedOverGround,
-        speedThroughWater: snapshot.speedThroughWater,
-        windSpeedApparent: snapshot.windSpeedApparent,
-        windAngleApparent: snapshot.windAngleApparent,
-        depthBelowTransducer: snapshot.depthBelowTransducer,
-        waterTemperatureKelvin: snapshot.waterTemperatureKelvin,
-        batteryVoltage: snapshot.batteryVoltage,
-        engineRpm: snapshot.engineRpm,
-        updatedAt: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: vesselLiveSnapshots.vesselId,
-        set: {
-          source: 'signal-k',
+    if (installationBinding.isPrimary) {
+      await db
+        .insert(vesselLiveSnapshots)
+        .values({
+          vesselId: installationBinding.vesselId,
+          source: installationBinding.installationType,
           observedAt,
           positionLat: snapshot.positionLat,
           positionLng: snapshot.positionLng,
@@ -215,16 +201,35 @@ export default defineWebhookMutation(
           waterTemperatureKelvin: snapshot.waterTemperatureKelvin,
           batteryVoltage: snapshot.batteryVoltage,
           engineRpm: snapshot.engineRpm,
-          updatedAt: new Date().toISOString(),
-        },
-      })
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: vesselLiveSnapshots.vesselId,
+          set: {
+            source: installationBinding.installationType,
+            observedAt,
+            positionLat: snapshot.positionLat,
+            positionLng: snapshot.positionLng,
+            headingMagnetic: snapshot.headingMagnetic,
+            speedOverGround: snapshot.speedOverGround,
+            speedThroughWater: snapshot.speedThroughWater,
+            windSpeedApparent: snapshot.windSpeedApparent,
+            windAngleApparent: snapshot.windAngleApparent,
+            depthBelowTransducer: snapshot.depthBelowTransducer,
+            waterTemperatureKelvin: snapshot.waterTemperatureKelvin,
+            batteryVoltage: snapshot.batteryVoltage,
+            engineRpm: snapshot.engineRpm,
+            updatedAt: now,
+          },
+        })
+    }
 
     await db
       .update(vesselInstallations)
       .set({
         connectionState: 'live',
         lastSeenAt: observedAt,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
         eventCount: sql`${vesselInstallations.eventCount} + 1`,
       })
       .where(eq(vesselInstallations.id, installationBinding.installationId))

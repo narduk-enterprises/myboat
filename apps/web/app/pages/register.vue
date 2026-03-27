@@ -14,7 +14,7 @@ useWebPageSchema({
     'Create a MyBoat account to publish a vessel profile and connect your first live install.',
 })
 
-definePageMeta({ middleware: ['guest'] })
+definePageMeta({ layout: 'auth', middleware: ['guest'] })
 
 const dockChecklist = [
   'Claim the captain handle that becomes the public home for your boat.',

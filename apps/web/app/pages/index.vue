@@ -114,13 +114,13 @@ const productSurfaces = [
                 {{ loggedIn ? 'Open dashboard' : 'Create account' }}
               </UButton>
               <UButton
-                :to="loggedIn ? '/dashboard/onboarding' : '/login'"
+                :to="loggedIn ? '/dashboard/onboarding' : '/explore'"
                 color="neutral"
                 variant="soft"
                 size="xl"
-                icon="i-lucide-navigation"
+                :icon="loggedIn ? 'i-lucide-navigation' : 'i-lucide-compass'"
               >
-                {{ loggedIn ? 'Refine boat setup' : 'Sign in' }}
+                {{ loggedIn ? 'Refine boat setup' : 'Explore public boats' }}
               </UButton>
             </div>
 

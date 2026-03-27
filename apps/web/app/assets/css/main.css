@@ -211,6 +211,81 @@ body {
   pointer-events: none;
 }
 
+.marine-operator-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.marine-operator-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background:
+    radial-gradient(circle at top left, rgb(14 165 233 / 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgb(34 197 94 / 0.1), transparent 18%),
+    linear-gradient(rgb(148 163 184 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.06) 1px, transparent 1px);
+  background-size: auto, auto, 56px 56px, 56px 56px;
+  mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.6), transparent 85%);
+}
+
+.marine-operator-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(248 250 252 / 0.82));
+  backdrop-filter: blur(24px);
+  box-shadow: 0 18px 48px -38px rgb(15 23 42 / 0.4);
+}
+
+.dark .marine-operator-header {
+  background: linear-gradient(180deg, rgb(2 6 23 / 0.9), rgb(15 23 42 / 0.72));
+}
+
+.marine-operator-panel {
+  border: 1px solid rgb(191 219 254 / 0.46);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.94), rgb(239 246 255 / 0.74)),
+    url('/images/hero-bg.webp') center/cover;
+  box-shadow: var(--shadow-card);
+}
+
+.dark .marine-operator-panel {
+  border-color: rgb(96 165 250 / 0.18);
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.88), rgb(2 6 23 / 0.84)),
+    url('/images/hero-bg.webp') center/cover;
+}
+
+.marine-mobile-nav {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+
+.marine-mobile-nav-panel {
+  pointer-events: auto;
+  border: 1px solid rgb(191 219 254 / 0.38);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.94), rgb(239 246 255 / 0.88));
+  backdrop-filter: blur(20px);
+}
+
+.dark .marine-mobile-nav-panel {
+  border-color: rgb(96 165 250 / 0.18);
+  background: linear-gradient(180deg, rgb(15 23 42 / 0.92), rgb(2 6 23 / 0.88));
+}
+
+.marine-auth-screen {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgb(59 130 246 / 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgb(14 165 233 / 0.12), transparent 22%);
+}
+
 ::selection {
   background: rgb(96 165 250 / 0.2);
   color: rgb(15 23 42);

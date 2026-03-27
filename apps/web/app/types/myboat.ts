@@ -76,8 +76,21 @@ export interface InstallationSummary {
   vesselSlug: string
   vesselName: string
   label: string
+  installationType: string
   edgeHostname: string | null
   signalKUrl: string | null
+  isPrimary: boolean
+  connectionState: string
+  lastSeenAt: string | null
+  eventCount: number
+}
+
+export interface PublicInstallationSummary {
+  id: string
+  vesselId: string
+  vesselSlug: string
+  vesselName: string
+  label: string
   connectionState: string
   lastSeenAt: string | null
   eventCount: number
@@ -130,8 +143,38 @@ export interface VesselDetailResponse {
   waypoints: WaypointSummary[]
 }
 
+export type PublicFreshnessState = 'live' | 'recent' | 'stale' | 'offline'
+
+export interface PublicVesselDetailResponse {
+  profile: PublicProfileSummary
+  vessel: VesselCardSummary
+  installations: PublicInstallationSummary[]
+  passages: PassageSummary[]
+  media: MediaItemSummary[]
+  waypoints: WaypointSummary[]
+  freshnessState: PublicFreshnessState
+}
+
 export interface PublicProfileResponse {
   profile: PublicProfileSummary
   vessels: VesselCardSummary[]
-  installations: InstallationSummary[]
+  installations: PublicInstallationSummary[]
+}
+
+export interface PublicExploreItem {
+  profile: PublicProfileSummary
+  vessel: VesselCardSummary
+  freshnessState: PublicFreshnessState
+  lastObservedAt: string | null
+}
+
+export interface PublicExploreResponse {
+  items: PublicExploreItem[]
+  featuredItems: PublicExploreItem[]
+  stats: {
+    publicCaptainCount: number
+    publicVesselCount: number
+    liveVesselCount: number
+    recentVesselCount: number
+  }
 }

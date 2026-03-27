@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: ['auth'] })
+definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Boat Setup',
@@ -24,33 +24,59 @@ async function handleComplete(redirectTo: string) {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <UPageHero
-      title="Boat setup"
-      description="Create your public captain profile, choose the vessel you publish, and register the first onboard install for live data."
-    />
+  <div class="space-y-6">
+    <div class="grid gap-6 xl:grid-cols-[0.86fr_1.14fr]">
+      <div class="space-y-5 xl:sticky xl:top-24 xl:self-start">
+        <section class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8">
+          <div class="relative z-10 space-y-5">
+            <div class="marine-kicker w-fit">Launch pass</div>
+            <div>
+              <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
+                Lock the captain, vessel, and first install in one pass
+              </h1>
+              <p class="mt-3 text-base leading-7 text-muted">
+                This setup becomes the canonical source for the public captain page, the live
+                telemetry path, and the first install you trust in production.
+              </p>
+            </div>
 
-    <div class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <UCard class="border-default/80 bg-default/90 shadow-card">
-        <template #header>
-          <div>
-            <h2 class="font-display text-2xl text-default">What this setup controls</h2>
-            <p class="mt-2 text-sm text-muted">
-              These choices become the foundation for your dashboard, public profile, and ingest
-              pipeline.
+            <div class="grid gap-3">
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Public route</p>
+                <p class="mt-2 font-display text-xl text-default">Captain handle + vessel page</p>
+              </div>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
+                <p class="mt-2 font-display text-xl text-default">Live map, passages, media</p>
+              </div>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">First install</p>
+                <p class="mt-2 font-display text-xl text-default">Keys, SignalK, edge hostname</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+          <template #header>
+            <div>
+              <h2 class="font-display text-2xl text-default">What this setup controls</h2>
+              <p class="mt-2 text-sm text-muted">
+                One save aligns the private operator surface and the public-facing boat story.
+              </p>
+            </div>
+          </template>
+
+          <div class="space-y-4 text-sm leading-6 text-muted">
+            <p>Your public handle becomes the URL for your captain profile and shared vessel pages.</p>
+            <p>Your primary vessel powers the live map, passages, media memories, and voyage timeline.</p>
+            <p>
+              Your first onboard install is where ingest keys, SignalK details, and device metadata
+              are managed.
             </p>
           </div>
-        </template>
-
-        <div class="space-y-4 text-sm text-muted">
-          <p>Your public handle becomes the URL for your captain profile and shared boat pages.</p>
-          <p>Your primary vessel powers the live map, passages, media memories, and timeline.</p>
-          <p>
-            Your first onboard install is where ingest keys, SignalK details, and device metadata
-            are managed.
-          </p>
-        </div>
-      </UCard>
+        </UCard>
+      </div>
 
       <OnboardingForm
         :initial-state="{

@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
   mediaItems,
@@ -69,6 +69,30 @@ export function toCaptainProfileSummary(row: {
   }
 }
 
+export function getPublicFreshnessState(observedAt: string | null) {
+  if (!observedAt) {
+    return 'offline' as const
+  }
+
+  const observedMs = new Date(observedAt).getTime()
+
+  if (Number.isNaN(observedMs)) {
+    return 'stale' as const
+  }
+
+  const ageMinutes = (Date.now() - observedMs) / 60_000
+
+  if (ageMinutes <= 15) {
+    return 'live' as const
+  }
+
+  if (ageMinutes <= 120) {
+    return 'recent' as const
+  }
+
+  return 'stale' as const
+}
+
 export function buildPassageMap<T extends { vesselId: string }>(rows: T[]) {
   return rows.reduce<Record<string, T[]>>((accumulator, row) => {
     accumulator[row.vesselId] ||= []
@@ -113,6 +137,24 @@ export async function getCaptainProfileByUsername(event: H3Event, username: stri
     .get()
 }
 
+export async function getDiscoverableCaptainProfiles(event: H3Event) {
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      userId: publicProfiles.userId,
+      username: publicProfiles.username,
+      headline: publicProfiles.headline,
+      bio: publicProfiles.bio,
+      homePort: publicProfiles.homePort,
+      shareProfile: publicProfiles.shareProfile,
+      captainName: users.name,
+    })
+    .from(publicProfiles)
+    .innerJoin(users, eq(publicProfiles.userId, users.id))
+    .where(eq(publicProfiles.shareProfile, true))
+    .all()
+}
+
 export async function getUserVessels(event: H3Event, userId: string) {
   const db = useAppDatabase(event)
   return db
@@ -133,6 +175,70 @@ export async function getPublicVessels(event: H3Event, userId: string) {
     .all()
 }
 
+export async function getAllPublicVessels(event: H3Event) {
+  const db = useAppDatabase(event)
+  return db
+    .select()
+    .from(vessels)
+    .innerJoin(publicProfiles, eq(vessels.ownerUserId, publicProfiles.userId))
+    .where(and(eq(vessels.sharePublic, true), eq(publicProfiles.shareProfile, true)))
+    .orderBy(desc(vessels.isPrimary), desc(vessels.createdAt))
+    .all()
+}
+
+export async function getPublicVesselByUsernameAndSlug(
+  event: H3Event,
+  username: string,
+  vesselSlug: string,
+) {
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      id: vessels.id,
+      ownerUserId: vessels.ownerUserId,
+      slug: vessels.slug,
+      name: vessels.name,
+      vesselType: vessels.vesselType,
+      homePort: vessels.homePort,
+      summary: vessels.summary,
+      callSign: vessels.callSign,
+      isPrimary: vessels.isPrimary,
+      sharePublic: vessels.sharePublic,
+      createdAt: vessels.createdAt,
+      updatedAt: vessels.updatedAt,
+    })
+    .from(vessels)
+    .innerJoin(publicProfiles, eq(vessels.ownerUserId, publicProfiles.userId))
+    .where(
+      and(
+        eq(publicProfiles.username, username),
+        eq(publicProfiles.shareProfile, true),
+        eq(vessels.slug, vesselSlug),
+        eq(vessels.sharePublic, true),
+      ),
+    )
+    .get()
+}
+
+export async function getPublicVesselBySlug(
+  event: H3Event,
+  userId: string,
+  vesselSlug: string,
+) {
+  const db = useAppDatabase(event)
+  return db
+    .select()
+    .from(vessels)
+    .where(
+      and(
+        eq(vessels.ownerUserId, userId),
+        eq(vessels.slug, vesselSlug),
+        eq(vessels.sharePublic, true),
+      ),
+    )
+    .get()
+}
+
 export async function getVesselBySlug(event: H3Event, userId: string, vesselSlug: string) {
   const db = useAppDatabase(event)
   return db
@@ -140,6 +246,36 @@ export async function getVesselBySlug(event: H3Event, userId: string, vesselSlug
     .from(vessels)
     .where(and(eq(vessels.ownerUserId, userId), eq(vessels.slug, vesselSlug)))
     .get()
+}
+
+export async function getPublicExploreRows(event: H3Event) {
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      userId: publicProfiles.userId,
+      username: publicProfiles.username,
+      headline: publicProfiles.headline,
+      bio: publicProfiles.bio,
+      homePort: publicProfiles.homePort,
+      captainName: users.name,
+      vesselId: vessels.id,
+      vesselSlug: vessels.slug,
+      vesselName: vessels.name,
+      vesselType: vessels.vesselType,
+      vesselHomePort: vessels.homePort,
+      vesselSummary: vessels.summary,
+      callSign: vessels.callSign,
+      isPrimary: vessels.isPrimary,
+      sharePublic: vessels.sharePublic,
+      createdAt: vessels.createdAt,
+      updatedAt: vessels.updatedAt,
+    })
+    .from(vessels)
+    .innerJoin(publicProfiles, eq(vessels.ownerUserId, publicProfiles.userId))
+    .innerJoin(users, eq(publicProfiles.userId, users.id))
+    .where(and(eq(publicProfiles.shareProfile, true), eq(vessels.sharePublic, true)))
+    .orderBy(desc(vessels.isPrimary), desc(vessels.updatedAt))
+    .all()
 }
 
 export async function getSnapshotsForVesselIds(event: H3Event, vesselIds: string[]) {
@@ -205,6 +341,30 @@ export async function getMediaForVesselIds(event: H3Event, vesselIds: string[]) 
     .all()
 }
 
+export async function getPublicInstallationsForVesselIds(event: H3Event, vesselIds: string[]) {
+  if (!vesselIds.length) {
+    return []
+  }
+
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      id: vesselInstallations.id,
+      vesselId: vesselInstallations.vesselId,
+      vesselSlug: vessels.slug,
+      vesselName: vessels.name,
+      label: vesselInstallations.label,
+      connectionState: vesselInstallations.connectionState,
+      lastSeenAt: vesselInstallations.lastSeenAt,
+      eventCount: vesselInstallations.eventCount,
+    })
+    .from(vesselInstallations)
+    .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
+    .where(inArray(vesselInstallations.vesselId, vesselIds))
+    .orderBy(desc(vesselInstallations.updatedAt))
+    .all()
+}
+
 export async function getWaypointsForVesselIds(event: H3Event, vesselIds: string[]) {
   if (!vesselIds.length) {
     return []
@@ -237,16 +397,18 @@ export async function getInstallationsForUser(event: H3Event, userId: string) {
       vesselSlug: vessels.slug,
       vesselName: vessels.name,
       label: vesselInstallations.label,
+      installationType: vesselInstallations.installationType,
       edgeHostname: vesselInstallations.edgeHostname,
       signalKUrl: vesselInstallations.signalKUrl,
+      isPrimary: vesselInstallations.isPrimary,
       connectionState: vesselInstallations.connectionState,
       lastSeenAt: vesselInstallations.lastSeenAt,
       eventCount: vesselInstallations.eventCount,
     })
     .from(vesselInstallations)
     .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
-    .where(eq(vessels.ownerUserId, userId))
-    .orderBy(desc(vesselInstallations.updatedAt))
+    .where(and(eq(vessels.ownerUserId, userId), isNull(vesselInstallations.archivedAt)))
+    .orderBy(desc(vesselInstallations.isPrimary), desc(vesselInstallations.updatedAt))
     .all()
 }
 
@@ -264,15 +426,23 @@ export async function getInstallationDetail(
       vesselSlug: vessels.slug,
       vesselName: vessels.name,
       label: vesselInstallations.label,
+      installationType: vesselInstallations.installationType,
       edgeHostname: vesselInstallations.edgeHostname,
       signalKUrl: vesselInstallations.signalKUrl,
+      isPrimary: vesselInstallations.isPrimary,
       connectionState: vesselInstallations.connectionState,
       lastSeenAt: vesselInstallations.lastSeenAt,
       eventCount: vesselInstallations.eventCount,
     })
     .from(vesselInstallations)
     .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
-    .where(and(eq(vesselInstallations.id, installationId), eq(vessels.ownerUserId, userId)))
+    .where(
+      and(
+        eq(vesselInstallations.id, installationId),
+        eq(vessels.ownerUserId, userId),
+        isNull(vesselInstallations.archivedAt),
+      ),
+    )
     .get()
 
   if (!installation) {
@@ -297,6 +467,28 @@ export async function getInstallationDetail(
     installation,
     keys,
   }
+}
+
+export type FreshnessState = 'live' | 'recent' | 'stale' | 'offline'
+
+export function classifyFreshnessState(observedAt: string | null | undefined): FreshnessState {
+  if (!observedAt) {
+    return 'offline'
+  }
+
+  const observed = new Date(observedAt).getTime()
+  if (Number.isNaN(observed)) {
+    return 'offline'
+  }
+
+  const ageMs = Date.now() - observed
+  if (ageMs <= 2 * 60 * 1000) {
+    return 'live'
+  }
+  if (ageMs <= 30 * 60 * 1000) {
+    return 'recent'
+  }
+  return 'stale'
 }
 
 export function serializeVesselCards(

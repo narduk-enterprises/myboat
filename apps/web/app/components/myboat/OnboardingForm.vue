@@ -50,6 +50,49 @@ const state = reactive<z.infer<typeof schema>>({
   signalKUrl: props.initialState.signalKUrl || '',
 })
 
+watch(
+  () =>
+    [
+      props.initialState.captainName,
+      props.initialState.username,
+      props.initialState.headline,
+      props.initialState.bio,
+      props.initialState.vesselName,
+      props.initialState.vesselType,
+      props.initialState.homePort,
+      props.initialState.summary,
+      props.initialState.installationLabel,
+      props.initialState.edgeHostname,
+      props.initialState.signalKUrl,
+    ] as const,
+  ([
+    captainName,
+    username,
+    headline,
+    bio,
+    vesselName,
+    vesselType,
+    homePort,
+    summary,
+    installationLabel,
+    edgeHostname,
+    signalKUrl,
+  ]) => {
+    state.captainName = captainName || ''
+    state.username = username || ''
+    state.headline = headline || ''
+    state.bio = bio || ''
+    state.vesselName = vesselName || ''
+    state.vesselType = vesselType || ''
+    state.homePort = homePort || ''
+    state.summary = summary || ''
+    state.installationLabel = installationLabel || ''
+    state.edgeHostname = edgeHostname || ''
+    state.signalKUrl = signalKUrl || ''
+  },
+  { immediate: true },
+)
+
 async function onSubmit() {
   errorMessage.value = ''
 
@@ -72,7 +115,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <UCard class="border-default/80 bg-default/90 shadow-card">
+  <UCard class="chart-surface rounded-[1.9rem] shadow-card">
     <template #header>
       <div>
         <h2 class="font-display text-2xl text-default">Lock the boat profile</h2>
@@ -93,7 +136,7 @@ async function onSubmit() {
     />
 
     <UForm :schema="schema" :state="state" class="space-y-6" @submit.prevent="onSubmit">
-      <section class="space-y-4">
+      <section class="rounded-[1.5rem] border border-default/70 bg-default/70 p-5 shadow-sm">
         <div>
           <p class="text-sm font-medium text-default">Captain identity</p>
           <p class="mt-1 text-xs text-muted">
@@ -129,9 +172,7 @@ async function onSubmit() {
         </UFormField>
       </section>
 
-      <USeparator />
-
-      <section class="space-y-4">
+      <section class="rounded-[1.5rem] border border-default/70 bg-default/70 p-5 shadow-sm">
         <div>
           <p class="text-sm font-medium text-default">Vessel identity</p>
           <p class="mt-1 text-xs text-muted">
@@ -178,9 +219,7 @@ async function onSubmit() {
         </UFormField>
       </section>
 
-      <USeparator />
-
-      <section class="space-y-4">
+      <section class="rounded-[1.5rem] border border-default/70 bg-default/70 p-5 shadow-sm">
         <div>
           <p class="text-sm font-medium text-default">Telemetry install</p>
           <p class="mt-1 text-xs text-muted">
@@ -203,7 +242,11 @@ async function onSubmit() {
         </div>
       </section>
 
-      <div class="flex justify-end">
+      <div class="flex flex-wrap items-center justify-between gap-4 rounded-[1.35rem] border border-default/70 bg-default/60 px-4 py-4">
+        <p class="max-w-2xl text-sm leading-6 text-muted">
+          Save once to establish the captain profile, primary vessel identity, and the first live
+          install that all other controls build from.
+        </p>
         <UButton type="submit" color="primary" :loading="loading" icon="i-lucide-anchor">
           Save boat profile
         </UButton>

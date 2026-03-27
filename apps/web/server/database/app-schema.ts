@@ -51,11 +51,14 @@ export const vesselInstallations = sqliteTable('vessel_installations', {
     .notNull()
     .references(() => vessels.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
+  installationType: text('installation_type').notNull().default('edge_agent'),
   edgeHostname: text('edge_hostname'),
   signalKUrl: text('signalk_url'),
+  isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
   connectionState: text('connection_state').notNull().default('pending'),
   lastSeenAt: text('last_seen_at'),
   eventCount: integer('event_count').notNull().default(0),
+  archivedAt: text('archived_at'),
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
   updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
 })

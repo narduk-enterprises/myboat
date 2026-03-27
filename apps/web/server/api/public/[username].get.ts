@@ -1,8 +1,9 @@
 import {
   getCaptainProfileByUsername,
-  getInstallationsForUser,
   getMediaForVesselIds,
   getPassagesForVesselIds,
+  getPublicFreshnessState,
+  getPublicInstallationsForVesselIds,
   getPublicVessels,
   getSnapshotsForVesselIds,
   getWaypointsForVesselIds,
@@ -30,14 +31,17 @@ export default defineEventHandler(async (event) => {
     getPassagesForVesselIds(event, vesselIds),
     getMediaForVesselIds(event, vesselIds),
     getWaypointsForVesselIds(event, vesselIds),
-    getInstallationsForUser(event, profileRow.userId),
+    getPublicInstallationsForVesselIds(event, vesselIds),
   ])
+
+  const vesselCards = serializeVesselCards(vesselRows, snapshotRows, passageRows, mediaRows, waypointRows)
 
   return {
     profile: toCaptainProfileSummary(profileRow),
-    vessels: serializeVesselCards(vesselRows, snapshotRows, passageRows, mediaRows, waypointRows),
-    installations: installations.filter((installation) =>
-      vesselRows.some((vessel) => vessel.id === installation.vesselId),
-    ),
+    vessels: vesselCards.map((vessel) => ({
+      ...vessel,
+      freshnessState: getPublicFreshnessState(vessel.liveSnapshot?.observedAt || null),
+    })),
+    installations,
   }
 })

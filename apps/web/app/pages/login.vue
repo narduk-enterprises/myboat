@@ -12,7 +12,7 @@ useWebPageSchema({
   description: 'Sign in to manage vessels, installations, telemetry, and public boat sharing.',
 })
 
-definePageMeta({ middleware: ['guest'] })
+definePageMeta({ layout: 'auth', middleware: ['guest'] })
 
 const dockChecklist = [
   'Review the live vessel board without exposing private install controls.',

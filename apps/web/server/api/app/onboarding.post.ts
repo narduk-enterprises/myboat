@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { users } from '#layer/server/database/schema'
 import { defineUserMutation, withValidatedBody } from '#layer/server/utils/mutation'
@@ -26,6 +26,10 @@ const onboardingSchema = z.object({
   edgeHostname: z.string().trim().max(120).optional().or(z.literal('')),
   signalKUrl: z.string().trim().url().optional().or(z.literal('')),
 })
+
+function inferInstallationType(signalKUrl: string | undefined) {
+  return signalKUrl ? 'direct_signalk' : 'edge_agent'
+}
 
 export default defineUserMutation(
   {
@@ -131,7 +135,12 @@ export default defineUserMutation(
     const existingInstallation = await db
       .select({ id: vesselInstallations.id })
       .from(vesselInstallations)
-      .where(eq(vesselInstallations.vesselId, currentVesselId))
+      .where(
+        and(
+          eq(vesselInstallations.vesselId, currentVesselId),
+          isNull(vesselInstallations.archivedAt),
+        ),
+      )
       .get()
 
     if (existingInstallation) {
@@ -139,8 +148,10 @@ export default defineUserMutation(
         .update(vesselInstallations)
         .set({
           label: body.installationLabel,
+          installationType: inferInstallationType(body.signalKUrl),
           edgeHostname: body.edgeHostname || null,
           signalKUrl: body.signalKUrl || null,
+          isPrimary: true,
           updatedAt: now,
         })
         .where(eq(vesselInstallations.id, existingInstallation.id))
@@ -149,8 +160,10 @@ export default defineUserMutation(
         id: crypto.randomUUID(),
         vesselId: currentVesselId,
         label: body.installationLabel,
+        installationType: inferInstallationType(body.signalKUrl),
         edgeHostname: body.edgeHostname || null,
         signalKUrl: body.signalKUrl || null,
+        isPrimary: true,
         connectionState: 'pending',
         eventCount: 0,
         createdAt: now,
