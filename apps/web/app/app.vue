@@ -18,6 +18,7 @@ const navLinks = computed(() =>
 const userMenuLinks = [
   { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
   { label: 'Boat setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
+  { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-settings' },
 ]
 
 const footerLinks = computed(() =>
