@@ -18,7 +18,7 @@ ALTER TABLE `users` ADD COLUMN `apple_id` text;
 --> statement-breakpoint
 ALTER TABLE `users` ADD COLUMN `is_admin` integer DEFAULT false;
 --> statement-breakpoint
-ALTER TABLE `users` ADD COLUMN `updated_at` text DEFAULT (datetime('now'));
+ALTER TABLE `users` ADD COLUMN `updated_at` text;
 --> statement-breakpoint
 UPDATE `users`
 SET `updated_at` = COALESCE(`updated_at`, `created_at`, datetime('now'));
