@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatRelativeTime, getConnectionTone } from '~/utils/marine'
+
 definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 const route = useRoute()
@@ -7,9 +9,29 @@ const installationId = computed(() => String(route.params.installationId || ''))
 const { data, pending, refresh } = await useInstallationDetail(installationId.value)
 
 const detail = computed(() => data.value)
+const installation = computed(() => detail.value?.installation || null)
 const appFetch = useAppFetch()
 const toast = useToast()
 const actionPending = ref<'primary' | 'archive' | null>(null)
+
+const signalKModeLabel = computed(() => {
+  switch (installation.value?.signalKAccessMode) {
+    case 'relay':
+      return 'MyBoat relay'
+    case 'direct':
+      return 'Direct Signal K'
+    default:
+      return 'Signal K pending'
+  }
+})
+
+const lastSeenLabel = computed(() => {
+  if (!installation.value?.lastSeenAt) {
+    return 'No telemetry observed yet'
+  }
+
+  return `Last seen ${formatRelativeTime(installation.value.lastSeenAt)}`
+})
 
 useSeo({
   title: detail.value?.installation.label || 'Installation',
@@ -93,23 +115,121 @@ async function archiveInstallation() {
     </template>
 
     <template v-else-if="detail">
-      <div data-testid="installation-hero">
-        <UPageHero
-          :title="detail.installation.label"
-          :description="`Linked to ${detail.installation.vesselName}. Issue ingest keys and choose whether the collector should use the MyBoat relay or a direct Signal K websocket.`"
-        >
-          <template #links>
-            <UButton
-              :to="`/dashboard/vessels/${detail.installation.vesselSlug}`"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-arrow-left"
+      <section
+        data-testid="installation-hero"
+        class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8"
+      >
+        <div class="relative z-10 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+          <div class="space-y-6">
+            <div class="marine-kicker w-fit">Install control plane</div>
+
+            <div>
+              <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
+                {{ detail.installation.label }}
+              </h1>
+              <p class="mt-3 max-w-2xl text-base text-muted sm:text-lg">
+                Linked to {{ detail.installation.vesselName }}. Issue ingest keys, choose the Signal
+                K path, and verify whether this collector is actively feeding the vessel surfaces.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <UBadge
+                :color="
+                  getConnectionTone(
+                    detail.installation.connectionState,
+                    detail.installation.lastSeenAt,
+                  )
+                "
+                variant="soft"
+              >
+                {{ detail.installation.connectionState }}
+              </UBadge>
+              <UBadge color="neutral" variant="soft">{{ signalKModeLabel }}</UBadge>
+              <UBadge color="primary" variant="soft">{{ detail.installation.vesselName }}</UBadge>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <UButton
+                :to="`/dashboard/vessels/${detail.installation.vesselSlug}`"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-arrow-left"
+              >
+                Back to vessel
+              </UButton>
+            </div>
+
+            <div
+              class="rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-5 shadow-card backdrop-blur"
             >
-              Back to vessel
-            </UButton>
-          </template>
-        </UPageHero>
-      </div>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Collector briefing</p>
+              <p class="mt-2 font-display text-2xl text-default">
+                {{
+                  detail.installation.edgeHostname ||
+                  detail.installation.collectorSignalKUrl ||
+                  detail.installation.signalKUrl ||
+                  'Hostname still pending'
+                }}
+              </p>
+              <p class="mt-2 text-sm text-muted">{{ lastSeenLabel }}</p>
+
+              <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
+                  <p class="text-xs uppercase tracking-[0.22em] text-muted">Signal K target</p>
+                  <p class="mt-2 font-medium text-default">
+                    {{ detail.installation.collectorSignalKUrl || 'Pending configuration' }}
+                  </p>
+                </div>
+
+                <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
+                  <p class="text-xs uppercase tracking-[0.22em] text-muted">Usage posture</p>
+                  <p class="mt-2 font-medium text-default">
+                    {{ detail.installation.eventCount }} events observed
+                  </p>
+                  <p class="mt-1 text-xs text-muted">{{ detail.keys.length }} keys tracked</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid self-start gap-3 sm:grid-cols-2">
+            <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Connection state</p>
+              <p class="mt-2 font-display text-2xl text-default">
+                {{ detail.installation.connectionState }}
+              </p>
+              <p class="mt-2 text-xs text-muted">{{ lastSeenLabel }}</p>
+            </div>
+
+            <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Collector mode</p>
+              <p class="mt-2 font-display text-2xl text-default">{{ signalKModeLabel }}</p>
+              <p class="mt-2 text-xs text-muted">
+                {{ detail.installation.collectorSignalKUrl || 'Awaiting websocket target' }}
+              </p>
+            </div>
+
+            <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Edge hostname</p>
+              <p class="mt-2 font-display text-2xl text-default">
+                {{ detail.installation.edgeHostname || 'Pending' }}
+              </p>
+              <p class="mt-2 text-xs text-muted">
+                {{ detail.installation.signalKUrl || 'Upstream Signal K route not set yet' }}
+              </p>
+            </div>
+
+            <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Issued keys</p>
+              <p class="mt-2 font-display text-2xl text-default">{{ detail.keys.length }}</p>
+              <p class="mt-2 text-xs text-muted">
+                API credentials currently tracked for this collector.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MarineMetricCard
@@ -175,6 +295,7 @@ async function archiveInstallation() {
             <p class="mt-2 text-sm font-medium text-default">
               {{
                 detail.installation.edgeHostname ||
+                detail.installation.collectorSignalKUrl ||
                 detail.installation.signalKUrl ||
                 'No hostname or SignalK endpoint recorded yet'
               }}

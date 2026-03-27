@@ -62,9 +62,13 @@ the next best target clearly named.
   section reads as structured system rules instead of template prose, and the
   three-surface grid now states the private, public, and edge roles more
   explicitly on both desktop and mobile.
+- 2026-03-27: Installation detail received a compact control-plane hero. The
+  route now opens with connection state, collector mode, hostname, key count,
+  and a tighter collector briefing instead of a mostly empty generic page hero.
 
 ## Next Target
 
-- Onboarding and installation detail are the next highest-leverage targets. The
-  home page and dashboard now read more like real product surfaces, so the next
-  cycle should tighten the remaining private setup flows.
+- Onboarding is now the next highest-leverage target. The home page, dashboard,
+  and installation detail all read more like real product surfaces, so the next
+  cycle should tighten the remaining private setup flow and then revisit the
+  public profile if time remains.
