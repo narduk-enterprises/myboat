@@ -53,6 +53,20 @@ function fetchDynamicToken(): Promise<string> {
   return $fetch<{ token: string }>('/api/mapkit-token').then(({ token }) => token)
 }
 
+function mapkitTokenFetchErrorMessage(e: unknown): string {
+  const maybeError = e as {
+    status?: number
+    statusCode?: number
+    data?: { message?: string }
+    message?: string
+  }
+  const status = maybeError?.statusCode ?? maybeError?.status
+  if (status === 503) {
+    return 'MapKit is not configured. Set MAPKIT_TOKEN or APPLE_MAPKIT_TOKEN, or APPLE_SECRET_KEY + APPLE_TEAM_ID + APPLE_KEY_ID.'
+  }
+  return maybeError?.data?.message || maybeError?.message || 'Failed to load MapKit token'
+}
+
 export function useMapKit() {
   const ready = ref(false)
   const error = ref<string | null>(null)
@@ -67,33 +81,49 @@ export function useMapKit() {
   }
 
   if (!initPromise) {
-    initPromise = loadScript().then(() => {
-      const authorizationCallback = (done: (token: string) => void) => {
-        if (staticToken && !isJwtExpired(staticToken)) {
-          done(staticToken)
-          return
+    initPromise = loadScript().then(async () => {
+      let lastIssuedToken = ''
+
+      if (staticToken && !isJwtExpired(staticToken)) {
+        lastIssuedToken = staticToken
+      } else {
+        try {
+          lastIssuedToken = await fetchDynamicToken()
+        } catch (e: unknown) {
+          error.value = mapkitTokenFetchErrorMessage(e)
+          throw new Error(error.value || 'Failed to initialize MapKit')
         }
-        fetchDynamicToken()
-          .then(done)
-          .catch(
-            (e: {
-              status?: number
-              statusCode?: number
-              data?: { message?: string }
-              message?: string
-            }) => {
-              const status = e?.statusCode ?? e?.status
-              if (status === 503) {
-                error.value =
-                  'MapKit is not configured. Set MAPKIT_TOKEN or APPLE_MAPKIT_TOKEN, or APPLE_SECRET_KEY + APPLE_TEAM_ID + APPLE_KEY_ID.'
-              } else {
-                error.value = e?.data?.message || e?.message || 'Failed to load MapKit token'
-              }
-              done('')
-            },
-          )
       }
-      mapkit.init({ authorizationCallback })
+
+      /**
+       * MapKit calls this whenever it needs a token, including after JWT expiry. Always re-check
+       * expiry; refresh from `/api/mapkit-token` when the current credential is stale.
+       */
+      async function resolveAuthorizationToken(): Promise<string> {
+        if (staticToken && !isJwtExpired(staticToken)) {
+          return staticToken
+        }
+        if (lastIssuedToken && !isJwtExpired(lastIssuedToken)) {
+          return lastIssuedToken
+        }
+        const token = await fetchDynamicToken()
+        lastIssuedToken = token
+        return token
+      }
+
+      mapkit.init({
+        authorizationCallback: (done: (token: string) => void) => {
+          void (async () => {
+            try {
+              const token = await resolveAuthorizationToken()
+              done(token)
+            } catch (e: unknown) {
+              error.value = mapkitTokenFetchErrorMessage(e)
+              done('')
+            }
+          })()
+        },
+      })
       return mapkit
     })
   }

@@ -48,6 +48,18 @@ importers:
         specifier: ^8.0.5
         version: 8.0.5
 
+  apps/edge-collector:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.13
+        version: 22.19.15
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   apps/web:
     dependencies:
       '@narduk-enterprises/eslint-config':
