@@ -147,7 +147,7 @@ LEFT JOIN (
       ? "CASE WHEN install_stats.last_seen_at IS NULL THEN 'pending' ELSE 'live' END"
       : "'pending'"
     const updatedAtSelect = hasLegacyEvents
-      ? "coalesce(install_stats.last_seen_at, installs.created_at)"
+      ? 'coalesce(install_stats.last_seen_at, installs.created_at)'
       : 'installs.created_at'
 
     statements.push(`

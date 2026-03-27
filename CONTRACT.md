@@ -75,7 +75,8 @@ Status: LOCKED
 - use `installation` for device deployments
 - use `public profile` for `/:username`
 - use `captain` for the human owner/operator identity
-- route params must stay descriptive: `[vesselSlug]`, `[installationId]`, `[username]`
+- route params must stay descriptive: `[vesselSlug]`, `[installationId]`,
+  `[username]`
 
 ## Platform rules
 
@@ -98,12 +99,14 @@ Status: LOCKED
 
 - keep the layer analytics hooks available
 - do not introduce a parallel analytics stack
-- public/profile/dashboard pages should remain compatible with the shipped PostHog and GA hooks
+- public/profile/dashboard pages should remain compatible with the shipped
+  PostHog and GA hooks
 
 ## SEO rules
 
 - public pages can be indexed
-- dashboard/auth/install pages are private and should not be treated as public SEO surfaces
+- dashboard/auth/install pages are private and should not be treated as public
+  SEO surfaces
 - schema identity must use real MyBoat assets
 
 ## Migration completeness criteria
@@ -119,6 +122,8 @@ Status: LOCKED
 
 - do not reintroduce separate cloud-web and edge-web apps inside this repo
 - do not add another auth, session, or API-key implementation
-- do not bypass the app-owned schema with ad hoc JSON files for core product data
+- do not bypass the app-owned schema with ad hoc JSON files for core product
+  data
 - do not add raw SignalK or raw Influx browser proxies
-- do not create new pages that compete with existing vessel/install/public profile terminology
+- do not create new pages that compete with existing vessel/install/public
+  profile terminology

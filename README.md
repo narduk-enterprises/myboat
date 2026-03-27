@@ -2,7 +2,10 @@
 
 Canonical home for the migrated MyBoat platform.
 
-This repo is the structured successor to `loganrenz/myboat`. The source repo’s real vessel-platform work has been normalized into the Narduk Nuxt workspace so the product can evolve on one coherent foundation instead of a split cloud/edge scaffold.
+This repo is the structured successor to `loganrenz/myboat`. The source repo’s
+real vessel-platform work has been normalized into the Narduk Nuxt workspace so
+the product can evolve on one coherent foundation instead of a split cloud/edge
+scaffold.
 
 ## What Lives Here
 

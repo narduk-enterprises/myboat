@@ -4,7 +4,8 @@ Status: LOCKED
 
 ## Global layout
 
-- Single branded shell with sticky header, compact nav, dashboard CTA, and footer.
+- Single branded shell with sticky header, compact nav, dashboard CTA, and
+  footer.
 - Landing pages can use full-width hero treatment.
 - Authenticated application pages use a constrained `max-w-7xl` content frame.
 
@@ -12,8 +13,10 @@ Status: LOCKED
 
 - Header primary nav: `Home`
 - Header action: `Sign in` or `Dashboard`
-- Dashboard navigation is route-driven through direct links, not a second competing shell
-- Vessel and install pages use in-page action links rather than adding more global chrome
+- Dashboard navigation is route-driven through direct links, not a second
+  competing shell
+- Vessel and install pages use in-page action links rather than adding more
+  global chrome
 
 ## Page priorities
 
@@ -60,8 +63,10 @@ Status: LOCKED
 
 - hero stacks to one column on mobile
 - dashboard becomes single column under `xl`
-- map height stays fixed but shorter on smaller breakpoints via container classes
-- vessel cards and install cards remain readable as stacked cards, never compressed tables
+- map height stays fixed but shorter on smaller breakpoints via container
+  classes
+- vessel cards and install cards remain readable as stacked cards, never
+  compressed tables
 
 ## Presentation rules
 
@@ -81,7 +86,8 @@ Status: LOCKED
 
 - route-level loading relies on Nuxt async data behavior
 - map has its own loading/unavailable state via `AppMapKit`
-- no spinner-only pages after initial navigation; use meaningful surrounding structure where possible
+- no spinner-only pages after initial navigation; use meaningful surrounding
+  structure where possible
 
 ### Error states
 
@@ -111,7 +117,8 @@ Status: LOCKED
 - neutral family: slate
 - typography: display face for headings, modern sans for body
 - visuals should feel maritime, technical, and calm
-- use semantic colors and layer tokens, not arbitrary Tailwind grays or inline color styling
+- use semantic colors and layer tokens, not arbitrary Tailwind grays or inline
+  color styling
 
 ## Public/shareable behavior
 

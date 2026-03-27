@@ -4,7 +4,8 @@ Status: LOCKED
 
 ## Product definition
 
-MyBoat is a vessel-first platform for captains and crew who want one canonical home for:
+MyBoat is a vessel-first platform for captains and crew who want one canonical
+home for:
 
 - public boat identity
 - authenticated vessel operations
@@ -13,14 +14,20 @@ MyBoat is a vessel-first platform for captains and crew who want one canonical h
 - geo-linked media and notes
 - edge install and ingest-key management
 
-This repo is the canonical successor to the earlier `loganrenz/myboat` starter work. The product now lives in one Nuxt 4 application at `apps/web/`, backed by the Narduk Nuxt layer for auth, D1, SEO, analytics, and Cloudflare-safe runtime conventions.
+This repo is the canonical successor to the earlier `loganrenz/myboat` starter
+work. The product now lives in one Nuxt 4 application at `apps/web/`, backed by
+the Narduk Nuxt layer for auth, D1, SEO, analytics, and Cloudflare-safe runtime
+conventions.
 
 ## Target users
 
-- Owner-operators who want a private operations dashboard and a clean public boat profile
-- Couples, crew, and families who need current location, install status, and passage history
+- Owner-operators who want a private operations dashboard and a clean public
+  boat profile
+- Couples, crew, and families who need current location, install status, and
+  passage history
 - Technical boat owners running SignalK or adjacent onboard telemetry
-- Future collaborators who need a stable schema and route system for telemetry, media, and public sharing
+- Future collaborators who need a stable schema and route system for telemetry,
+  media, and public sharing
 
 ## Public vs private surfaces
 
@@ -29,7 +36,8 @@ This repo is the canonical successor to the earlier `loganrenz/myboat` starter w
 - `/`
 - `/:username`
 
-Public surfaces must show only captain-approved identity, vessel summaries, and any live or historical context already marked public.
+Public surfaces must show only captain-approved identity, vessel summaries, and
+any live or historical context already marked public.
 
 ### Private
 
@@ -40,7 +48,8 @@ Public surfaces must show only captain-approved identity, vessel summaries, and 
 - `/dashboard/vessels/[vesselSlug]`
 - `/dashboard/installations/[installationId]`
 
-Private surfaces are for vessel ownership, install configuration, ingest credentials, and internal telemetry views.
+Private surfaces are for vessel ownership, install configuration, ingest
+credentials, and internal telemetry views.
 
 ## Major feature areas
 
@@ -54,30 +63,35 @@ Private surfaces are for vessel ownership, install configuration, ingest credent
 
 - a captain can define one or more vessels
 - one vessel is marked primary
-- vessel metadata includes name, type, home port, summary, and public-sharing flag
+- vessel metadata includes name, type, home port, summary, and public-sharing
+  flag
 
 ### 3. Live vessel state
 
 - latest known telemetry snapshot is stored per vessel
-- snapshot fields include fix, heading, speed, wind, depth, water temperature, battery voltage, and engine RPM
+- snapshot fields include fix, heading, speed, wind, depth, water temperature,
+  battery voltage, and engine RPM
 - snapshots are updated through `/api/ingest/v1/delta`
 
 ### 4. Install management
 
 - installs represent real onboard or near-boat device deployments
-- installs hold hostnames, SignalK stream URLs, connectivity state, event counts, and last-seen timestamps
+- installs hold hostnames, SignalK stream URLs, connectivity state, event
+  counts, and last-seen timestamps
 - install pages can issue ingest keys tied to the install
 
 ### 5. Passages
 
 - passages represent meaningful historical movement or voyage slices
-- each passage can include summary copy, endpoints, distance, wind, and optional route geometry
+- each passage can include summary copy, endpoints, distance, wind, and optional
+  route geometry
 - passages are historical context, not raw timeseries dumps
 
 ### 6. Media and annotations
 
 - media items are geo-aware vessel memories tied to passages or places
-- waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or notes
+- waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or
+  notes
 
 ## Page inventory
 
@@ -112,8 +126,10 @@ Private surfaces are for vessel ownership, install configuration, ingest credent
 ### Public sharing
 
 1. Visit `/:username`.
-2. View captain identity, vessel summaries, latest route context, and public install posture.
-3. Move between the public profile and the private dashboard without route confusion.
+2. View captain identity, vessel summaries, latest route context, and public
+   install posture.
+3. Move between the public profile and the private dashboard without route
+   confusion.
 
 ## Domain model
 
@@ -131,7 +147,8 @@ Private surfaces are for vessel ownership, install configuration, ingest credent
 - calm, marine-aware, precise, operational
 - not a generic SaaS dashboard
 - not a consumer social network
-- product language centers on captains, vessels, installs, telemetry, passages, and public profiles
+- product language centers on captains, vessels, installs, telemetry, passages,
+  and public profiles
 
 ## SEO and public sharing strategy
 
@@ -152,7 +169,8 @@ Private surfaces are for vessel ownership, install configuration, ingest credent
 ## Acceptance criteria
 
 - source repo product concepts are represented in the destination app
-- Narduk auth, D1, mutation helpers, API-key hashing, SEO, and app shell conventions are canonical
+- Narduk auth, D1, mutation helpers, API-key hashing, SEO, and app shell
+  conventions are canonical
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
 - no placeholder home/about/contact scaffold remains
 - docs describe the real migrated product, not the provision brief
