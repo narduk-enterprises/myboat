@@ -15,8 +15,8 @@ function cycleColorMode() {
 </script>
 
 <template>
-  <div class="myboat-shell">
-    <LayerAppShell>
+  <LayerChromelessShell>
+    <div class="myboat-shell">
       <div class="marine-auth-screen">
         <div class="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
           <div class="flex items-center justify-between gap-4">
@@ -43,6 +43,6 @@ function cycleColorMode() {
           </div>
         </div>
       </div>
-    </LayerAppShell>
-  </div>
+    </div>
+  </LayerChromelessShell>
 </template>

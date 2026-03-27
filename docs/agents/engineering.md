@@ -161,6 +161,22 @@ useWebPageSchema({
 
 Use another schema helper when the page is an article, product, and so on.
 
+## Route layouts and full-bleed pages
+
+Downstream apps often split chrome across **`app.vue`** and **`layouts/*`**.
+Keep ownership clear: either the layout supplies the shell, or the page does,
+not both with competing headers and max-width wrappers.
+
+- Use **`LayerChromelessShell`** (via app layouts such as `auth` / `blank`) when
+  the page implements the full viewport (auth docks, onboarding, branded
+  one-offs).
+- On the default layer **`app.vue`**, the max-width gutter is omitted when
+  `definePageMeta({ fullBleed: true })` or when the layout is `landing`,
+  `blank`, or `auth`. Use `fullBleed` for other layout names that need the same
+  behavior.
+- Prefer a thin **`app.vue`** (`<NuxtLayout><NuxtPage /></NuxtLayout>`) once
+  real route layouts own marketing, dashboard, and auth chrome.
+
 ## Architecture Patterns
 
 - Thin components, thick composables.

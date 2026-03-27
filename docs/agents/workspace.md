@@ -45,7 +45,7 @@ provides it.
 | Category      | Provided by layer                                                       |
 | ------------- | ----------------------------------------------------------------------- |
 | Modules       | `@nuxt/ui`, `@nuxt/fonts`, `@nuxt/image`, `@nuxtjs/seo`, `@nuxt/eslint` |
-| App shell     | `app/app.vue`, `app/app.config.ts`, branded `app/error.vue`             |
+| App shell     | `app/app.vue`, `LayerAppShell`, `LayerChromelessShell`, `app/app.config.ts`, branded `app/error.vue` |
 | SEO           | `useSeo`, `useSchemaOrg`, OG image components                           |
 | UI helpers    | `AppTabs`, `usePersistentTab`, base CSS utilities                       |
 | Analytics     | `gtag.client.ts`, `posthog.client.ts`, `usePosthog`                     |
@@ -55,6 +55,18 @@ provides it.
 
 If the feature belongs in every downstream app, add it to the layer. If it
 belongs only to this application, keep it in `apps/web/`.
+
+### Route layouts and `app.vue`
+
+When you introduce `layouts/landing`, `layouts/dashboard`, `layouts/auth`, and
+similar, avoid **double framing**: do not wrap the same route in both a fat
+`app.vue` and a layout that adds headers or max-width boxes, unless that is
+intentional. Auth and other **page-owned full-viewport** flows should use a
+chromeless layout (this repo ships `layouts/auth.vue` and `layouts/blank.vue`
+built on `LayerChromelessShell`). The layer’s default `app.vue` also skips the
+standard content gutter for `fullBleed` page meta and for layouts named
+`landing`, `blank`, or `auth`. See **Layout ownership** in
+`layers/narduk-nuxt-layer/AGENTS.md`.
 
 ## Updating Template Infrastructure
 

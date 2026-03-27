@@ -108,6 +108,26 @@ Sitemap and robots.txt are automatic. OG image templates live in
   `drizzle/`. Downstream apps must apply these migrations via their standard
   `db:migrate` script and must not copy them into `apps/web/drizzle/`.
 
+### Layout ownership (downstream apps)
+
+Product apps usually grow **multiple shells** (marketing, dashboard, admin,
+auth). Mixing a layout-level header or max-width container with a page that
+already implements its own full-viewport surface (for example a split auth dock)
+produces a **double-framed** look.
+
+- Keep **`app.vue` thin** when you use real route layouts: delegate chrome to
+  `layouts/*` instead of stacking shells in both places.
+- Use **`LayerChromelessShell`** inside app-local layouts such as `auth` or
+  `blank` so Nuxt UI and accessibility primitives stay consistent while the
+  **page owns the viewport**.
+- The default layer **`app.vue`** skips the standard max-width gutter when
+  `definePageMeta({ fullBleed: true })` is set, or when the active layout is
+  named `landing`, `blank`, or `auth`. Prefer `fullBleed` for custom layout
+  names.
+- **Marketing vs app chrome**: prefer a dedicated `landing` (or similar)
+  layout for public pages; reserve `LayerAppShell` + header/footer patterns for
+  experiences that share one app chrome.
+
 ## Integrating this Layer into a New Project
 
 Do **NOT** clone `narduk-nuxt-layer` directly to start a project. Start with
@@ -170,7 +190,12 @@ apps **inherit these automatically** and do not need to repeat them:
 
 **App files** (auto-inherited by consuming apps):
 
-- `app/app.vue` — `<UApp>` shell with `<NuxtLayout>` + `<NuxtPage>`
+- `app/app.vue` — default header/footer shell, content gutter, `<NuxtLayout>` +
+  `<NuxtPage>` (override in downstream apps when shells live in layouts only)
+- `app/components/LayerAppShell.vue` — flexible shell with header/main/footer
+  slots
+- `app/components/LayerChromelessShell.vue` — `UApp` + skip link + full-width
+  `<main>` for page-owned surfaces (auth, onboarding, full-bleed flows)
 - `app/app.config.ts` — Nuxt UI color tokens (primary/neutral)
 - `app/error.vue` — Branded error page (404/500)
 - `app/assets/css/main.css` — Tailwind v4 `@theme` tokens, glass/card utility
@@ -180,7 +205,8 @@ apps **inherit these automatically** and do not need to repeat them:
 - `app/plugins/gtag.client.ts`, `posthog.client.ts`, `fetch.client.ts`,
   `app/composables/usePosthog.ts` (client `capture` / `identify` / `reset`
   helpers)
-- `app/types/api.ts`, `runtime-config.d.ts`
+- `app/types/api.ts`, `runtime-config.d.ts`, `page-meta.d.ts` (`fullBleed` and
+  other shared `PageMeta` fields)
 
 **Public assets** (default favicons — apps override by placing their own in
 `public/`):
