@@ -3,7 +3,7 @@ export default defineAppConfig({
     redirectPath: '/dashboard',
   },
   ui: {
-    primary: 'cyan',
+    primary: 'blue',
     neutral: 'slate',
     strategy: 'override',
   },

@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <UCard class="border-default/80 bg-default/90 shadow-card">
+  <UCard class="chart-surface rounded-[1.75rem] shadow-card">
     <template #header>
       <div>
         <h3 class="font-display text-xl text-default">Passages</h3>
@@ -20,7 +20,7 @@ defineProps<{
       <article
         v-for="passage in passages"
         :key="passage.id"
-        class="rounded-2xl border border-default bg-elevated/60 px-4 py-4"
+        class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
       >
         <div class="flex items-center justify-between gap-3">
           <div>
@@ -44,7 +44,7 @@ defineProps<{
       </article>
     </div>
 
-    <AppEmptyState
+    <MarineEmptyState
       v-else
       icon="i-lucide-route"
       title="No passages logged yet"

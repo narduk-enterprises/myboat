@@ -1,15 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 48" role="img" aria-labelledby="title desc">
   <title id="title">MyBoat</title>
-  <desc id="desc">Wordmark for the MyBoat marine platform.</desc>
+  <desc id="desc">Wordmark for the MyBoat bluewater intelligence platform.</desc>
   <defs>
-    <linearGradient id="ocean" x1="0%" x2="100%" y1="0%" y2="100%">
-      <stop offset="0%" stop-color="#22d3ee" />
-      <stop offset="100%" stop-color="#155e75" />
+    <linearGradient id="ocean" x1="4" y1="3" x2="40" y2="43" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#93c5fd" />
+      <stop offset="45%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e3a8a" />
     </linearGradient>
   </defs>
-  <rect width="36" height="36" x="2" y="2" rx="12" fill="url(#ocean)" />
-  <path d="M13 23c3.4-2.7 6.8-4 10.2-4 2.9 0 5.4.8 7.8 2.3-1.8 3.6-4.9 6.7-9.4 9.2-3-2.1-5.8-4.6-8.6-7.5Z" fill="#f8fafc" />
-  <path d="M10 16.5c4.2-3.8 8.7-5.8 13.5-5.8 2.8 0 5.5.7 8.3 2.1" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.6" />
-  <text x="48" y="18" fill="#0f172a" font-family="Sora, Manrope, system-ui, sans-serif" font-size="16" font-weight="700">MyBoat</text>
-  <text x="48" y="31" fill="#475569" font-family="Manrope, system-ui, sans-serif" font-size="9" letter-spacing="1.4">LIVE VESSEL INTELLIGENCE</text>
+  <rect width="40" height="40" x="2" y="4" rx="14" fill="url(#ocean)" />
+  <circle cx="22" cy="24" r="12.5" fill="none" opacity=".22" stroke="#f8fafc" stroke-width="1.6" />
+  <path d="M11.8 26.2C15 21.6 18.5 19.3 22 19.3s7 2.1 10.2 6" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.6" />
+  <path d="M12.2 30.1C15.1 33.6 18.4 35.4 22 35.4c3.6 0 6.8-1.7 9.8-5" fill="none" opacity=".82" stroke="#f8fafc" stroke-linecap="round" stroke-width="2" />
+  <path d="M22 14.3v21.1" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.1" />
+  <circle cx="22" cy="14.3" r="2.1" fill="#fbbf24" />
+  <text x="52" y="21" fill="#0f172a" font-family="Lexend, Source Sans 3, system-ui, sans-serif" font-size="18" font-weight="700">MyBoat</text>
+  <text x="52" y="35" fill="#475569" font-family="Source Sans 3, system-ui, sans-serif" font-size="9.5" letter-spacing="2">BLUEWATER VESSEL INTELLIGENCE</text>
 </svg>

@@ -25,18 +25,16 @@ useWebPageSchema({
 <template>
   <div class="space-y-8">
     <template v-if="profile">
-      <section
-        class="rounded-[2rem] border border-default bg-default/90 px-6 py-10 shadow-card sm:px-10"
-      >
-        <div class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <section class="public-hero px-6 py-10 shadow-overlay sm:px-10">
+        <div class="relative z-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div class="space-y-4">
-            <p class="text-sm uppercase tracking-[0.3em] text-primary">Captain profile</p>
+            <div class="marine-kicker w-fit">Public captain log</div>
             <div>
               <h1 class="font-display text-5xl text-default">@{{ profile.profile.username }}</h1>
-              <p class="mt-3 text-lg text-muted">
+              <p class="mt-3 max-w-2xl text-lg text-muted">
                 {{
                   profile.profile.headline ||
-                  'Public window into the vessel, passages, and live status.'
+                  'Public window into the vessel, passages, and current reporting posture.'
                 }}
               </p>
             </div>
@@ -45,25 +43,27 @@ useWebPageSchema({
             </p>
           </div>
 
-          <UCard class="border-default/80 bg-elevated/70 shadow-card">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <p class="text-sm text-muted">Captain</p>
-                <p class="font-medium text-default">{{ profile.profile.captainName }}</p>
+          <UCard class="chart-surface rounded-[1.75rem]">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Captain</p>
+                <p class="mt-3 font-display text-xl text-default">
+                  {{ profile.profile.captainName }}
+                </p>
               </div>
-              <div class="flex items-center justify-between">
-                <p class="text-sm text-muted">Home port</p>
-                <p class="font-medium text-default">
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Home port</p>
+                <p class="mt-3 font-display text-xl text-default">
                   {{ profile.profile.homePort || 'Undisclosed' }}
                 </p>
               </div>
-              <div class="flex items-center justify-between">
-                <p class="text-sm text-muted">Tracked vessels</p>
-                <p class="font-medium text-default">{{ profile.vessels.length }}</p>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Tracked vessels</p>
+                <p class="mt-3 font-display text-xl text-default">{{ profile.vessels.length }}</p>
               </div>
-              <div class="flex items-center justify-between">
-                <p class="text-sm text-muted">Live installs</p>
-                <p class="font-medium text-default">
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Live installs</p>
+                <p class="mt-3 font-display text-xl text-default">
                   {{
                     profile.installations.filter(
                       (installation) => installation.connectionState === 'live',
@@ -86,7 +86,7 @@ useWebPageSchema({
         <VesselSummaryCard v-for="vessel in profile.vessels" :key="vessel.id" :vessel="vessel" />
       </section>
 
-      <UCard class="border-default/80 bg-default/90 shadow-card">
+      <UCard class="chart-surface rounded-[1.75rem] shadow-card">
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Live readiness</h2>
@@ -100,7 +100,7 @@ useWebPageSchema({
           <div
             v-for="installation in profile.installations"
             :key="installation.id"
-            class="rounded-2xl border border-default bg-elevated/60 px-4 py-4"
+            class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
           >
             <p class="font-medium text-default">{{ installation.label }}</p>
             <p class="mt-1 text-sm text-muted">{{ installation.vesselName }}</p>
@@ -114,7 +114,7 @@ useWebPageSchema({
           </div>
         </div>
 
-        <AppEmptyState
+        <MarineEmptyState
           v-else
           icon="i-lucide-radio-tower"
           title="No public install surface yet"

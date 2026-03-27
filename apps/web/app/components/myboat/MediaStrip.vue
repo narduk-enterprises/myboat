@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <UCard class="border-default/80 bg-default/90 shadow-card">
+  <UCard class="chart-surface rounded-[1.75rem] shadow-card">
     <template #header>
       <div>
         <h3 class="font-display text-xl text-default">Media & notes</h3>
@@ -22,7 +22,7 @@ defineProps<{
       <article
         v-for="item in media"
         :key="item.id"
-        class="overflow-hidden rounded-2xl border border-default bg-elevated/60"
+        class="overflow-hidden rounded-2xl border border-default bg-elevated/70"
       >
         <NuxtImg
           :src="item.imageUrl"
@@ -39,7 +39,7 @@ defineProps<{
       </article>
     </div>
 
-    <AppEmptyState
+    <MarineEmptyState
       v-else
       icon="i-lucide-camera"
       title="No media connected yet"

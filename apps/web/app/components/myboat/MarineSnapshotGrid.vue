@@ -80,7 +80,7 @@ const metrics = computed(() => {
       />
     </div>
 
-    <AppEmptyState
+    <MarineEmptyState
       v-else
       icon="i-lucide-radio"
       title="No live vessel snapshot yet"

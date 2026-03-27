@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <UCard class="h-full border-default/80 bg-default/90 shadow-card">
+  <UCard class="chart-surface h-full rounded-[1.75rem] shadow-card">
     <template #header>
       <div class="flex items-start justify-between gap-4">
         <div>
@@ -42,15 +42,15 @@ defineProps<{
       </p>
 
       <div class="grid grid-cols-3 gap-3 text-sm">
-        <div class="rounded-2xl bg-elevated px-3 py-2">
+        <div class="metric-shell rounded-2xl px-3 py-2">
           <p class="text-xs uppercase tracking-wide text-muted">Passages</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.latestPassage ? '1+' : '0' }}</p>
         </div>
-        <div class="rounded-2xl bg-elevated px-3 py-2">
+        <div class="metric-shell rounded-2xl px-3 py-2">
           <p class="text-xs uppercase tracking-wide text-muted">Media</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.mediaCount }}</p>
         </div>
-        <div class="rounded-2xl bg-elevated px-3 py-2">
+        <div class="metric-shell rounded-2xl px-3 py-2">
           <p class="text-xs uppercase tracking-wide text-muted">Places</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.waypointCount }}</p>
         </div>
@@ -58,7 +58,7 @@ defineProps<{
 
       <div
         v-if="vessel.latestPassage"
-        class="rounded-2xl border border-default bg-elevated/60 px-4 py-3"
+        class="rounded-2xl border border-default bg-elevated/70 px-4 py-3"
       >
         <p class="text-xs uppercase tracking-wide text-muted">Latest passage</p>
         <p class="mt-1 font-medium text-default">{{ vessel.latestPassage.title }}</p>

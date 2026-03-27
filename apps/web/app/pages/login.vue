@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AuthDock from '~/components/myboat/AuthDock.vue'
+
 useSeo({
   title: 'Sign In',
   description: 'Sign in to manage vessels, installations, telemetry, and public boat sharing.',
@@ -11,17 +13,28 @@ useWebPageSchema({
 })
 
 definePageMeta({ middleware: ['guest'] })
+
+const dockChecklist = [
+  'Review the live vessel board without exposing private install controls.',
+  'Issue ingest keys, inspect SignalK posture, and keep the edge path healthy.',
+  'Update the public captain page, passage history, and shared boat memory from one place.',
+]
 </script>
 
 <template>
-  <div class="flex min-h-[calc(100vh-8rem)] items-center justify-center">
+  <AuthDock
+    eyebrow="Captain access"
+    title="Return to the bridge"
+    description="Sign in to reach the live vessel board, manage onboard installs, and keep the public captain page current."
+    :checklist="dockChecklist"
+  >
     <AuthLoginCard
       title="Welcome back aboard"
-      subtitle="Sign in to reach your vessel dashboard and installation controls."
+      subtitle="Sign in to reach your dashboard, telemetry posture, and installation controls."
     >
       <template #logo>
         <AppBrandMark />
       </template>
     </AuthLoginCard>
-  </div>
+  </AuthDock>
 </template>

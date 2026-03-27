@@ -16,7 +16,7 @@ withDefaults(
 </script>
 
 <template>
-  <UCard class="h-full border-default/80 bg-default/80 shadow-card">
+  <UCard class="metric-shell h-full rounded-[1.5rem] shadow-card">
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="text-sm text-muted">{{ label }}</p>

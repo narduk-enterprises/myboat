@@ -27,39 +27,88 @@ watchEffect(() => {
 
 <template>
   <div v-if="overview" class="space-y-8">
-    <UPageHero
-      :title="
-        overview.profile
-          ? `Welcome aboard, ${overview.profile.captainName}`
-          : 'Set up your boat profile'
-      "
-      :description="
-        overview.profile
-          ? `Public handle @${overview.profile.username} · ${overview.vessels.length} vessel${overview.vessels.length === 1 ? '' : 's'} under management`
-          : 'Finish the captain profile, vessel profile, and first install before inviting the public or issuing ingest keys.'
-      "
-    >
-      <template #links>
-        <UButton
-          v-if="overview.profile"
-          to="/dashboard/onboarding"
-          color="neutral"
-          variant="soft"
-          icon="i-lucide-settings-2"
-        >
-          Edit profile
-        </UButton>
-        <UButton
-          v-if="overview.profile"
-          :to="`/${overview.profile.username}`"
-          color="primary"
-          variant="soft"
-          icon="i-lucide-share-2"
-        >
-          View public profile
-        </UButton>
-      </template>
-    </UPageHero>
+    <section class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8">
+      <div class="relative z-10 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <div class="space-y-5">
+          <div class="marine-kicker w-fit">Owner dashboard</div>
+          <div>
+            <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
+              {{
+                overview.profile
+                  ? `Welcome aboard, ${overview.profile.captainName}`
+                  : 'Set up your boat profile'
+              }}
+            </h1>
+            <p class="mt-3 max-w-2xl text-base text-muted sm:text-lg">
+              {{
+                overview.profile
+                  ? `Public handle @${overview.profile.username} · ${overview.vessels.length} vessel${overview.vessels.length === 1 ? '' : 's'} under management`
+                  : 'Finish the captain profile, vessel profile, and first install before inviting the public or issuing ingest keys.'
+              }}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              v-if="overview.profile"
+              to="/dashboard/onboarding"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-settings-2"
+            >
+              Edit boat setup
+            </UButton>
+            <UButton
+              v-if="overview.profile"
+              :to="`/${overview.profile.username}`"
+              color="primary"
+              icon="i-lucide-share-2"
+            >
+              View public profile
+            </UButton>
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+            <p class="text-xs uppercase tracking-[0.24em] text-muted">Public sharing</p>
+            <p class="mt-3 font-display text-2xl text-default">
+              {{ overview.profile ? 'Ready' : 'Pending' }}
+            </p>
+            <p class="mt-2 text-xs text-muted">
+              The captain route and public vessel surfaces follow the owner profile.
+            </p>
+          </div>
+          <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+            <p class="text-xs uppercase tracking-[0.24em] text-muted">Live installs</p>
+            <p class="mt-3 font-display text-2xl text-default">
+              {{ overview.stats.liveInstallationCount }}
+            </p>
+            <p class="mt-2 text-xs text-muted">
+              Installs currently reporting data through the ingest edge.
+            </p>
+          </div>
+          <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+            <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
+            <p class="mt-3 font-display text-2xl text-default">
+              {{ overview.vessels[0]?.name || 'Pending' }}
+            </p>
+            <p class="mt-2 text-xs text-muted">
+              The primary boat anchors the live map, passages, and public story.
+            </p>
+          </div>
+          <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+            <p class="text-xs uppercase tracking-[0.24em] text-muted">Recent passages</p>
+            <p class="mt-3 font-display text-2xl text-default">
+              {{ overview.recentPassages.length }}
+            </p>
+            <p class="mt-2 text-xs text-muted">
+              Route memory stays connected to current telemetry and vessel history.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
       <MarineMetricCard
@@ -110,7 +159,7 @@ watchEffect(() => {
       </div>
 
       <div class="space-y-6">
-        <UCard class="border-default/80 bg-default/90 shadow-card">
+        <UCard class="chart-surface rounded-[1.75rem]">
           <template #header>
             <div>
               <h3 class="font-display text-xl text-default">Install readiness</h3>
@@ -124,7 +173,7 @@ watchEffect(() => {
             <div
               v-for="installation in overview.installations"
               :key="installation.id"
-              class="rounded-2xl border border-default bg-elevated/60 px-4 py-4"
+              class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
             >
               <div class="flex items-center justify-between gap-4">
                 <div>
@@ -161,20 +210,18 @@ watchEffect(() => {
             </div>
           </div>
 
-          <AppEmptyState
+          <MarineEmptyState
             v-else
             icon="i-lucide-cpu"
             title="No installs defined"
             description="Create the first boat install in onboarding to start issuing ingest keys."
             compact
           >
-            <UButton to="/dashboard/onboarding" color="primary" variant="soft">
-              Complete onboarding
-            </UButton>
-          </AppEmptyState>
+            <UButton to="/dashboard/onboarding" color="primary">Complete onboarding</UButton>
+          </MarineEmptyState>
         </UCard>
 
-        <UCard class="border-default/80 bg-default/90 shadow-card">
+        <UCard class="chart-surface rounded-[1.75rem]">
           <template #header>
             <div>
               <h3 class="font-display text-xl text-default">Recent public moments</h3>
@@ -188,7 +235,7 @@ watchEffect(() => {
             <article
               v-for="item in overview.recentMedia.slice(0, 3)"
               :key="item.id"
-              class="rounded-2xl border border-default bg-elevated/60 px-4 py-4"
+              class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
             >
               <p class="font-medium text-default">{{ item.title }}</p>
               <p v-if="item.caption" class="mt-2 text-sm text-muted">{{ item.caption }}</p>
@@ -196,7 +243,7 @@ watchEffect(() => {
             </article>
           </div>
 
-          <AppEmptyState
+          <MarineEmptyState
             v-else
             icon="i-lucide-images"
             title="No media attached yet"
