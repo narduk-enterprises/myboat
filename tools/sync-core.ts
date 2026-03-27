@@ -813,13 +813,20 @@ function patchWebDatabaseSchema(
     return false
   }
 
-  const updated = content.replace(
-    "export * from '#server/database/app-schema'",
-    [
-      "export * from '#server/database/auth-bridge-schema'",
+  const bridgeExport = "export * from '#server/database/auth-bridge-schema'"
+  let updated = content
+
+  if (content.includes("export * from '#server/database/app-schema'")) {
+    updated = content.replace(
       "export * from '#server/database/app-schema'",
-    ].join('\n'),
-  )
+      [bridgeExport, "export * from '#server/database/app-schema'"].join('\n'),
+    )
+  } else if (content.includes("export * from '#layer/server/database/schema'")) {
+    updated = content.replace(
+      "export * from '#layer/server/database/schema'",
+      ["export * from '#layer/server/database/schema'", bridgeExport].join('\n'),
+    )
+  }
 
   if (updated === content) return false
 
@@ -828,6 +835,54 @@ function patchWebDatabaseSchema(
     writeFileSync(schemaPath, updated, 'utf-8')
   }
   return true
+}
+
+/**
+ * `app-auth.ts` imports `useAppDatabase` from `#server/utils/database`. Sync
+ * must not leave downstream apps without this helper (see template issue #12).
+ */
+function ensureWebDatabaseUtils(
+  appDir: string,
+  counters: SyncCounters,
+  dryRun: boolean,
+  mode: 'full' | 'layer',
+  log: (message: string) => void,
+): void {
+  if (mode !== 'full') return
+
+  const utilPath = join(appDir, 'apps/web/server/utils/database.ts')
+  const authPath = join(appDir, 'apps/web/server/utils/app-auth.ts')
+  if (!existsSync(authPath)) return
+
+  const authContent = readFileSync(authPath, 'utf-8')
+  if (!authContent.includes("from '#server/utils/database'")) return
+
+  const canonical = [
+    "import * as schema from '#server/database/schema'",
+    "import { createAppDatabase } from '#layer/server/utils/database'",
+    '',
+    'export const useAppDatabase = createAppDatabase(schema)',
+    '',
+  ].join('\n')
+
+  if (existsSync(utilPath)) {
+    const existing = readFileSync(utilPath, 'utf-8')
+    if (existing.includes('useAppDatabase') && existing.includes('createAppDatabase')) {
+      return
+    }
+
+    log(
+      '  WARN: apps/web/server/utils/database.ts exists but is not the auth-bridge helper; fix manually so useAppDatabase wraps createAppDatabase(schema).',
+    )
+    return
+  }
+
+  log('  ADD: apps/web/server/utils/database.ts (auth bridge companion)')
+  if (!dryRun) {
+    ensureDir(utilPath)
+    writeFileSync(utilPath, canonical, 'utf-8')
+  }
+  counters.copied += 1
 }
 
 function patchWebPackage(
@@ -1259,6 +1314,7 @@ export async function runAppSync(options: RunAppSyncOptions) {
   patchWebPackage(options.appDir, options.templateDir, dryRun, mode, log)
   patchWebNuxtConfig(options.appDir, dryRun, mode, log)
   patchWebDatabaseSchema(options.appDir, dryRun, mode, log)
+  ensureWebDatabaseUtils(options.appDir, counters, dryRun, mode, log)
   patchDopplerTemplate(options.appDir, dryRun, mode, log)
   mergeWebWranglerKvBinding(options.appDir, options.templateDir, dryRun, mode, log)
   if (mode === 'full') {

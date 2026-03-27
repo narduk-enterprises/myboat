@@ -96,7 +96,11 @@ What the sync flow does:
 3. Rewrites the vendored layer `repository.url` to match the downstream app.
 4. Applies canonical pnpm config.
 5. Runs `pnpm install`.
-6. Repairs `.agent/skills`, `.cursor/skills`, `.codex/skills`, `.claude/skills`,
+6. Ensures the auth-bridge contract when those files sync: patches
+   `apps/web/server/database/schema.ts` to export `auth-bridge-schema` when
+   needed and adds `apps/web/server/utils/database.ts` with `useAppDatabase` if
+   it is missing (see `tools/sync-core.ts`).
+7. Repairs `.agent/skills`, `.cursor/skills`, `.codex/skills`, `.claude/skills`,
    and `.github/skills` so they all point at the repo-local `.agents/skills`
    tree via `pnpm run skills:link`.
 

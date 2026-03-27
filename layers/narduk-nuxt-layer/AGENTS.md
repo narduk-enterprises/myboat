@@ -19,6 +19,10 @@
 >
 > - If you are building a feature specific to one app, you must make that change
 >   in the downstream app, NOT here.
+> - If a downstream investigation suggests a reusable defect or docs gap, use
+>   [`.agents/skills/narduk-template-issues/SKILL.md`](.agents/skills/narduk-template-issues/SKILL.md)
+>   to search for and file the upstream template issue before patching around it
+>   repeatedly in apps.
 
 This layer provides a **minimal Nuxt 4 + Nuxt UI 4** foundation deployed to
 **Cloudflare Workers** with **D1 SQLite** (Drizzle ORM).
@@ -127,6 +131,10 @@ produces a **double-framed** look.
 - **Marketing vs app chrome**: prefer a dedicated `landing` (or similar)
   layout for public pages; reserve `LayerAppShell` + header/footer patterns for
   experiences that share one app chrome.
+- **Layer `layouts/landing.vue`**: the layer ships a minimal full-width
+  `landing` layout; downstream apps can override it in `apps/web/app/layouts/`
+  or add `dashboard` / `admin` / `auth` / `blank` alongside it. Nuxt resolves the
+  app layout first when names collide.
 
 ## Integrating this Layer into a New Project
 

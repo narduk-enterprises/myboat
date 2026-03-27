@@ -161,6 +161,20 @@ useWebPageSchema({
 
 Use another schema helper when the page is an article, product, and so on.
 
+## Favicons and `app.head` assets
+
+The shared layer `nuxt.config` links to `/favicon-32x32.png`,
+`/favicon-16x16.png`, `/apple-touch-icon.png`, and `/site.webmanifest`. Those
+files must exist under `layers/narduk-nuxt-layer/public/` (and any app-owned
+`site.webmanifest` under `apps/web/public/` must list files that exist there).
+Regenerate from the source SVG with:
+
+`pnpm run generate:favicons -- --target=layers/narduk-nuxt-layer/public`
+
+For a branded app manifest, also run with `--target=apps/web/public` and
+`--name` / `--color` / `--bg`. `pnpm exec tsx tools/check-sync-health.ts`
+includes checks for these paths.
+
 ## Route layouts and full-bleed pages
 
 Downstream apps often split chrome across **`app.vue`** and **`layouts/*`**.
