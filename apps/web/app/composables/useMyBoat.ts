@@ -3,7 +3,9 @@ import type {
   InstallationKeySummary,
   InstallationSummary,
   OnboardingPayload,
+  PublicExploreResponse,
   PublicProfileResponse,
+  PublicVesselDetailResponse,
   VesselDetailResponse,
 } from '~/types/myboat'
 
@@ -17,6 +19,17 @@ export function usePublicProfile(username: string) {
   return useFetch<PublicProfileResponse>(`/api/public/${username}`, {
     key: `myboat-public-${username}`,
   })
+}
+
+export function usePublicExplore(key = 'myboat-explore') {
+  return useFetch<PublicExploreResponse>('/api/public/explore', { key })
+}
+
+export function usePublicVesselDetail(username: string, vesselSlug: string) {
+  return useFetch<PublicVesselDetailResponse>(
+    `/api/public/${username}/${vesselSlug}`,
+    { key: `myboat-public-vessel-${username}-${vesselSlug}` },
+  )
 }
 
 export function useVesselDetail(vesselSlug: string) {

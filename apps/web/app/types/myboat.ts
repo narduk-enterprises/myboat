@@ -135,3 +135,20 @@ export interface PublicProfileResponse {
   vessels: VesselCardSummary[]
   installations: InstallationSummary[]
 }
+
+export interface ExploreVesselEntry extends VesselCardSummary {
+  captainUsername: string
+  captainName: string
+}
+
+export interface PublicExploreResponse {
+  vessels: ExploreVesselEntry[]
+}
+
+export interface PublicVesselDetailResponse {
+  profile: PublicProfileSummary
+  vessel: VesselCardSummary
+  passages: PassageSummary[]
+  media: MediaItemSummary[]
+  waypoints: WaypointSummary[]
+}

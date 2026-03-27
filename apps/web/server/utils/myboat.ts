@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
   mediaItems,
@@ -297,6 +297,63 @@ export async function getInstallationDetail(
     installation,
     keys,
   }
+}
+
+export async function getPublicVesselsForExplore(event: H3Event) {
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      id: vessels.id,
+      slug: vessels.slug,
+      name: vessels.name,
+      vesselType: vessels.vesselType,
+      homePort: vessels.homePort,
+      summary: vessels.summary,
+      isPrimary: vessels.isPrimary,
+      sharePublic: vessels.sharePublic,
+      ownerUserId: vessels.ownerUserId,
+      captainUsername: publicProfiles.username,
+      captainName: sql<string>`coalesce(${users.name}, ${publicProfiles.username})`,
+    })
+    .from(vessels)
+    .innerJoin(publicProfiles, eq(vessels.ownerUserId, publicProfiles.userId))
+    .innerJoin(users, eq(publicProfiles.userId, users.id))
+    .where(and(eq(vessels.sharePublic, true), eq(publicProfiles.shareProfile, true)))
+    .orderBy(desc(vessels.createdAt))
+    .all()
+}
+
+export async function getPublicVesselBySlug(event: H3Event, username: string, vesselSlug: string) {
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      id: vessels.id,
+      slug: vessels.slug,
+      name: vessels.name,
+      vesselType: vessels.vesselType,
+      homePort: vessels.homePort,
+      summary: vessels.summary,
+      isPrimary: vessels.isPrimary,
+      sharePublic: vessels.sharePublic,
+      ownerUserId: vessels.ownerUserId,
+      captainUsername: publicProfiles.username,
+      captainName: sql<string>`coalesce(${users.name}, ${publicProfiles.username})`,
+      captainHeadline: publicProfiles.headline,
+      captainBio: publicProfiles.bio,
+      captainHomePort: publicProfiles.homePort,
+    })
+    .from(vessels)
+    .innerJoin(publicProfiles, eq(vessels.ownerUserId, publicProfiles.userId))
+    .innerJoin(users, eq(publicProfiles.userId, users.id))
+    .where(
+      and(
+        eq(publicProfiles.username, username),
+        eq(vessels.slug, vesselSlug),
+        eq(vessels.sharePublic, true),
+        eq(publicProfiles.shareProfile, true),
+      ),
+    )
+    .get()
 }
 
 export function serializeVesselCards(

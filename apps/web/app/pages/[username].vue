@@ -91,7 +91,12 @@ useWebPageSchema({
       />
 
       <section class="grid gap-5 lg:grid-cols-2">
-        <VesselSummaryCard v-for="vessel in profile.vessels" :key="vessel.id" :vessel="vessel" />
+        <VesselSummaryCard
+          v-for="vessel in profile.vessels"
+          :key="vessel.id"
+          :vessel="vessel"
+          :to="`/${profile.profile.username}/${vessel.slug}`"
+        />
       </section>
 
       <UCard class="chart-surface rounded-[1.75rem] shadow-card">
