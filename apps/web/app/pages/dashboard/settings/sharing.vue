@@ -56,12 +56,7 @@ const vessels = computed(() => data.value?.vessels ?? [])
                   When enabled, anyone with your handle URL can view your captain profile and shared vessels.
                 </p>
               </div>
-              <UBadge
-                :color="profile ? 'success' : 'warning'"
-                variant="soft"
-              >
-                Active
-              </UBadge>
+              <UBadge color="success" variant="soft">Active</UBadge>
             </div>
 
             <p class="mt-4 text-sm text-muted">

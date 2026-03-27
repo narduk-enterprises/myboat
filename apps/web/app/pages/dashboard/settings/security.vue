@@ -41,7 +41,7 @@ async function changePassword() {
     await appFetch('/api/auth/change-password', {
       method: 'POST',
       body: {
-        currentPassword: currentPassword.value || undefined,
+        ...(currentPassword.value.trim() ? { currentPassword: currentPassword.value.trim() } : {}),
         newPassword: newPassword.value,
       },
     })
