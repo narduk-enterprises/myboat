@@ -23,18 +23,24 @@ const { loggedIn } = useUserSession()
 const capabilityCards = [
   {
     icon: 'i-lucide-anchor',
+    eyebrow: 'Public identity',
+    signal: '@captain route',
     title: 'Captain and vessel identity',
     description:
       'Lock the public captain handle, define the primary vessel, and keep one authoritative home for the boat profile.',
   },
   {
     icon: 'i-lucide-radio',
+    eyebrow: 'Operational telemetry',
+    signal: 'Live + historical',
     title: 'Live telemetry with context',
     description:
       'Treat current position, onboard signals, passages, and historical track memory as one operational record.',
   },
   {
     icon: 'i-lucide-eye',
+    eyebrow: 'Disciplined sharing',
+    signal: 'Public by choice',
     title: 'Public sharing with discipline',
     description:
       'Publish the surfaces worth sharing while keeping install controls, admin actions, and private history inside the owner dashboard.',
@@ -68,18 +74,39 @@ const workflow = [
 
 const productSurfaces = [
   {
+    badge: 'Private',
     title: 'Owner dashboard',
     description:
       'Operational board for telemetry posture, installs, passages, and vessel-level detail.',
   },
   {
+    badge: 'Public',
     title: 'Public captain page',
     description: 'A shareable route for vessel identity, current readiness, and recent movement.',
   },
   {
+    badge: 'Edge',
     title: 'Install control plane',
     description:
       'The ingest edge for API keys, hostnames, SignalK endpoints, and live connection state.',
+  },
+]
+
+const boundaryRules = [
+  {
+    title: 'Captain-owned identity',
+    description:
+      'Public handles, captain headlines, and vessel presence stay tied to one explicit owner record.',
+  },
+  {
+    title: 'Telemetry plus logbook',
+    description:
+      'Live fixes and voyage memory share the same operating model instead of splitting into separate tools.',
+  },
+  {
+    title: 'Private edge controls',
+    description:
+      'Install credentials, relay posture, and admin actions stay inside the operational workspace.',
   },
 ]
 </script>
@@ -202,13 +229,17 @@ const productSurfaces = [
           :key="card.title"
           class="chart-surface rounded-[1.75rem]"
         >
-          <div class="space-y-4">
-            <div
-              class="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"
-            >
-              <UIcon :name="card.icon" class="size-5" />
+          <div class="space-y-5">
+            <div class="flex items-start justify-between gap-4">
+              <div
+                class="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+              >
+                <UIcon :name="card.icon" class="size-5" />
+              </div>
+              <UBadge color="neutral" variant="soft">{{ card.signal }}</UBadge>
             </div>
             <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">{{ card.eyebrow }}</p>
               <h2 class="font-display text-2xl text-default">{{ card.title }}</h2>
               <p class="mt-2 text-sm text-muted">{{ card.description }}</p>
             </div>
@@ -229,19 +260,15 @@ const productSurfaces = [
           </div>
         </template>
 
-        <div class="space-y-4 text-sm text-muted">
-          <p>
-            Vessel identity is captain-owned, public URLs are explicit, and install credentials stay
-            inside the operational workspace.
-          </p>
-          <p>
-            Live position and historical route memory belong together, so the app treats current
-            motion and voyage history as one timeline rather than separate products.
-          </p>
-          <p>
-            Media, notes, and place-linked memory remain first-class parts of the boat story instead
-            of getting flattened into generic uploads.
-          </p>
+        <div class="grid gap-3">
+          <article
+            v-for="rule in boundaryRules"
+            :key="rule.title"
+            class="metric-shell rounded-[1.35rem] p-4"
+          >
+            <p class="font-display text-lg text-default">{{ rule.title }}</p>
+            <p class="mt-2 text-sm text-muted">{{ rule.description }}</p>
+          </article>
         </div>
       </UCard>
 
@@ -261,6 +288,7 @@ const productSurfaces = [
             :key="surface.title"
             class="metric-shell rounded-[1.4rem] p-4"
           >
+            <UBadge color="primary" variant="soft">{{ surface.badge }}</UBadge>
             <p class="font-display text-lg text-default">{{ surface.title }}</p>
             <p class="mt-2 text-sm text-muted">{{ surface.description }}</p>
           </article>

@@ -57,9 +57,14 @@ the next best target clearly named.
   route and edge posture cues, richer stat-card hints, and a calmer map fallback
   state that no longer exposes raw MapKit configuration language in the UI
   screenshots.
+- 2026-03-27: Landing page lower sections received a cleanup pass. The product
+  capability cards now carry clearer operating labels, the product boundaries
+  section reads as structured system rules instead of template prose, and the
+  three-surface grid now states the private, public, and edge roles more
+  explicitly on both desktop and mobile.
 
 ## Next Target
 
-- Landing page hierarchy is still the next overnight target. The dashboard now
-  reads more like a product surface, so the home hero, quick signals, and lower
-  content rhythm are the highest-leverage remaining pass.
+- Onboarding and installation detail are the next highest-leverage targets. The
+  home page and dashboard now read more like real product surfaces, so the next
+  cycle should tighten the remaining private setup flows.
