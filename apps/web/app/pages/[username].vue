@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PassageSummary } from '~/types/myboat'
 import { formatRelativeTime } from '~/utils/marine'
 
 const route = useRoute()
@@ -7,6 +8,13 @@ const username = computed(() => String(route.params.username || ''))
 const { data, error } = await usePublicProfile(username.value)
 
 const profile = computed(() => data.value ?? null)
+const publicPassages = computed<PassageSummary[]>(() => {
+  return (
+    profile.value?.vessels
+      .map((vessel) => vessel.latestPassage)
+      .filter((passage): passage is PassageSummary => passage !== null) ?? []
+  )
+})
 
 useSeo({
   title: profile.value ? `@${profile.value.profile.username}` : 'Captain profile',
@@ -78,7 +86,7 @@ useWebPageSchema({
 
       <MarineTrackMap
         :vessels="profile.vessels"
-        :passages="profile.vessels.map((vessel) => vessel.latestPassage).filter(Boolean)"
+        :passages="publicPassages"
         height-class="h-[28rem]"
       />
 

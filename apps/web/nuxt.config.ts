@@ -29,6 +29,11 @@ export default defineNuxtConfig({
   // Extend the published Narduk Nuxt Layer
   extends: ['@narduk-enterprises/narduk-nuxt-template-layer'],
 
+  // The app references its local components without directory prefixes
+  // (AppBrandMark, AuthDock, OnboardingForm, MarineTrackMap, etc.), so expose
+  // the full app/components tree with prefixless auto-imports.
+  components: [{ path: resolve(__dirname, 'app/components'), pathPrefix: false }],
+
   // nitro-cloudflare-dev proxies D1 bindings to the local dev server
   modules: ['nitro-cloudflare-dev'],
 
