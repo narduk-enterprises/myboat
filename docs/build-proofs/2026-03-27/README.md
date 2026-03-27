@@ -48,8 +48,13 @@ the next best target clearly named.
 - 2026-03-27: Updated the loop so the next cycle does a light branch review,
   runs a dedicated smoke test, and ships only after the audit plus smoke are
   green.
+- 2026-03-27: Auth surfaces received a second polish pass with a clearer
+  captain briefing, stronger route-level hierarchy, and a mobile pre-form
+  summary card. The critical auth-aside crop stayed green and improved its
+  visual variance from the initial washed-out state.
 
 ## Next Target
 
-- Auth desktop polish remains the first overnight target because the visual
-  audit now has dedicated critical crops for the auth aside and panel.
+- Landing page hierarchy is the next overnight target. The auth routes are now
+  stable enough to move the loop to the home hero, quick signals, and the lower
+  content rhythm.
