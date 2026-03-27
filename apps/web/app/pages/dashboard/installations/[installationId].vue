@@ -96,7 +96,7 @@ async function archiveInstallation() {
       <div data-testid="installation-hero">
         <UPageHero
           :title="detail.installation.label"
-          :description="`Linked to ${detail.installation.vesselName}. Issue ingest keys and stage your collector command here.`"
+          :description="`Linked to ${detail.installation.vesselName}. Issue ingest keys and choose whether the collector should use the MyBoat relay or a direct Signal K websocket.`"
         >
           <template #links>
             <UButton

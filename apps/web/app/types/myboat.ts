@@ -79,6 +79,9 @@ export interface InstallationSummary {
   installationType: string
   edgeHostname: string | null
   signalKUrl: string | null
+  collectorSignalKUrl: string | null
+  relaySignalKUrl: string | null
+  signalKAccessMode: 'direct' | 'relay' | 'unset'
   isPrimary: boolean
   connectionState: string
   lastSeenAt: string | null

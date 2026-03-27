@@ -223,7 +223,9 @@ async function onSubmit() {
         <div>
           <p class="text-sm font-medium text-default">Telemetry install</p>
           <p class="mt-1 text-xs text-muted">
-            SignalK and edge install metadata for the first live feed.
+            SignalK and edge install metadata for the first live feed. Use a direct websocket URL
+            if you want the collector to talk straight to Signal K, or keep the MyBoat relay URL if
+            you want the relay path instead.
           </p>
         </div>
 
@@ -232,11 +234,11 @@ async function onSubmit() {
             <UInput v-model="state.edgeHostname" class="w-full" placeholder="myboat.local" />
           </UFormField>
 
-          <UFormField name="signalKUrl" label="SignalK stream URL">
+          <UFormField name="signalKUrl" label="SignalK or relay URL">
             <UInput
               v-model="state.signalKUrl"
               class="w-full"
-              placeholder="ws://boat-pi.local:3000/signalk/v1/stream"
+              placeholder="wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none"
             />
           </UFormField>
         </div>

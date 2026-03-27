@@ -1,10 +1,15 @@
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
+import { resolveSignalKRelayOrigin } from './shared/signalkRelay'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const localNuxtPort = Number(process.env.NUXT_PORT || 3000)
 const localSiteUrl = `http://localhost:${Number.isFinite(localNuxtPort) ? localNuxtPort : 3000}`
 const canonicalSiteUrl = process.env.SITE_URL || 'https://mybo.at'
+const publicAppUrl = process.env.SITE_URL || localSiteUrl
+const relayCspConnectSrc = [process.env.CSP_CONNECT_SRC || '', resolveSignalKRelayOrigin(publicAppUrl)]
+  .filter(Boolean)
+  .join(', ')
 
 const configuredAuthBackend = process.env.AUTH_BACKEND
 const authBackend =
@@ -90,12 +95,13 @@ export default defineNuxtConfig({
       authPublicSignup: process.env.AUTH_PUBLIC_SIGNUP !== 'false',
       authRequireMfa: process.env.AUTH_REQUIRE_MFA === 'true',
       authTurnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '',
-      appUrl: process.env.SITE_URL || localSiteUrl,
+      appUrl: publicAppUrl,
       appName: process.env.APP_NAME || 'MyBoat',
       // Analytics (client-side tracking)
       posthogPublicKey: process.env.POSTHOG_PUBLIC_KEY || '',
       posthogHost: process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
       gaMeasurementId: process.env.GA_MEASUREMENT_ID || '',
+      cspConnectSrc: relayCspConnectSrc,
       // IndexNow
       indexNowKey: process.env.INDEXNOW_KEY || '',
     },
