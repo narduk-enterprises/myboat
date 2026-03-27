@@ -145,6 +145,19 @@ const emit = defineEmits<{
 const selectedId = defineModel<string | null>('selectedId', { default: null })
 
 const { mapkitReady, mapkitError } = useMapKit()
+const mapkitStatusDetail = computed(() => {
+  if (!mapkitError.value) return ''
+  if (
+    mapkitError.value.includes('MapKit is not configured') ||
+    mapkitError.value.includes('MapKit JS:')
+  ) {
+    return 'Apple MapKit credentials are not configured for this environment yet. The rest of the dashboard remains available while mapping is being wired up.'
+  }
+  if (mapkitError.value.includes('Failed to load MapKit token')) {
+    return 'The map credentials could not be loaded right now. Try the surface again in a moment.'
+  }
+  return mapkitError.value
+})
 const mapContainer = ref<HTMLElement | null>(null)
 
 const pinCleanups: Array<() => void> = []
@@ -813,22 +826,38 @@ defineExpose({ scrollIntoView, setRegion, zoomToFit })
 </script>
 
 <template>
-  <div class="mapkit-wrapper relative isolate overflow-hidden">
+  <div
+    class="mapkit-wrapper relative isolate overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgb(125_211_252_/_0.22),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgb(250_204_21_/_0.12),_transparent_18%),linear-gradient(180deg,_rgb(255_255_255_/_0.94),_rgb(239_246_255_/_0.86))] dark:bg-[radial-gradient(circle_at_top_left,_rgb(56_189_248_/_0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgb(250_204_21_/_0.08),_transparent_18%),linear-gradient(180deg,_rgb(15_23_42_/_0.94),_rgb(2_6_23_/_0.88))]"
+  >
     <div
       v-if="mapkitError"
-      class="mapkit-status absolute inset-0 flex flex-col items-center justify-center z-10 bg-muted/20 backdrop-blur-sm"
+      class="mapkit-status absolute inset-0 z-10 flex items-center justify-center bg-default/10 p-4 backdrop-blur-sm"
     >
-      <UIcon name="i-lucide-map" class="size-10 text-warning mb-3" />
-      <h3 class="text-lg font-bold font-display mb-1">Map Unavailable</h3>
-      <p class="text-sm text-muted">{{ mapkitError }}</p>
+      <div
+        class="max-w-md rounded-[1.75rem] border border-default bg-default/92 px-6 py-6 text-center shadow-xl backdrop-blur-xl"
+      >
+        <div
+          class="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-warning/10 text-warning"
+        >
+          <UIcon name="i-lucide-map" class="size-6" />
+        </div>
+        <p class="text-xs uppercase tracking-[0.24em] text-muted">MapKit status</p>
+        <h3 class="mt-2 font-display text-xl text-default">Map surface unavailable</h3>
+        <p class="mt-3 text-sm text-muted">{{ mapkitStatusDetail }}</p>
+      </div>
     </div>
 
     <div
       v-else-if="!mapkitReady"
-      class="mapkit-status absolute inset-0 flex flex-col items-center justify-center z-10 bg-muted/20 backdrop-blur-sm"
+      class="mapkit-status absolute inset-0 z-10 flex items-center justify-center bg-default/10 p-4 backdrop-blur-sm"
     >
-      <UIcon name="i-lucide-loader-2" class="size-8 text-primary animate-spin" />
-      <p class="text-sm text-muted mt-3">Loading map…</p>
+      <div
+        class="max-w-sm rounded-[1.75rem] border border-default bg-default/88 px-6 py-5 text-center shadow-xl backdrop-blur-xl"
+      >
+        <UIcon name="i-lucide-loader-2" class="mx-auto size-8 animate-spin text-primary" />
+        <p class="mt-3 text-sm font-medium text-default">Loading map surface</p>
+        <p class="mt-1 text-xs text-muted">Current fixes, anchorages, and route lines are on the way.</p>
+      </div>
     </div>
 
     <div

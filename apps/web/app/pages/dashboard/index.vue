@@ -17,6 +17,34 @@ useWebPageSchema({
 const { data, pending } = await useDashboardOverview()
 
 const overview = computed(() => data.value)
+const primaryVessel = computed(
+  () =>
+    overview.value?.vessels.find((vessel) => vessel.isPrimary) ||
+    overview.value?.vessels[0] ||
+    null,
+)
+const latestPassage = computed(
+  () => overview.value?.recentPassages[0] || primaryVessel.value?.latestPassage || null,
+)
+const setupFocus = computed(() => {
+  if (!overview.value) return ''
+  if (!overview.value.profile) {
+    return 'Complete the captain profile to unlock the public route, vessel sharing, and the rest of the owner board.'
+  }
+  if (!overview.value.vessels.length) {
+    return 'Add the first vessel so telemetry, passages, and public sharing can anchor to a real boat profile.'
+  }
+  if (!overview.value.installations.length) {
+    return 'Register the first onboard install so the ingest edge can start receiving live data from the boat.'
+  }
+  if (!overview.value.stats.liveInstallationCount) {
+    return 'The install is registered, but no live feed is reporting yet. Bring one collector online to light up the live surfaces.'
+  }
+  if (latestPassage.value) {
+    return `Latest route memory is "${latestPassage.value.title}". Keep the dashboard fresh with the next passage, harbor note, or media moment.`
+  }
+  return 'The command surface is ready. Add the next passage or media note to keep the public vessel story active.'
+})
 
 watchEffect(() => {
   if (overview.value && !overview.value.profile) {
@@ -84,6 +112,22 @@ watchEffect(() => {
               </p>
             </div>
 
+            <div class="flex flex-wrap gap-2">
+              <UBadge v-if="overview.profile" color="primary" variant="soft">
+                @{{ overview.profile.username }}
+              </UBadge>
+              <UBadge
+                :color="overview.stats.liveInstallationCount ? 'success' : 'warning'"
+                variant="soft"
+              >
+                {{ overview.stats.liveInstallationCount }} live /
+                {{ overview.stats.installationCount }} installs
+              </UBadge>
+              <UBadge v-if="primaryVessel" color="neutral" variant="soft">
+                {{ primaryVessel.name }}
+              </UBadge>
+            </div>
+
             <div class="flex flex-wrap gap-3">
               <UButton
                 v-if="overview.profile"
@@ -103,9 +147,96 @@ watchEffect(() => {
                 View public profile
               </UButton>
             </div>
+
+            <div class="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+              <div
+                class="rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-5 shadow-card backdrop-blur"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.24em] text-muted">Captain briefing</p>
+                    <p class="mt-2 font-display text-2xl text-default">
+                      {{ primaryVessel?.name || 'Boat setup pending' }}
+                    </p>
+                  </div>
+                  <UBadge
+                    :color="overview.stats.liveInstallationCount ? 'success' : 'warning'"
+                    variant="soft"
+                  >
+                    {{
+                      overview.stats.liveInstallationCount
+                        ? 'Live feed active'
+                        : 'Awaiting live feed'
+                    }}
+                  </UBadge>
+                </div>
+
+                <p class="mt-3 max-w-2xl text-sm text-muted">
+                  {{ setupFocus }}
+                </p>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
+                    <p class="text-xs uppercase tracking-[0.22em] text-muted">Primary vessel</p>
+                    <p class="mt-2 font-medium text-default">
+                      {{ primaryVessel?.homePort || 'Home port still being defined' }}
+                    </p>
+                    <p class="mt-1 text-xs text-muted">
+                      {{
+                        primaryVessel?.vesselType ||
+                        'Finish the vessel profile to add type and operating context.'
+                      }}
+                    </p>
+                  </div>
+
+                  <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
+                    <p class="text-xs uppercase tracking-[0.22em] text-muted">
+                      Latest route memory
+                    </p>
+                    <p class="mt-2 font-medium text-default">
+                      {{ latestPassage?.title || 'No passage logged yet' }}
+                    </p>
+                    <p class="mt-1 text-xs text-muted">
+                      {{
+                        latestPassage
+                          ? `${latestPassage.departureName || 'Departure'} → ${latestPassage.arrivalName || 'Arrival pending'}`
+                          : 'The public story gets stronger once the first passage is attached to this boat.'
+                      }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Public route</p>
+                  <p class="mt-2 font-display text-2xl text-default">
+                    {{ overview.profile ? `@${overview.profile.username}` : 'Pending' }}
+                  </p>
+                  <p class="mt-2 text-xs text-muted">
+                    {{
+                      overview.profile?.headline ||
+                      'Claim the captain handle to open the shareable public surface.'
+                    }}
+                  </p>
+                </div>
+
+                <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
+                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Edge posture</p>
+                  <p class="mt-2 font-display text-2xl text-default">
+                    {{ overview.stats.liveInstallationCount }}/{{
+                      overview.stats.installationCount
+                    }}
+                  </p>
+                  <p class="mt-2 text-xs text-muted">
+                    Live installs currently reporting through the ingest edge.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid self-start gap-3 sm:grid-cols-2">
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
               <p class="text-xs uppercase tracking-[0.24em] text-muted">Public sharing</p>
               <p class="mt-3 font-display text-2xl text-default">
@@ -151,26 +282,31 @@ watchEffect(() => {
           label="Vessels"
           :value="String(overview.stats.vesselCount)"
           icon="i-lucide-ship"
+          hint="Named boats in this account"
         />
         <MarineMetricCard
           label="Installs"
           :value="String(overview.stats.installationCount)"
           icon="i-lucide-cpu"
+          hint="Registered collectors and onboard endpoints"
         />
         <MarineMetricCard
           label="Live installs"
           :value="String(overview.stats.liveInstallationCount)"
           icon="i-lucide-radio"
+          hint="Reporting through the edge right now"
         />
         <MarineMetricCard
           label="Passages"
           :value="String(overview.stats.passageCount)"
           icon="i-lucide-route"
+          hint="Route memory attached to the fleet"
         />
         <MarineMetricCard
           label="Media items"
           :value="String(overview.stats.mediaCount)"
           icon="i-lucide-camera"
+          hint="Photos and notes ready for sharing"
         />
       </div>
 

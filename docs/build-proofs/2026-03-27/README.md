@@ -52,9 +52,14 @@ the next best target clearly named.
   captain briefing, stronger route-level hierarchy, and a mobile pre-form
   summary card. The critical auth-aside crop stayed green and improved its
   visual variance from the initial washed-out state.
+- 2026-03-27: Dashboard hero and map surfaces received a focused polish pass.
+  The owner dashboard now opens with a denser captain briefing, clearer public
+  route and edge posture cues, richer stat-card hints, and a calmer map
+  fallback state that no longer exposes raw MapKit configuration language in
+  the UI screenshots.
 
 ## Next Target
 
-- Landing page hierarchy is the next overnight target. The auth routes are now
-  stable enough to move the loop to the home hero, quick signals, and the lower
-  content rhythm.
+- Landing page hierarchy is still the next overnight target. The dashboard now
+  reads more like a product surface, so the home hero, quick signals, and lower
+  content rhythm are the highest-leverage remaining pass.
