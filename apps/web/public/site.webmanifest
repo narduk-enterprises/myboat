@@ -1,6 +1,6 @@
 {
-  "name": "my-boat",
-  "short_name": "my-boat",
+  "name": "MyBoat",
+  "short_name": "MyBoat",
   "icons": [
     {
       "src": "/favicon-32x32.png",
@@ -13,7 +13,7 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#10b981",
-  "background_color": "#0B1120",
+  "theme_color": "#0f766e",
+  "background_color": "#03131a",
   "display": "standalone"
 }

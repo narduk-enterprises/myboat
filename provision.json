@@ -1,8 +1,8 @@
 {
   "name": "myboat",
   "displayName": "my-boat",
-  "description": "For serving up information about your boat for yourself and others. Soon to supersede the current https://mybo.at",
+  "description": "Marine platform for vessel identity, live telemetry, passages, media, and edge installs.",
   "url": "https://mybo.at",
   "provisionedAt": "2026-03-25T14:46:54.774Z",
-  "shortDescription": "For serving up information about your boat for yourself and others. Soon to supersede the current https://mybo.at"
+  "shortDescription": "Marine platform for vessel identity, live telemetry, passages, media, and edge installs."
 }

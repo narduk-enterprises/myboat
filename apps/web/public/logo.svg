@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" role="img" aria-labelledby="title desc">
+  <title id="title">MyBoat</title>
+  <desc id="desc">Wordmark for the MyBoat marine platform.</desc>
+  <defs>
+    <linearGradient id="ocean" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#155e75" />
+    </linearGradient>
+  </defs>
+  <rect width="36" height="36" x="2" y="2" rx="12" fill="url(#ocean)" />
+  <path d="M13 23c3.4-2.7 6.8-4 10.2-4 2.9 0 5.4.8 7.8 2.3-1.8 3.6-4.9 6.7-9.4 9.2-3-2.1-5.8-4.6-8.6-7.5Z" fill="#f8fafc" />
+  <path d="M10 16.5c4.2-3.8 8.7-5.8 13.5-5.8 2.8 0 5.5.7 8.3 2.1" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.6" />
+  <text x="48" y="18" fill="#0f172a" font-family="Sora, Manrope, system-ui, sans-serif" font-size="16" font-weight="700">MyBoat</text>
+  <text x="48" y="31" fill="#475569" font-family="Manrope, system-ui, sans-serif" font-size="9" letter-spacing="1.4">LIVE VESSEL INTELLIGENCE</text>
+</svg>

@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const localNuxtPort = Number(process.env.NUXT_PORT || 3000)
 const localSiteUrl = `http://localhost:${Number.isFinite(localNuxtPort) ? localNuxtPort : 3000}`
+const canonicalSiteUrl = process.env.SITE_URL || 'https://mybo.at'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -39,7 +40,7 @@ export default defineNuxtConfig({
     posthogProjectId: process.env.POSTHOG_PROJECT_ID || '',
     public: {
       appUrl: process.env.SITE_URL || localSiteUrl,
-      appName: process.env.APP_NAME || 'my-boat',
+      appName: process.env.APP_NAME || 'MyBoat',
       // Analytics (client-side tracking)
       posthogPublicKey: process.env.POSTHOG_PUBLIC_KEY || '',
       posthogHost: process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
@@ -50,25 +51,25 @@ export default defineNuxtConfig({
   },
 
   site: {
-    url: process.env.SITE_URL || localSiteUrl,
-    name: 'my-boat',
+    url: canonicalSiteUrl,
+    name: 'MyBoat',
     description:
-      'For serving up information about your boat for yourself and others. Soon to supersede the current https://mybo.at',
+      'Public vessel identity, live telemetry, passages, media, and edge installs in one coherent marine platform.',
     defaultLocale: 'en',
   },
 
   schemaOrg: {
     identity: {
       type: 'Organization',
-      name: 'my-boat',
-      url: process.env.SITE_URL || localSiteUrl,
-      logo: '/favicon.svg',
+      name: 'MyBoat',
+      url: canonicalSiteUrl,
+      logo: '/logo.svg',
     },
   },
 
   image: {
     cloudflare: {
-      baseURL: process.env.SITE_URL || localSiteUrl,
+      baseURL: canonicalSiteUrl,
     },
   },
 })

@@ -1,56 +1,158 @@
-Status: DRAFT
+Status: LOCKED
 
-# my-boat
+# MyBoat Product Spec
 
-Source: provision.json (myboat)
+## Product definition
 
-## Product
+MyBoat is a vessel-first platform for captains and crew who want one canonical home for:
 
-For serving up information about your boat for yourself and others. Soon to supersede the current https://mybo.at
+- public boat identity
+- authenticated vessel operations
+- live telemetry snapshots
+- passages and route memory
+- geo-linked media and notes
+- edge install and ingest-key management
 
+This repo is the canonical successor to the earlier `loganrenz/myboat` starter work. The product now lives in one Nuxt 4 application at `apps/web/`, backed by the Narduk Nuxt layer for auth, D1, SEO, analytics, and Cloudflare-safe runtime conventions.
 
-## In scope
+## Target users
 
-- (fill during agent workflow)
+- Owner-operators who want a private operations dashboard and a clean public boat profile
+- Couples, crew, and families who need current location, install status, and passage history
+- Technical boat owners running SignalK or adjacent onboard telemetry
+- Future collaborators who need a stable schema and route system for telemetry, media, and public sharing
 
+## Public vs private surfaces
 
-## Out of scope
+### Public
 
-- (fill during agent workflow)
+- `/`
+- `/:username`
 
-## User flows
+Public surfaces must show only captain-approved identity, vessel summaries, and any live or historical context already marked public.
 
-1. Review the product brief, lock the first end-to-end workflow in SPEC, and confirm the implementation order before building.
+### Private
 
-2. Expand secondary journeys, error states, and privileged/admin flows during the downstream agent workflow.
+- `/login`
+- `/register`
+- `/dashboard`
+- `/dashboard/onboarding`
+- `/dashboard/vessels/[vesselSlug]`
+- `/dashboard/installations/[installationId]`
 
+Private surfaces are for vessel ownership, install configuration, ingest credentials, and internal telemetry views.
 
-## Conceptual data model
+## Major feature areas
 
-- 
+### 1. Captain profile
 
-## Pages / routes
+- one public username per authenticated user
+- public headline, bio, and home port
+- profile becomes the stable public entry point
 
-- 
+### 2. Vessel identity
 
-## Non-functional
+- a captain can define one or more vessels
+- one vessel is marked primary
+- vessel metadata includes name, type, home port, summary, and public-sharing flag
 
-### Guardrails
+### 3. Live vessel state
 
-Do not reinvent platform primitives. Before adding new auth, session, CSRF, analytics, SEO, OG images, rate limiting, mutation helpers, or DB access patterns:
+- latest known telemetry snapshot is stored per vessel
+- snapshot fields include fix, heading, speed, wind, depth, water temperature, battery voltage, and engine RPM
+- snapshots are updated through `/api/ingest/v1/delta`
 
-Auth: Use the template / layer auth (session, login/register routes, guards, useUser-style composables) exactly as shipped. Extend with new tables and route rules, not a parallel auth stack.
-Maps / geo (if needed): Use first-class template or layer integrations (e.g. documented map components, env keys, server utilities). Do not embed a new map SDK or geocoder unless the template has no path and SPEC explicitly approves an exception.
-Data & API: Use useAppDatabase, layer useDatabase rules, withValidatedBody / mutation wrappers, #server/ imports, and existing D1 + Drizzle patterns.
-UI & SEO: Use Nuxt UI v4, useSeo + Schema.org helpers, useFetch / useAsyncData (no raw $fetch in pages). Reuse OgImage templates from the layer where applicable.
-Analytics / admin patterns: Wire through existing PostHog, GA, or admin patterns if the template already exposes them; do not duplicate trackers or admin APIs.
-If something is missing, extend the layer only when the feature is reusable across apps; otherwise keep changes in apps/web/ and still call into layer utilities.
+### 4. Install management
 
+- installs represent real onboard or near-boat device deployments
+- installs hold hostnames, SignalK stream URLs, connectivity state, event counts, and last-seen timestamps
+- install pages can issue ingest keys tied to the install
 
-## Test acceptance (MVP)
+### 5. Passages
 
-- 
+- passages represent meaningful historical movement or voyage slices
+- each passage can include summary copy, endpoints, distance, wind, and optional route geometry
+- passages are historical context, not raw timeseries dumps
 
-## Open questions
+### 6. Media and annotations
 
-- 
+- media items are geo-aware vessel memories tied to passages or places
+- waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or notes
+
+## Page inventory
+
+- `/`: public product overview
+- `/login`: branded auth entry
+- `/register`: branded account creation
+- `/dashboard`: operational overview
+- `/dashboard/onboarding`: captain, vessel, and install setup
+- `/dashboard/vessels/[vesselSlug]`: vessel detail
+- `/dashboard/installations/[installationId]`: install and ingest key detail
+- `/:username`: public captain profile
+
+## Core flows
+
+### Captain setup
+
+1. Register or sign in.
+2. Complete onboarding.
+3. Lock the public handle.
+4. Define the vessel.
+5. Define the first install.
+6. Land on vessel detail.
+
+### Install activation
+
+1. Open installation detail.
+2. Generate an ingest key.
+3. Copy the collector command template.
+4. Point a collector or bridge service at `/api/ingest/v1/delta`.
+5. Confirm live snapshot and last-seen updates on dashboard and vessel pages.
+
+### Public sharing
+
+1. Visit `/:username`.
+2. View captain identity, vessel summaries, latest route context, and public install posture.
+3. Move between the public profile and the private dashboard without route confusion.
+
+## Domain model
+
+- `public_profiles`: public captain handle and profile metadata
+- `vessels`: captain-owned vessel records
+- `vessel_installations`: onboard device installs
+- `vessel_installation_api_keys`: mapping from install to layer-owned API keys
+- `vessel_live_snapshots`: last known live state per vessel
+- `passages`: voyage summaries and optional route geometry
+- `waypoints`: geo-linked annotations and visited places
+- `media_items`: geo-linked images and notes
+
+## Branding and positioning
+
+- calm, marine-aware, precise, operational
+- not a generic SaaS dashboard
+- not a consumer social network
+- product language centers on captains, vessels, installs, telemetry, passages, and public profiles
+
+## SEO and public sharing strategy
+
+- home page is indexable and product-level
+- captain profile pages are indexable when public
+- private dashboard and install pages must never be indexable
+- structured data uses `useSeo()` plus `useWebPageSchema()`
+- schema identity points at real MyBoat branding assets
+
+## Out of scope for this migration
+
+- rebuilding the old split cloud-web/edge-web/edge-api monorepo structure
+- OTP auth or a second auth stack
+- raw SignalK or raw Influx browser proxies
+- giant marketing-site expansion unrelated to the product
+- telemetry charts beyond the current live snapshot and passage framing
+
+## Acceptance criteria
+
+- source repo product concepts are represented in the destination app
+- Narduk auth, D1, mutation helpers, API-key hashing, SEO, and app shell conventions are canonical
+- `/api/ingest/v1/delta` exists and updates install + live snapshot state
+- no placeholder home/about/contact scaffold remains
+- docs describe the real migrated product, not the provision brief

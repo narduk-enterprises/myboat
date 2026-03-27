@@ -1,7 +1,10 @@
 export default defineAppConfig({
+  auth: {
+    redirectPath: '/dashboard',
+  },
   ui: {
-    primary: 'blue',
+    primary: 'cyan',
     neutral: 'slate',
-    strategy: 'override'
-  }
+    strategy: 'override',
+  },
 })
