@@ -28,6 +28,18 @@ const metrics = computed(() => {
       icon: 'i-lucide-gauge',
     },
     {
+      label: 'Speed through water',
+      value: convertSpeed(props.snapshot.speedThroughWater),
+      unit: speedUnitLabel.value,
+      icon: 'i-lucide-ship-wheel',
+    },
+    {
+      label: 'Heading magnetic',
+      value: convertAngle(props.snapshot.headingMagnetic),
+      unit: '°',
+      icon: 'i-lucide-compass',
+    },
+    {
       label: 'Apparent wind',
       value: convertSpeed(props.snapshot.windSpeedApparent),
       unit: speedUnitLabel.value,
@@ -57,12 +69,20 @@ const metrics = computed(() => {
       unit: 'V',
       icon: 'i-lucide-battery-medium',
     },
+    {
+      label: 'Engine RPM',
+      value: props.snapshot.engineRpm,
+      unit: 'rpm',
+      icon: 'i-lucide-gauge-circle',
+    },
   ]
     .filter((metric) => metric.value !== null)
     .map((metric) => ({
       ...metric,
       value:
-        typeof metric.value === 'number' ? metric.value.toFixed(metric.unit === '°' ? 0 : 1) : '--',
+        typeof metric.value === 'number'
+          ? metric.value.toFixed(metric.unit === '°' || metric.unit === 'rpm' ? 0 : 1)
+          : '--',
     }))
 })
 </script>

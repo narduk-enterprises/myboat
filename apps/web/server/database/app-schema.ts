@@ -141,6 +141,64 @@ export const mediaItems = sqliteTable('media_items', {
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
 })
 
+export const followedVessels = sqliteTable(
+  'followed_vessels',
+  {
+    id: text('id').primaryKey(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: text('source').notNull().default('aishub'),
+    matchMode: text('match_mode').notNull().default('mmsi'),
+    mmsi: text('mmsi').notNull(),
+    imo: text('imo'),
+    name: text('name').notNull(),
+    callSign: text('call_sign'),
+    destination: text('destination'),
+    lastReportAt: text('last_report_at'),
+    positionLat: real('position_lat'),
+    positionLng: real('position_lng'),
+    shipType: integer('ship_type'),
+    sourceStationsJson: text('source_stations_json').notNull().default('[]'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+    updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    ownerMmsiIdx: uniqueIndex('followed_vessels_owner_mmsi_idx').on(table.ownerUserId, table.mmsi),
+  }),
+)
+
+export const aishubSearchCache = sqliteTable('aishub_search_cache', {
+  queryKey: text('query_key').primaryKey(),
+  matchMode: text('match_mode').notNull(),
+  responseJson: text('response_json').notNull(),
+  cachedAt: text('cached_at').notNull().$defaultFn(isoTimestamp),
+  expiresAt: text('expires_at').notNull(),
+})
+
+export const aishubVessels = sqliteTable('aishub_vessels', {
+  mmsi: text('mmsi').primaryKey(),
+  imo: text('imo'),
+  name: text('name').notNull(),
+  callSign: text('call_sign'),
+  destination: text('destination'),
+  lastReportAt: text('last_report_at'),
+  positionLat: real('position_lat'),
+  positionLng: real('position_lng'),
+  shipType: integer('ship_type'),
+  sourceStationsJson: text('source_stations_json').notNull().default('[]'),
+  searchDocument: text('search_document').notNull(),
+  firstSeenAt: text('first_seen_at').notNull().$defaultFn(isoTimestamp),
+  lastFetchedAt: text('last_fetched_at').notNull().$defaultFn(isoTimestamp),
+  updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+})
+
+export const aishubRequestState = sqliteTable('aishub_request_state', {
+  id: text('id').primaryKey(),
+  lastRequestAt: text('last_request_at').notNull(),
+  updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+})
+
 export type PublicProfile = typeof publicProfiles.$inferSelect
 export type Vessel = typeof vessels.$inferSelect
 export type VesselInstallation = typeof vesselInstallations.$inferSelect
@@ -148,3 +206,5 @@ export type VesselLiveSnapshot = typeof vesselLiveSnapshots.$inferSelect
 export type Passage = typeof passages.$inferSelect
 export type Waypoint = typeof waypoints.$inferSelect
 export type MediaItem = typeof mediaItems.$inferSelect
+export type FollowedVessel = typeof followedVessels.$inferSelect
+export type AisHubVessel = typeof aishubVessels.$inferSelect

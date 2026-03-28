@@ -25,7 +25,7 @@ withDefaults(
             <div
               class="rounded-full border border-default bg-default/70 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted"
             >
-              Fleet ready
+              Secure access
             </div>
           </div>
 
@@ -46,10 +46,10 @@ withDefaults(
             <div
               class="rounded-[1.5rem] border border-default bg-elevated/90 px-4 py-4 text-right text-default shadow-[0_24px_60px_-42px_rgb(15_23_42_/_0.24)] backdrop-blur-md"
             >
-              <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Private route</p>
-              <p class="mt-2 font-display text-2xl text-default">Bridge auth</p>
+              <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Private access</p>
+              <p class="mt-2 font-display text-2xl text-default">Dashboard</p>
               <p class="mt-2 max-w-[10rem] text-sm leading-5 text-muted">
-                Secure captain access for installs, passages, and public updates.
+                Manage installs, trips, and sharing.
               </p>
             </div>
           </div>
@@ -59,30 +59,28 @@ withDefaults(
               <div
                 class="rounded-[1.35rem] border border-default bg-elevated/88 px-4 py-4 text-default shadow-[0_20px_45px_-38px_rgb(15_23_42_/_0.24)] backdrop-blur-xl"
               >
-                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Public route</p>
+                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Public page</p>
                 <p class="mt-3 font-display text-xl text-default">@captain</p>
-                <p class="mt-2 text-sm leading-5 text-muted">
-                  Shared vessel page stays current while private install controls stay sealed.
-                </p>
+                <p class="mt-2 text-sm leading-5 text-muted">Your captain and boat page.</p>
               </div>
 
               <div
                 class="rounded-[1.35rem] border border-default bg-elevated/88 px-4 py-4 text-default shadow-[0_20px_45px_-38px_rgb(15_23_42_/_0.24)] backdrop-blur-xl"
               >
-                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Live posture</p>
+                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Live feed</p>
                 <p class="mt-3 font-display text-xl text-default">SignalK ready</p>
                 <p class="mt-2 text-sm leading-5 text-muted">
-                  Watch telemetry health, route freshness, and dockside readiness in one pass.
+                  Watch feed health and recent activity.
                 </p>
               </div>
 
               <div
                 class="rounded-[1.35rem] border border-default bg-elevated/88 px-4 py-4 text-default shadow-[0_20px_45px_-38px_rgb(15_23_42_/_0.24)] backdrop-blur-xl"
               >
-                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Edge control</p>
-                <p class="mt-3 font-display text-xl text-default">Ingest keys</p>
+                <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Install setup</p>
+                <p class="mt-3 font-display text-xl text-default">Keys + relay</p>
                 <p class="mt-2 text-sm leading-5 text-muted">
-                  Keep collector credentials and the relay path aligned before the boat reports.
+                  Manage device labels and connection details.
                 </p>
               </div>
             </div>
@@ -106,9 +104,9 @@ withDefaults(
           <div
             class="mt-10 flex items-center justify-between gap-4 border-t border-default/70 pt-5 text-sm text-muted"
           >
-            <p>Designed for the captain view that connects public presence to live operations.</p>
+            <p>Private access for what you manage. Public pages for what you share.</p>
             <div class="rounded-full border border-default bg-default/70 px-3 py-1 text-default">
-              Auth surface v2
+              Secure sign-in
             </div>
           </div>
         </div>

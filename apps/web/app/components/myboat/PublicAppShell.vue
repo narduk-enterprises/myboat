@@ -46,9 +46,7 @@ const { footerGroups, loggedIn, publicNavLinks, userMenuLinks } = useMyBoatShell
 
       <div
         :class="
-          props.fullBleed
-            ? 'w-full'
-            : 'mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10'
+          props.fullBleed ? 'w-full' : 'mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10'
         "
       >
         <slot />
@@ -61,8 +59,7 @@ const { footerGroups, loggedIn, publicNavLinks, userMenuLinks } = useMyBoatShell
               <div class="space-y-4">
                 <AppBrandMark />
                 <p class="max-w-2xl text-sm leading-6 text-muted">
-                  A bluewater operations surface for captain identity, live vessel tracking,
-                  passages, onboard installs, and the public story you choose to share.
+                  Track your boat, manage installs, and share a public page when you&apos;re ready.
                 </p>
                 <div class="flex flex-wrap gap-3">
                   <UButton
@@ -74,7 +71,7 @@ const { footerGroups, loggedIn, publicNavLinks, userMenuLinks } = useMyBoatShell
                     {{ loggedIn ? 'Open dashboard' : 'Create account' }}
                   </UButton>
                   <UButton to="/explore" color="neutral" variant="ghost" icon="i-lucide-compass">
-                    Explore public boats
+                    Explore boats
                   </UButton>
                 </div>
               </div>

@@ -1,0 +1,466 @@
+import type { H3Event } from 'h3'
+import { desc, eq, like } from 'drizzle-orm'
+import type { AisHubSearchResponse, AisHubSearchResult } from '~/types/myboat'
+import {
+  AISHUB_SEARCH_COOLDOWN_MS,
+  normalizeAisHubSearchQuery,
+  parseAisHubApiSearchResponse,
+  parseAisHubVesselsHtml,
+} from '../../shared/aishub'
+import { aishubRequestState, aishubSearchCache, aishubVessels } from '#server/database/app-schema'
+import { useAppDatabase } from '#server/utils/database'
+
+const AISHUB_API_URL = 'https://data.aishub.net/ws.php'
+const AISHUB_VESSELS_URL = 'https://www.aishub.net/vessels'
+const AISHUB_GLOBAL_REQUEST_ID = 'global'
+const AISHUB_SEARCH_CACHE_TTL_MS = 10 * 60_000
+const AISHUB_LOCAL_SEARCH_LIMIT = 24
+const AISHUB_RESULT_LIMIT = 12
+
+type AisHubSearchMode = AisHubSearchResult['matchMode']
+
+function buildCacheKey(matchMode: AisHubSearchMode, query: string) {
+  return `${matchMode}:${query.toLowerCase()}`
+}
+
+function normalizeStoredSearchQuery(value: string) {
+  return value.trim().toLowerCase().replaceAll(/\s+/g, ' ')
+}
+
+function parseSourceStations(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+function buildSearchDocument(
+  result: Pick<
+    AisHubSearchResult,
+    'mmsi' | 'imo' | 'name' | 'callSign' | 'destination' | 'sourceStations'
+  >,
+) {
+  return [
+    result.mmsi,
+    result.imo,
+    result.name,
+    result.callSign,
+    result.destination,
+    ...result.sourceStations,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(' ')
+    .toLowerCase()
+}
+
+function inferLocalMatchMode(result: Pick<AisHubSearchResult, 'mmsi'>, normalizedQuery: string) {
+  const compactDigits = normalizedQuery.replaceAll(/\s+/g, '')
+  return compactDigits === result.mmsi ? 'mmsi' : 'name'
+}
+
+function scoreLocalResult(
+  result: Pick<AisHubSearchResult, 'mmsi' | 'imo' | 'name' | 'callSign' | 'destination'> & {
+    sourceStations: string[]
+  },
+  normalizedQuery: string,
+) {
+  const compactDigits = normalizedQuery.replaceAll(/\s+/g, '')
+  const name = result.name.toLowerCase()
+  const callSign = result.callSign?.toLowerCase() || ''
+  const imo = result.imo?.toLowerCase() || ''
+  const destination = result.destination?.toLowerCase() || ''
+  const stations = result.sourceStations.join(' ').toLowerCase()
+
+  if (compactDigits && result.mmsi === compactDigits) return 120
+  if (imo && imo === normalizedQuery) return 110
+  if (name === normalizedQuery) return 105
+  if (callSign && callSign === normalizedQuery) return 100
+  if (destination && destination === normalizedQuery) return 95
+  if (compactDigits && result.mmsi.startsWith(compactDigits)) return 92
+  if (imo && imo.startsWith(normalizedQuery)) return 88
+  if (name.startsWith(normalizedQuery)) return 85
+  if (callSign && callSign.startsWith(normalizedQuery)) return 82
+  if (destination && destination.startsWith(normalizedQuery)) return 80
+  if (stations && stations.includes(normalizedQuery)) return 76
+  if (name.includes(normalizedQuery)) return 72
+  if (callSign && callSign.includes(normalizedQuery)) return 69
+  if (destination && destination.includes(normalizedQuery)) return 66
+  if (imo && imo.includes(normalizedQuery)) return 64
+  if (compactDigits && result.mmsi.includes(compactDigits)) return 62
+
+  return 0
+}
+
+function canQueryUpstream(matchMode: AisHubSearchMode, normalizedQuery: string) {
+  return matchMode === 'mmsi' ? /^\d{9}$/.test(normalizedQuery) : normalizedQuery.length >= 3
+}
+
+function serializeStoredResult(
+  row: {
+    mmsi: string
+    imo: string | null
+    name: string
+    callSign: string | null
+    destination: string | null
+    lastReportAt: string | null
+    positionLat: number | null
+    positionLng: number | null
+    shipType: number | null
+    sourceStationsJson: string
+  },
+  normalizedQuery: string,
+): AisHubSearchResult {
+  const sourceStations = parseSourceStations(row.sourceStationsJson)
+
+  return {
+    source: 'aishub',
+    matchMode: inferLocalMatchMode(row, normalizedQuery),
+    mmsi: row.mmsi,
+    imo: row.imo,
+    name: row.name,
+    callSign: row.callSign,
+    destination: row.destination,
+    lastReportAt: row.lastReportAt,
+    positionLat: row.positionLat,
+    positionLng: row.positionLng,
+    shipType: row.shipType,
+    sourceStations,
+  }
+}
+
+export async function rememberAisHubResults(
+  event: H3Event,
+  results: AisHubSearchResult[],
+  fetchedAt: string,
+) {
+  if (!results.length) {
+    return
+  }
+
+  const db = useAppDatabase(event)
+
+  for (const result of results) {
+    await db
+      .insert(aishubVessels)
+      .values({
+        mmsi: result.mmsi,
+        imo: result.imo,
+        name: result.name,
+        callSign: result.callSign,
+        destination: result.destination,
+        lastReportAt: result.lastReportAt,
+        positionLat: result.positionLat,
+        positionLng: result.positionLng,
+        shipType: result.shipType,
+        sourceStationsJson: JSON.stringify(result.sourceStations),
+        searchDocument: buildSearchDocument(result),
+        firstSeenAt: fetchedAt,
+        lastFetchedAt: fetchedAt,
+        updatedAt: fetchedAt,
+      })
+      .onConflictDoUpdate({
+        target: aishubVessels.mmsi,
+        set: {
+          imo: result.imo,
+          name: result.name,
+          callSign: result.callSign,
+          destination: result.destination,
+          lastReportAt: result.lastReportAt,
+          positionLat: result.positionLat,
+          positionLng: result.positionLng,
+          shipType: result.shipType,
+          sourceStationsJson: JSON.stringify(result.sourceStations),
+          searchDocument: buildSearchDocument(result),
+          lastFetchedAt: fetchedAt,
+          updatedAt: fetchedAt,
+        },
+      })
+  }
+}
+
+async function searchStoredAisHubVessels(event: H3Event, rawQuery: string) {
+  const normalizedQuery = normalizeStoredSearchQuery(rawQuery)
+  if (!normalizedQuery) {
+    return {
+      cachedAt: null,
+      results: [] as AisHubSearchResult[],
+    }
+  }
+
+  const db = useAppDatabase(event)
+  const rows = await db
+    .select({
+      mmsi: aishubVessels.mmsi,
+      imo: aishubVessels.imo,
+      name: aishubVessels.name,
+      callSign: aishubVessels.callSign,
+      destination: aishubVessels.destination,
+      lastReportAt: aishubVessels.lastReportAt,
+      positionLat: aishubVessels.positionLat,
+      positionLng: aishubVessels.positionLng,
+      shipType: aishubVessels.shipType,
+      sourceStationsJson: aishubVessels.sourceStationsJson,
+      lastFetchedAt: aishubVessels.lastFetchedAt,
+    })
+    .from(aishubVessels)
+    .where(like(aishubVessels.searchDocument, `%${normalizedQuery}%`))
+    .orderBy(desc(aishubVessels.lastFetchedAt))
+    .limit(AISHUB_LOCAL_SEARCH_LIMIT)
+    .all()
+
+  const results = rows
+    .map((row) => ({
+      lastFetchedAt: row.lastFetchedAt,
+      result: serializeStoredResult(row, normalizedQuery),
+    }))
+    .sort((left, right) => {
+      const scoreDelta =
+        scoreLocalResult(right.result, normalizedQuery) -
+        scoreLocalResult(left.result, normalizedQuery)
+      if (scoreDelta !== 0) {
+        return scoreDelta
+      }
+
+      return new Date(right.lastFetchedAt).getTime() - new Date(left.lastFetchedAt).getTime()
+    })
+    .slice(0, AISHUB_RESULT_LIMIT)
+
+  return {
+    cachedAt: results[0]?.lastFetchedAt || null,
+    results: results.map((item) => item.result),
+  }
+}
+
+async function getCachedSearch(
+  event: H3Event,
+  matchMode: AisHubSearchMode,
+  query: string,
+  rawQuery: string,
+): Promise<AisHubSearchResponse | null> {
+  const db = useAppDatabase(event)
+  const cacheKey = buildCacheKey(matchMode, query)
+  const row = await db
+    .select({
+      matchMode: aishubSearchCache.matchMode,
+      responseJson: aishubSearchCache.responseJson,
+      cachedAt: aishubSearchCache.cachedAt,
+      expiresAt: aishubSearchCache.expiresAt,
+    })
+    .from(aishubSearchCache)
+    .where(eq(aishubSearchCache.queryKey, cacheKey))
+    .get()
+
+  if (!row) {
+    return null
+  }
+
+  const expiresAtMs = Date.parse(row.expiresAt)
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+    return null
+  }
+
+  try {
+    const results = JSON.parse(row.responseJson) as AisHubSearchResult[]
+    await rememberAisHubResults(event, results, row.cachedAt)
+
+    return {
+      query: rawQuery,
+      matchMode,
+      source: 'cache',
+      cachedAt: row.cachedAt,
+      results,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function setCachedSearch(event: H3Event, response: Omit<AisHubSearchResponse, 'source'>) {
+  const db = useAppDatabase(event)
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + AISHUB_SEARCH_CACHE_TTL_MS).toISOString()
+  const queryKey = buildCacheKey(response.matchMode, response.query)
+
+  await db
+    .insert(aishubSearchCache)
+    .values({
+      queryKey,
+      matchMode: response.matchMode,
+      responseJson: JSON.stringify(response.results),
+      cachedAt: response.cachedAt || now.toISOString(),
+      expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: aishubSearchCache.queryKey,
+      set: {
+        matchMode: response.matchMode,
+        responseJson: JSON.stringify(response.results),
+        cachedAt: response.cachedAt || now.toISOString(),
+        expiresAt,
+      },
+    })
+}
+
+async function assertAisHubCooldownAvailable(event: H3Event) {
+  const db = useAppDatabase(event)
+  const row = await db
+    .select({ lastRequestAt: aishubRequestState.lastRequestAt })
+    .from(aishubRequestState)
+    .where(eq(aishubRequestState.id, AISHUB_GLOBAL_REQUEST_ID))
+    .get()
+
+  if (!row) {
+    return
+  }
+
+  const lastRequestMs = Date.parse(row.lastRequestAt)
+  if (!Number.isFinite(lastRequestMs)) {
+    return
+  }
+
+  const remainingMs = AISHUB_SEARCH_COOLDOWN_MS - (Date.now() - lastRequestMs)
+  if (remainingMs <= 0) {
+    return
+  }
+
+  setResponseHeader(event, 'Retry-After', Math.ceil(remainingMs / 1000))
+  throw createError({
+    statusCode: 429,
+    statusMessage: `AIS Hub only allows one upstream lookup per minute. Try again in ${Math.ceil(remainingMs / 1000)}s.`,
+    data: { retryAfterMs: remainingMs },
+  })
+}
+
+async function recordAisHubRequest(event: H3Event, requestedAt: string) {
+  const db = useAppDatabase(event)
+
+  await db
+    .insert(aishubRequestState)
+    .values({
+      id: AISHUB_GLOBAL_REQUEST_ID,
+      lastRequestAt: requestedAt,
+      updatedAt: requestedAt,
+    })
+    .onConflictDoUpdate({
+      target: aishubRequestState.id,
+      set: {
+        lastRequestAt: requestedAt,
+        updatedAt: requestedAt,
+      },
+    })
+}
+
+async function fetchAisHubApiByMmsi(mmsi: string) {
+  const apiKey = useRuntimeConfig().aisHubKey?.trim() || ''
+  if (!apiKey) {
+    return null
+  }
+
+  const url = new URL(AISHUB_API_URL)
+  url.searchParams.set('username', apiKey)
+  url.searchParams.set('format', '1')
+  url.searchParams.set('output', 'json')
+  url.searchParams.set('compress', '0')
+  url.searchParams.set('mmsi', mmsi)
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
+    },
+  })
+
+  if (!response.ok) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'AIS Hub lookup failed.',
+    })
+  }
+
+  const payload = await response.text()
+  if (!payload.trim()) {
+    return []
+  }
+
+  return parseAisHubApiSearchResponse(payload)
+}
+
+async function fetchAisHubVesselsPage(query: string, matchMode: AisHubSearchMode) {
+  const url = new URL(AISHUB_VESSELS_URL)
+  url.searchParams.set(matchMode === 'mmsi' ? 'Ship[mmsi]' : 'Ship[name]', query)
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  })
+
+  if (!response.ok) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'AIS Hub vessel search failed.',
+    })
+  }
+
+  return parseAisHubVesselsHtml(await response.text(), matchMode)
+}
+
+export async function searchAisHubVessels(
+  event: H3Event,
+  rawQuery: string,
+): Promise<AisHubSearchResponse> {
+  const trimmedQuery = rawQuery.trim().replaceAll(/\s+/g, ' ')
+  const { matchMode, normalizedQuery } = normalizeAisHubSearchQuery(trimmedQuery)
+
+  const local = await searchStoredAisHubVessels(event, trimmedQuery)
+  if (local.results.length) {
+    return {
+      query: trimmedQuery,
+      matchMode,
+      source: 'local',
+      cachedAt: local.cachedAt,
+      results: local.results,
+    }
+  }
+
+  if (!canQueryUpstream(matchMode, normalizedQuery)) {
+    return {
+      query: trimmedQuery,
+      matchMode,
+      source: 'local',
+      cachedAt: null,
+      results: [],
+    }
+  }
+
+  const cached = await getCachedSearch(event, matchMode, normalizedQuery, trimmedQuery)
+  if (cached) {
+    return cached
+  }
+
+  await assertAisHubCooldownAvailable(event)
+
+  const results =
+    matchMode === 'mmsi'
+      ? (await fetchAisHubApiByMmsi(normalizedQuery)) ||
+        (await fetchAisHubVesselsPage(normalizedQuery, matchMode))
+      : await fetchAisHubVesselsPage(normalizedQuery, matchMode)
+
+  const cachedAt = new Date().toISOString()
+  await recordAisHubRequest(event, cachedAt)
+  await rememberAisHubResults(event, results, cachedAt)
+
+  const response: AisHubSearchResponse = {
+    query: normalizedQuery,
+    matchMode,
+    source: 'upstream',
+    cachedAt,
+    results,
+  }
+
+  await setCachedSearch(event, response)
+  return response
+}

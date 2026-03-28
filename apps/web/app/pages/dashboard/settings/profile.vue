@@ -17,16 +17,21 @@ useWebPageSchema({
 const toast = useToast()
 const session = useUserSession()
 const appFetch = useAppFetch()
-const { data, pending } = await useDashboardOverview('myboat-settings-profile')
+const { data, pending, refresh } = await useDashboardOverview('myboat-settings-profile')
 
 const overview = computed(() => data.value)
 const profile = computed(() => overview.value?.profile ?? null)
 const primaryVessel = computed(
-  () => overview.value?.vessels.find((vessel) => vessel.isPrimary) || overview.value?.vessels[0] || null,
+  () =>
+    overview.value?.vessels.find((vessel) => vessel.isPrimary) ||
+    overview.value?.vessels[0] ||
+    null,
 )
 const primaryInstall = computed(
   () =>
-    overview.value?.installations.find((installation) => installation.vesselId === primaryVessel.value?.id) ||
+    overview.value?.installations.find(
+      (installation) => installation.vesselId === primaryVessel.value?.id,
+    ) ||
     overview.value?.installations[0] ||
     null,
 )
@@ -157,126 +162,138 @@ async function onSubmit() {
     </template>
 
     <template v-else-if="overview">
-    <UPageHero
-      title="Captain profile"
-      description="Update the name, handle, and profile copy that power your public identity."
-    >
-      <template #links>
-        <UButton to="/dashboard/settings" color="neutral" variant="soft" icon="i-lucide-arrow-left">
-          Back to settings
-        </UButton>
-      </template>
-    </UPageHero>
-
-    <div class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-      <UCard class="border-default/80 bg-default/90 shadow-card">
-        <template #header>
-          <div>
-            <h2 class="font-display text-2xl text-default">Profile editor</h2>
-            <p class="mt-1 text-sm text-muted">
-              These fields update the same canonical captain records used by onboarding.
-            </p>
-          </div>
+      <UPageHero
+        title="Captain profile"
+        description="Update the name, handle, and profile copy that power your public identity."
+      >
+        <template #links>
+          <UButton to="/dashboard/fleet-friends" color="primary" icon="i-lucide-users">
+            Find buddy boats
+          </UButton>
+          <UButton
+            to="/dashboard/settings"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-arrow-left"
+          >
+            Back to settings
+          </UButton>
         </template>
+      </UPageHero>
 
-        <UForm :schema="schema" :state="state" class="space-y-5" @submit.prevent="onSubmit">
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormField name="captainName" label="Captain name">
-              <UInput v-model="state.captainName" class="w-full" />
-            </UFormField>
-
-            <UFormField name="username" label="Public handle">
-              <UInput v-model="state.username" class="w-full" />
-            </UFormField>
-          </div>
-
-          <UFormField name="headline" label="Headline">
-            <UInput
-              v-model="state.headline"
-              class="w-full"
-              placeholder="Live tracking, passages, and story from the boat."
-            />
-          </UFormField>
-
-          <UFormField name="bio" label="Bio">
-            <UTextarea
-              v-model="state.bio"
-              class="w-full"
-              :rows="4"
-              placeholder="Describe the crew, cruising style, or what the public should know."
-            />
-          </UFormField>
-
-          <UFormField name="homePort" label="Home port">
-            <UInput v-model="state.homePort" class="w-full" placeholder="Galveston, Texas" />
-          </UFormField>
-
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <p class="text-sm text-muted">
-              This save keeps your vessel and installation records attached to the current primary
-              setup.
-            </p>
-            <UButton type="submit" color="primary" :loading="loading" icon="i-lucide-save">
-              Save profile
-            </UButton>
-          </div>
-        </UForm>
-      </UCard>
-
-      <div class="space-y-6">
-        <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+      <div class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h3 class="font-display text-xl text-default">Current public surface</h3>
-              <p class="mt-1 text-sm text-muted">What followers see today.</p>
-            </div>
-          </template>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div class="metric-shell rounded-[1.35rem] p-4">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Public URL</p>
-              <p class="mt-3 break-all font-display text-xl text-default">
-                /{{ profile?.username || 'pending' }}
-              </p>
-            </div>
-            <div class="metric-shell rounded-[1.35rem] p-4">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
-              <p class="mt-3 font-display text-xl text-default">
-                {{ primaryVessel?.name || 'Pending' }}
-              </p>
-            </div>
-            <div class="metric-shell rounded-[1.35rem] p-4">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Install label</p>
-              <p class="mt-3 font-display text-xl text-default">
-                {{ primaryInstall?.label || 'Pending' }}
-              </p>
-            </div>
-            <div class="metric-shell rounded-[1.35rem] p-4">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Handle</p>
-              <p class="mt-3 font-display text-xl text-default">@{{ profile?.username || 'pending' }}</p>
-            </div>
-          </div>
-        </UCard>
-
-        <UCard class="chart-surface rounded-[1.75rem] shadow-card">
-          <template #header>
-            <div>
-              <h3 class="font-display text-xl text-default">What this page does</h3>
+              <h2 class="font-display text-2xl text-default">Profile editor</h2>
               <p class="mt-1 text-sm text-muted">
-                It updates the captain identity and preserves the current vessel/install base.
+                These fields update the same canonical captain records used by onboarding.
               </p>
             </div>
           </template>
 
-          <div class="space-y-3 text-sm text-muted">
-            <p>Captain name updates the owner account display name.</p>
-            <p>Public handle controls the captain profile URL.</p>
-            <p>Headline and bio shape the public story pages and profile cards.</p>
-            <p>Home port keeps the public map and summary language grounded.</p>
-          </div>
+          <UForm :schema="schema" :state="state" class="space-y-5" @submit.prevent="onSubmit">
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField name="captainName" label="Captain name">
+                <UInput v-model="state.captainName" class="w-full" />
+              </UFormField>
+
+              <UFormField name="username" label="Public handle">
+                <UInput v-model="state.username" class="w-full" />
+              </UFormField>
+            </div>
+
+            <UFormField name="headline" label="Headline">
+              <UInput
+                v-model="state.headline"
+                class="w-full"
+                placeholder="Live tracking, passages, and story from the boat."
+              />
+            </UFormField>
+
+            <UFormField name="bio" label="Bio">
+              <UTextarea
+                v-model="state.bio"
+                class="w-full"
+                :rows="4"
+                placeholder="Describe the crew, cruising style, or what the public should know."
+              />
+            </UFormField>
+
+            <UFormField name="homePort" label="Home port">
+              <UInput v-model="state.homePort" class="w-full" placeholder="Galveston, Texas" />
+            </UFormField>
+
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <p class="text-sm text-muted">
+                This save keeps your vessel and installation records attached to the current primary
+                setup.
+              </p>
+              <UButton type="submit" color="primary" :loading="loading" icon="i-lucide-save">
+                Save profile
+              </UButton>
+            </div>
+          </UForm>
         </UCard>
+
+        <div class="space-y-6">
+          <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+            <template #header>
+              <div>
+                <h3 class="font-display text-xl text-default">Current public surface</h3>
+                <p class="mt-1 text-sm text-muted">What followers see today.</p>
+              </div>
+            </template>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Public URL</p>
+                <p class="mt-3 break-all font-display text-xl text-default">
+                  /{{ profile?.username || 'pending' }}
+                </p>
+              </div>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
+                <p class="mt-3 font-display text-xl text-default">
+                  {{ primaryVessel?.name || 'Pending' }}
+                </p>
+              </div>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Install label</p>
+                <p class="mt-3 font-display text-xl text-default">
+                  {{ primaryInstall?.label || 'Pending' }}
+                </p>
+              </div>
+              <div class="metric-shell rounded-[1.35rem] p-4">
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">Handle</p>
+                <p class="mt-3 font-display text-xl text-default">
+                  @{{ profile?.username || 'pending' }}
+                </p>
+              </div>
+            </div>
+          </UCard>
+
+          <UCard class="chart-surface rounded-[1.75rem] shadow-card">
+            <template #header>
+              <div>
+                <h3 class="font-display text-xl text-default">What this page does</h3>
+                <p class="mt-1 text-sm text-muted">
+                  It updates the captain identity and preserves the current vessel/install base.
+                </p>
+              </div>
+            </template>
+
+            <div class="space-y-3 text-sm text-muted">
+              <p>Captain name updates the owner account display name.</p>
+              <p>Public handle controls the captain profile URL.</p>
+              <p>Headline and bio shape the public story pages and profile cards.</p>
+              <p>Home port keeps the public map and summary language grounded.</p>
+            </div>
+          </UCard>
+        </div>
       </div>
-    </div>
+
+      <FleetFriendsManager :items="overview.followedVessels" @changed="refresh" />
     </template>
 
     <UAlert

@@ -3,20 +3,39 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Boat Setup',
-  description:
-    'Define the captain profile, vessel identity, and primary install for the MyBoat workspace.',
+  description: 'Set up your captain profile, boat, and first install.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'Boat setup',
-  description:
-    'Define the captain profile, vessel identity, and primary install for the MyBoat workspace.',
+  description: 'Set up your captain profile, boat, and first install.',
 })
 
 const { data } = await useDashboardOverview('myboat-onboarding-overview')
 
 const { user } = useUserSession()
+
+const setupHighlights = [
+  {
+    label: 'Public page',
+    value: 'Handle + profile',
+  },
+  {
+    label: 'Boat record',
+    value: 'Map + trips',
+  },
+  {
+    label: 'First install',
+    value: 'Keys + SignalK',
+  },
+]
+
+const setupOutcomes = [
+  'Creates your shareable captain URL.',
+  'Links your boat to maps, trips, and media.',
+  'Sets up the first live data path.',
+]
 
 async function handleComplete(redirectTo: string) {
   await navigateTo(redirectTo)
@@ -32,26 +51,23 @@ async function handleComplete(redirectTo: string) {
             <div class="marine-kicker w-fit">Launch pass</div>
             <div>
               <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
-                Lock the captain, vessel, and first install in one pass
+                Set up your captain page, boat, and first install
               </h1>
               <p class="mt-3 text-base leading-7 text-muted">
-                This setup becomes the canonical source for the public captain page, the live
-                telemetry path, and the first install you trust in production.
+                Save this once and the dashboard, public page, and live feed all use the same setup.
               </p>
             </div>
 
             <div class="grid gap-3">
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Public route</p>
-                <p class="mt-2 font-display text-xl text-default">Captain handle + vessel page</p>
-              </div>
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
-                <p class="mt-2 font-display text-xl text-default">Live map, passages, media</p>
-              </div>
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">First install</p>
-                <p class="mt-2 font-display text-xl text-default">Keys, SignalK, edge hostname</p>
+              <div
+                v-for="highlight in setupHighlights"
+                :key="highlight.label"
+                class="metric-shell rounded-[1.35rem] p-4"
+              >
+                <p class="text-xs uppercase tracking-[0.24em] text-muted">
+                  {{ highlight.label }}
+                </p>
+                <p class="mt-2 font-display text-xl text-default">{{ highlight.value }}</p>
               </div>
             </div>
           </div>
@@ -63,25 +79,19 @@ async function handleComplete(redirectTo: string) {
         >
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">What this setup controls</h2>
-              <p class="mt-2 text-sm text-muted">
-                One save aligns the private operator surface and the public-facing boat story.
-              </p>
+              <h2 class="font-display text-2xl text-default">What this unlocks</h2>
+              <p class="mt-2 text-sm text-muted">Each section updates the same boat record.</p>
             </div>
           </template>
 
-          <div class="space-y-4 text-sm leading-6 text-muted">
-            <p>
-              Your public handle becomes the URL for your captain profile and shared vessel pages.
-            </p>
-            <p>
-              Your primary vessel powers the live map, passages, media memories, and voyage
-              timeline.
-            </p>
-            <p>
-              Your first onboard install is where ingest keys, SignalK details, and device metadata
-              are managed.
-            </p>
+          <div class="space-y-3">
+            <article
+              v-for="item in setupOutcomes"
+              :key="item"
+              class="rounded-[1.2rem] border border-default/70 bg-default/60 px-4 py-3 text-sm text-muted"
+            >
+              {{ item }}
+            </article>
           </div>
         </UCard>
       </div>

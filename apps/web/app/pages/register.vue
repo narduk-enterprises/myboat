@@ -3,36 +3,34 @@ import AuthDock from '~/components/myboat/AuthDock.vue'
 
 useSeo({
   title: 'Create Account',
-  description:
-    'Create a MyBoat account to publish a vessel profile and connect your first live install.',
+  description: 'Create an account to set up your boat and first live feed.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'Create Account',
-  description:
-    'Create a MyBoat account to publish a vessel profile and connect your first live install.',
+  description: 'Create an account to set up your boat and first live feed.',
 })
 
 definePageMeta({ layout: 'auth', middleware: ['guest'] })
 
 const dockChecklist = [
-  'Claim the captain handle that becomes the public home for your boat.',
-  'Define the vessel, first install, and ingest posture in one bluewater control surface.',
-  'Keep live telemetry, passages, and public sharing aligned as the boat starts reporting.',
+  'Claim the public handle for your captain page.',
+  'Add your boat and first install in one setup flow.',
+  'Connect a live feed when the hardware is ready.',
 ]
 </script>
 
 <template>
   <AuthDock
-    eyebrow="New captain workspace"
-    title="Launch the operating surface for your boat"
-    description="Create the account that owns your public vessel identity, telemetry surface, and edge installation keys."
+    eyebrow="New boat setup"
+    title="Set up your boat workspace"
+    description="Create the account that owns your dashboard, public page, and first live feed."
     :checklist="dockChecklist"
   >
     <AuthRegisterCard
-      title="Build the canonical home for your boat"
-      subtitle="Create the account that owns the public profile, telemetry surface, and edge install keys."
+      title="Create your account"
+      subtitle="Start with your captain login. Boat setup comes next."
     >
       <template #logo>
         <AppBrandMark />

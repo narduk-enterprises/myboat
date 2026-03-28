@@ -3,9 +3,9 @@
 
 UPDATE users
 SET
-  name = 'Demo Skipper',
+  name = 'Admin Captain',
   updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-WHERE id = '00000000-0000-0000-0000-000000000001';
+WHERE id = '00000000-0000-0000-0000-000000000002';
 
 INSERT INTO public_profiles (
   user_id,
@@ -18,10 +18,10 @@ INSERT INTO public_profiles (
   updated_at
 )
 VALUES (
-  '00000000-0000-0000-0000-000000000001',
-  'tideye-demo',
-  'Leopard 42 passages imported from the public Tideye log (demo@example.com).',
-  'Local demo profile using a curated slice of real Gulf Coast tracks from tideye.nard.uk—same boat, same NMEA feed family as production Tideye.',
+  '00000000-0000-0000-0000-000000000002',
+  'captain-tideye',
+  'Admin workspace wired to the live Tideye Gulf Coast feed.',
+  'Local admin profile seeded for live Tideye telemetry, AIS traffic, and Gulf Coast passage playback from the same Signal K source the narduk edge canary consumes.',
   'Kemah Boardwalk Marina, TX',
   1,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-120 days'),
@@ -52,31 +52,17 @@ INSERT INTO vessels (
 VALUES
   (
     '10000000-0000-0000-0000-000000000001',
-    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000002',
     'tideye',
     'Tideye',
     'Leopard 42 (2023)',
     'Kemah Boardwalk Marina, TX',
-    '2023 Leopard 42 (Tideye) with Gulf Coast voyage history seeded from tideye.nard.uk passages; live feed remains the public Signal K stream for dashboard demos.',
+    '2023 Leopard 42 (Tideye) with Gulf Coast voyage history seeded from tideye.nard.uk passages and a live Signal K source matching the narduk edge canary collector.',
     'WDM4821',
     1,
     1,
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-120 days'),
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-  ),
-  (
-    '10000000-0000-0000-0000-000000000002',
-    '00000000-0000-0000-0000-000000000001',
-    'shoreboat',
-    'Shoreboat',
-    'Rigid Inflatable Tender',
-    'Kemah Boardwalk Marina, TX',
-    'A private tender used for shore runs, dinghy dock approaches, and scout hops before bigger passages.',
-    'WDM4822',
-    0,
-    0,
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-100 days'),
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-8 days')
   )
 ON CONFLICT(id) DO UPDATE SET
   owner_user_id = excluded.owner_user_id,
@@ -108,10 +94,10 @@ INSERT INTO vessel_installations (
 VALUES (
   '20000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001',
-  'Bee public Signal K',
+  'narduk edge canary · Tideye Signal K',
   'direct_signalk',
-  NULL,
-  'wss://signalk-public.tideye.com/signalk/v1/stream',
+  'narduk/myboat-edge-canary',
+  'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
   1,
   'live',
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 seconds'),
@@ -145,10 +131,10 @@ INSERT INTO api_keys (
 )
 VALUES (
   '30000000-0000-0000-0000-000000000001',
-  '00000000-0000-0000-0000-000000000001',
-  'Bee collector key',
+  '00000000-0000-0000-0000-000000000002',
+  'Tideye edge collector key',
   '5b97022f7dcee71f34b10b7eaf0c5b41b32fa4a30d3849d7fd14f7a6f761c842',
-  'mb_demo_',
+  'mb_admin_',
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-12 minutes'),
   NULL,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-21 days')
@@ -204,7 +190,7 @@ VALUES (
   299.6,
   13.2,
   2250,
-  'At the Kemah dock with the Tideye demo seed position (from the imported passage endpoints).',
+  'At the Kemah dock with the seeded Tideye position, ready for live self telemetry and nearby AIS from the narduk feed.',
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 )
 ON CONFLICT(vessel_id) DO UPDATE SET
@@ -416,18 +402,6 @@ VALUES
     -94.5,
     '2025-12-07T03:00:00.000Z',
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-100 days')
-  ),
-  (
-    '60000000-0000-0000-0000-000000000003',
-    '10000000-0000-0000-0000-000000000002',
-    '40000000-0000-0000-0000-000000000004',
-    'Kemah day sail',
-    'Local loop from the Tideye Kemah Boardwalk day-sail passage.',
-    '/images/hero-bg.webp',
-    29.5459,
-    -95.0199,
-    '2025-08-24T15:00:00.000Z',
-    strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-200 days')
   )
 ON CONFLICT(id) DO UPDATE SET
   vessel_id = excluded.vessel_id,

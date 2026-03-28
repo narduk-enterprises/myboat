@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_LOCAL_DEMO_SIGNALK_URL,
-  isDemoAccountEmail,
-  resolveDemoSignalKUrl,
   resolveInstallationSignalKConfig,
   resolveSignalKRelayOrigin,
   resolveScopedSignalKUrl,
@@ -22,23 +19,6 @@ describe('signalk relay helpers', () => {
     expect(resolveSignalKRelayOrigin('https://mybo.at/dashboard/')).toBe('wss://mybo.at')
   })
 
-  it('detects the seeded demo account email', () => {
-    expect(isDemoAccountEmail('demo@example.com')).toBe(true)
-    expect(isDemoAccountEmail(' Demo@Example.com ')).toBe(true)
-    expect(isDemoAccountEmail('captain@example.com')).toBe(false)
-  })
-
-  it('replaces local seeded demo URLs with the current dev origin', () => {
-    expect(
-      resolveDemoSignalKUrl({
-        appOrigin: 'http://127.0.0.1:4321',
-        currentSignalKUrl: DEFAULT_LOCAL_DEMO_SIGNALK_URL,
-        isDev: true,
-        userEmail: 'demo@example.com',
-      }),
-    ).toBe('ws://127.0.0.1:4321/api/signalk/relay')
-  })
-
   it('forces the relay URL when the account is explicitly scoped to it', () => {
     expect(
       resolveScopedSignalKUrl({
@@ -52,11 +32,11 @@ describe('signalk relay helpers', () => {
   it('prefers the app relay for Tideye-compatible sources when available', () => {
     expect(
       resolveInstallationSignalKConfig({
-        currentSignalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none',
+        currentSignalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
         relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
       }),
     ).toEqual({
-      signalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none',
+      signalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
       collectorSignalKUrl: 'wss://mybo.at/api/signalk/relay',
       relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
       signalKAccessMode: 'relay',
@@ -103,22 +83,12 @@ describe('signalk relay helpers', () => {
     })
   })
 
-  it('leaves non-demo or non-dev URLs untouched', () => {
+  it('leaves explicit direct urls untouched without a relay override', () => {
     expect(
-      resolveDemoSignalKUrl({
+      resolveScopedSignalKUrl({
         appOrigin: 'http://localhost:3000',
         currentSignalKUrl: 'wss://custom.example.com/signalk',
-        isDev: true,
-        userEmail: 'captain@example.com',
       }),
     ).toBe('wss://custom.example.com/signalk')
-    expect(
-      resolveDemoSignalKUrl({
-        appOrigin: 'http://localhost:3000',
-        currentSignalKUrl: null,
-        isDev: false,
-        userEmail: 'demo@example.com',
-      }),
-    ).toBeNull()
   })
 })

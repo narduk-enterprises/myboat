@@ -1,4 +1,4 @@
-import type { PassageSummary, VesselCardSummary, WaypointSummary } from '~/types/myboat'
+import type { PassageSummary } from '~/types/myboat'
 
 export function formatCoordinate(value: number | null | undefined, isLatitude: boolean) {
   if (value === null || value === undefined) {
@@ -74,7 +74,7 @@ export function getConnectionTone(connectionState: string, lastSeenAt: string | 
 export function buildTrackFeatureCollection(passages: PassageSummary[]) {
   const features = passages
     .filter((passage) => Boolean(passage.trackGeojson))
-    .map((passage) => {
+    .map((passage, index) => {
       try {
         const geometry = JSON.parse(passage.trackGeojson || '') as {
           type: string
@@ -85,9 +85,14 @@ export function buildTrackFeatureCollection(passages: PassageSummary[]) {
           type: 'Feature' as const,
           geometry,
           properties: {
+            id: passage.id,
             name: passage.title,
             departure: passage.departureName,
             arrival: passage.arrivalName,
+            startedAt: passage.startedAt,
+            endedAt: passage.endedAt,
+            distanceNm: passage.distanceNm,
+            rank: index,
           },
         }
       } catch {
@@ -101,9 +106,14 @@ export function buildTrackFeatureCollection(passages: PassageSummary[]) {
         type: 'Feature'
         geometry: { type: string; coordinates: unknown }
         properties: {
+          id: string
           name: string
           departure: string | null
           arrival: string | null
+          startedAt: string
+          endedAt: string | null
+          distanceNm: number | null
+          rank: number
         }
       } => feature !== null,
     )
@@ -112,32 +122,4 @@ export function buildTrackFeatureCollection(passages: PassageSummary[]) {
     type: 'FeatureCollection' as const,
     features,
   }
-}
-
-export function buildWaypointPins(waypoints: WaypointSummary[]) {
-  return waypoints.map((waypoint) => ({
-    id: waypoint.id,
-    lat: waypoint.lat,
-    lng: waypoint.lng,
-    title: waypoint.title,
-    kind: waypoint.kind,
-  }))
-}
-
-export function buildVesselPins(vessels: VesselCardSummary[]) {
-  return vessels
-    .filter(
-      (vessel) =>
-        vessel.liveSnapshot?.positionLat !== null &&
-        vessel.liveSnapshot?.positionLat !== undefined &&
-        vessel.liveSnapshot?.positionLng !== null &&
-        vessel.liveSnapshot?.positionLng !== undefined,
-    )
-    .map((vessel) => ({
-      id: vessel.id,
-      lat: vessel.liveSnapshot!.positionLat!,
-      lng: vessel.liveSnapshot!.positionLng!,
-      title: vessel.name,
-      kind: vessel.isPrimary ? 'primary' : 'fleet',
-    }))
 }

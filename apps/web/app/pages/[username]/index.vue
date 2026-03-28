@@ -93,6 +93,7 @@ useWebPageSchema({
         :vessels="profile.vessels"
         :passages="publicPassages"
         height-class="h-[28rem]"
+        traffic-mode="off"
       />
 
       <section data-testid="public-vessel-grid" class="grid gap-5 lg:grid-cols-2">
@@ -103,6 +104,36 @@ useWebPageSchema({
           :to="`/${profile.profile.username}/${vessel.slug}`"
         />
       </section>
+
+      <BuddyBoatsMap
+        v-if="profile.followedVessels.length"
+        :vessels="profile.followedVessels"
+        title="Buddy boats map"
+        description="A wider chart view of the boats this captain follows through AIS Hub."
+        height-class="h-[28rem]"
+      />
+
+      <UCard
+        v-if="profile.followedVessels.length"
+        class="chart-surface rounded-[1.75rem] shadow-card"
+      >
+        <template #header>
+          <div>
+            <h2 class="font-display text-2xl text-default">Fleet friends</h2>
+            <p class="mt-1 text-sm text-muted">
+              Boats this captain explicitly follows through AIS Hub.
+            </p>
+          </div>
+        </template>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <FleetFriendCard
+            v-for="vessel in profile.followedVessels"
+            :key="vessel.id"
+            :vessel="vessel"
+          />
+        </div>
+      </UCard>
 
       <UCard
         data-testid="public-live-readiness"

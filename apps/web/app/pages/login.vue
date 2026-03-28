@@ -3,13 +3,13 @@ import AuthDock from '~/components/myboat/AuthDock.vue'
 
 useSeo({
   title: 'Sign In',
-  description: 'Sign in to manage vessels, installations, telemetry, and public boat sharing.',
+  description: 'Sign in to manage your boat, installs, and public page.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'Sign In',
-  description: 'Sign in to manage vessels, installations, telemetry, and public boat sharing.',
+  description: 'Sign in to manage your boat, installs, and public page.',
 })
 
 definePageMeta({ layout: 'auth', middleware: ['guest'] })
@@ -17,22 +17,22 @@ definePageMeta({ layout: 'auth', middleware: ['guest'] })
 const showDemoLogin = import.meta.dev
 
 const dockChecklist = [
-  'Review the live vessel board without exposing private install controls.',
-  'Issue ingest keys, inspect SignalK posture, and keep the edge path healthy.',
-  'Update the public captain page, passage history, and shared boat memory from one place.',
+  'Open the dashboard and current boat status.',
+  'Manage installs, keys, and SignalK feeds.',
+  'Update the public page when you want to share.',
 ]
 </script>
 
 <template>
   <AuthDock
     eyebrow="Captain access"
-    title="Return to the bridge"
-    description="Sign in to reach the live vessel board, manage onboard installs, and keep the public captain page current."
+    title="Back to your boat"
+    description="Sign in to open your dashboard, manage live feeds, and update the public page."
     :checklist="dockChecklist"
   >
     <AuthLoginCard
       title="Welcome back aboard"
-      subtitle="Sign in to reach your dashboard, telemetry posture, and installation controls."
+      subtitle="Open your dashboard and install controls."
       :show-demo-login="showDemoLogin"
     >
       <template #logo>

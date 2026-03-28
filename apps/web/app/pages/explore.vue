@@ -22,22 +22,20 @@ const vesselTypeOptions = computed(() => [
 const regionOptions = computed(() => [
   'All regions',
   ...new Set(
-    items.value
-      .map((item) => item.vessel.homePort || item.profile.homePort)
-      .filter(Boolean),
+    items.value.map((item) => item.vessel.homePort || item.profile.homePort).filter(Boolean),
   ),
 ])
 
 const filteredItems = computed(() =>
   items.value.filter((item) => {
-    const matchesLive =
-      liveFilter.value === 'all' ? true : item.freshnessState === liveFilter.value
+    const matchesLive = liveFilter.value === 'all' ? true : item.freshnessState === liveFilter.value
     const matchesType =
       vesselTypeFilter.value === 'All vessel types'
         ? true
         : item.vessel.vesselType === vesselTypeFilter.value
     const region = item.vessel.homePort || item.profile.homePort || ''
-    const matchesRegion = regionFilter.value === 'All regions' ? true : region === regionFilter.value
+    const matchesRegion =
+      regionFilter.value === 'All regions' ? true : region === regionFilter.value
 
     return matchesLive && matchesType && matchesRegion
   }),
@@ -52,16 +50,29 @@ const mapPassages = computed(() =>
 
 useSeo({
   title: 'Explore public vessels',
-  description:
-    'Discover public MyBoat vessels by region, live status, and vessel type through a map-first explore surface.',
+  description: 'Browse captain-shared boats by status, type, and region.',
 })
 
 useWebPageSchema({
   name: 'Explore public vessels',
-  description:
-    'Discover public MyBoat vessels by region, live status, and vessel type through a map-first explore surface.',
+  description: 'Browse captain-shared boats by status, type, and region.',
   type: 'CollectionPage',
 })
+
+const discoveryRules = [
+  {
+    title: 'Fresh boats first',
+    detail: 'Recently updated boats rise to the top.',
+  },
+  {
+    title: 'Filters stay broad',
+    detail: 'Use status, type, and region to narrow fast.',
+  },
+  {
+    title: 'Public pages stay clean',
+    detail: 'You see boat context, not private install controls.',
+  },
+]
 </script>
 
 <template>
@@ -71,12 +82,10 @@ useWebPageSchema({
         <div class="space-y-4">
           <div class="marine-kicker w-fit">Public explore</div>
           <div>
-            <h1 class="font-display text-5xl text-default sm:text-6xl">
-              See who is out there right now
-            </h1>
+            <h1 class="font-display text-5xl text-default sm:text-6xl">Explore public boats</h1>
             <p class="mt-3 max-w-2xl text-lg text-muted">
-              Explore public vessels through a map-first view of current activity, recent passages,
-              and captain-approved public sharing.
+              Browse captain-shared boats by status, type, and home port, then open the full public
+              page.
             </p>
           </div>
         </div>
@@ -119,7 +128,7 @@ useWebPageSchema({
             <div>
               <h2 class="font-display text-2xl text-default">Map view</h2>
               <p class="mt-1 text-sm text-muted">
-                Narrow the fleet by freshness state, vessel type, or region before opening a public page.
+                Filter by status, type, or region before you open a boat.
               </p>
             </div>
 
@@ -136,6 +145,7 @@ useWebPageSchema({
           :vessels="mapVessels"
           :passages="mapPassages"
           height-class="h-[34rem]"
+          traffic-mode="off"
         />
 
         <MarineEmptyState
@@ -151,7 +161,7 @@ useWebPageSchema({
           color="error"
           variant="soft"
           title="Explore unavailable"
-          description="The public discovery surface could not be loaded right now."
+          description="Public discovery could not be loaded right now."
         />
       </UCard>
 
@@ -159,10 +169,8 @@ useWebPageSchema({
         <UCard class="chart-surface rounded-[1.75rem] shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Featured right now</h2>
-              <p class="mt-1 text-sm text-muted">
-                Fresh data, recent movement, and stronger public profiles rise to the top.
-              </p>
+              <h2 class="font-display text-2xl text-default">Featured boats</h2>
+              <p class="mt-1 text-sm text-muted">Recently updated boats surface first.</p>
             </div>
           </template>
 
@@ -187,7 +195,7 @@ useWebPageSchema({
                 {{
                   item.vessel.summary ||
                   item.profile.headline ||
-                  'A captain-managed public vessel surface with current telemetry and route memory.'
+                  'Public boat with recent telemetry and trip history.'
                 }}
               </p>
 
@@ -223,7 +231,7 @@ useWebPageSchema({
             v-else
             icon="i-lucide-radio"
             title="No featured boats yet"
-            description="Public vessels with fresh telemetry or notable recent movement will surface here."
+            description="Boats with fresh telemetry or recent trips show up here."
             compact
           />
         </UCard>
@@ -231,14 +239,20 @@ useWebPageSchema({
         <UCard class="chart-surface rounded-[1.75rem] shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-xl text-default">Discovery posture</h2>
-              <p class="mt-1 text-sm text-muted">What this page is optimized to show.</p>
+              <h2 class="font-display text-xl text-default">What you&apos;ll see</h2>
+              <p class="mt-1 text-sm text-muted">A quick read on how discovery works.</p>
             </div>
           </template>
 
-          <div class="space-y-3 text-sm leading-6 text-muted">
-            <p>Open public boats with live fixes first, then use vessel pages for passages, media, and captain context.</p>
-            <p>Filters stay intentionally coarse so the public map remains useful without becoming a raw telemetry console.</p>
+          <div class="space-y-3">
+            <article
+              v-for="rule in discoveryRules"
+              :key="rule.title"
+              class="rounded-[1.2rem] border border-default/70 bg-default/60 px-4 py-3"
+            >
+              <p class="font-medium text-default">{{ rule.title }}</p>
+              <p class="mt-1 text-sm text-muted">{{ rule.detail }}</p>
+            </article>
           </div>
         </UCard>
       </div>
@@ -246,10 +260,8 @@ useWebPageSchema({
 
     <section class="space-y-4">
       <div>
-        <h2 class="font-display text-2xl text-default">All discoverable vessels</h2>
-        <p class="mt-1 text-sm text-muted">
-          Public vessels that captains have chosen to expose through MyBoat discovery.
-        </p>
+        <h2 class="font-display text-2xl text-default">All public boats</h2>
+        <p class="mt-1 text-sm text-muted">Every boat currently shared in MyBoat.</p>
       </div>
 
       <div v-if="filteredItems.length" class="grid gap-5 lg:grid-cols-2">

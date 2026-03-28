@@ -5,7 +5,7 @@ import { users } from '#layer/server/database/schema'
 import { useDatabase } from '#layer/server/utils/database'
 import {
   DEFAULT_SIGNALK_RELAY_UPSTREAM_URL,
-  resolveDemoSignalKUrl,
+  resolvePublicInstallationSignalKConfig,
   resolveInstallationSignalKConfig,
   resolveScopedSignalKUrl,
 } from '../../shared/signalkRelay'
@@ -72,9 +72,8 @@ function resolveSignalKUrlForUser(options: {
   appOrigin: string
   currentSignalKUrl?: string | null
   forceRelay: boolean
-  userEmail: string | null | undefined
 }) {
-  const { appOrigin, currentSignalKUrl = null, forceRelay, userEmail } = options
+  const { appOrigin, currentSignalKUrl = null, forceRelay } = options
 
   if (forceRelay) {
     return resolveScopedSignalKUrl({
@@ -84,25 +83,18 @@ function resolveSignalKUrlForUser(options: {
     })
   }
 
-  return resolveDemoSignalKUrl({
-    appOrigin,
-    currentSignalKUrl,
-    isDev: import.meta.dev,
-    userEmail,
-  })
+  return currentSignalKUrl
 }
 
 function buildInstallationSignalKConfig(options: {
   appOrigin: string
   currentSignalKUrl?: string | null
   forceRelay: boolean
-  userEmail: string | null | undefined
 }) {
   const relaySignalKUrl = resolveSignalKUrlForUser({
     appOrigin: options.appOrigin,
     currentSignalKUrl: null,
     forceRelay: options.forceRelay,
-    userEmail: options.userEmail,
   })
 
   return resolveInstallationSignalKConfig({
@@ -119,7 +111,6 @@ export async function getDefaultSignalKUrlForUser(event: H3Event, user: RelaySco
     appOrigin,
     currentSignalKUrl: null,
     forceRelay,
-    userEmail: user.email,
   })
 }
 
@@ -137,7 +128,6 @@ export async function applySignalKRelayDefault<T extends { signalKUrl: string | 
       appOrigin,
       currentSignalKUrl: installation.signalKUrl,
       forceRelay,
-      userEmail: user.email,
     }),
   }
 }
@@ -156,7 +146,21 @@ export async function applySignalKRelayDefaults<T extends { signalKUrl: string |
       appOrigin,
       currentSignalKUrl: installation.signalKUrl,
       forceRelay,
-      userEmail: user.email,
+    }),
+  }))
+}
+
+export function applyPublicSignalKDefaults<T extends { signalKUrl: string | null }>(
+  event: H3Event,
+  installations: T[],
+) {
+  const appOrigin = getRequestURL(event).origin
+
+  return installations.map((installation) => ({
+    ...installation,
+    ...resolvePublicInstallationSignalKConfig({
+      appOrigin,
+      currentSignalKUrl: installation.signalKUrl,
     }),
   }))
 }

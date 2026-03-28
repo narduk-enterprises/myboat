@@ -36,10 +36,19 @@ function buildSeededDatabase() {
 }
 
 describe('apps/web local seed data', () => {
-  it('seeds a populated demo fleet for the demo user', () => {
+  it('seeds a single admin Tideye workspace', () => {
     const db = buildSeededDatabase()
 
     try {
+      const userCount = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM users
+          `,
+        )
+        .get() as { count: number }
+
       const profile = db
         .prepare(
           `
@@ -48,7 +57,7 @@ describe('apps/web local seed data', () => {
             WHERE user_id = ?
           `,
         )
-        .get('00000000-0000-0000-0000-000000000001') as
+        .get('00000000-0000-0000-0000-000000000002') as
         | { username: string; homePort: string | null }
         | undefined
 
@@ -69,10 +78,10 @@ describe('apps/web local seed data', () => {
           `,
         )
         .get(
-          '00000000-0000-0000-0000-000000000001',
-          '00000000-0000-0000-0000-000000000001',
-          '00000000-0000-0000-0000-000000000001',
-          '00000000-0000-0000-0000-000000000001',
+          '00000000-0000-0000-0000-000000000002',
+          '00000000-0000-0000-0000-000000000002',
+          '00000000-0000-0000-0000-000000000002',
+          '00000000-0000-0000-0000-000000000002',
         ) as {
         vesselCount: number
         passageCount: number
@@ -80,14 +89,15 @@ describe('apps/web local seed data', () => {
         waypointCount: number
       }
 
+      expect(userCount.count).toBe(1)
       expect(profile).toEqual({
-        username: 'captain-tide',
-        homePort: 'St. Petersburg, FL',
+        username: 'captain-tideye',
+        homePort: 'Kemah Boardwalk Marina, TX',
       })
       expect(counts).toEqual({
-        vesselCount: 2,
-        passageCount: 3,
-        mediaCount: 3,
+        vesselCount: 1,
+        passageCount: 4,
+        mediaCount: 2,
         waypointCount: 4,
       })
     } finally {
@@ -95,7 +105,7 @@ describe('apps/web local seed data', () => {
     }
   })
 
-  it('points the primary demo installation at the Tideye public Signal K stream', () => {
+  it('points the primary admin installation at the Tideye public Signal K stream', () => {
     const db = buildSeededDatabase()
 
     try {
@@ -114,7 +124,7 @@ describe('apps/web local seed data', () => {
             LIMIT 1
           `,
         )
-        .get('00000000-0000-0000-0000-000000000001') as {
+        .get('00000000-0000-0000-0000-000000000002') as {
         installationType: string
         signalKUrl: string | null
         connectionState: string
@@ -123,7 +133,7 @@ describe('apps/web local seed data', () => {
 
       expect(installation).toEqual({
         installationType: 'direct_signalk',
-        signalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream',
+        signalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
         connectionState: 'live',
         isPrimary: 1,
       })

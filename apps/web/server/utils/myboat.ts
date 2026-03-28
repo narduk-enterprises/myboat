@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
+  followedVessels,
   mediaItems,
   passages,
   publicProfiles,
@@ -101,6 +102,17 @@ export function buildPassageMap<T extends { vesselId: string }>(rows: T[]) {
   }, {})
 }
 
+function parseSourceStations(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
 export async function getCaptainProfileByUserId(event: H3Event, userId: string) {
   const db = useAppDatabase(event)
   return db
@@ -186,6 +198,38 @@ export async function getAllPublicVessels(event: H3Event) {
     .all()
 }
 
+export async function getFollowedVesselsForUser(event: H3Event, userId: string) {
+  const db = useAppDatabase(event)
+  return db
+    .select()
+    .from(followedVessels)
+    .where(eq(followedVessels.ownerUserId, userId))
+    .orderBy(desc(followedVessels.updatedAt), desc(followedVessels.createdAt))
+    .all()
+}
+
+export function serializeFollowedVessels(
+  rows: Awaited<ReturnType<typeof getFollowedVesselsForUser>>,
+) {
+  return rows.map((row) => ({
+    id: row.id,
+    source: 'aishub' as const,
+    matchMode: row.matchMode === 'name' ? 'name' : 'mmsi',
+    mmsi: row.mmsi,
+    imo: row.imo,
+    name: row.name,
+    callSign: row.callSign,
+    destination: row.destination,
+    lastReportAt: row.lastReportAt,
+    positionLat: row.positionLat,
+    positionLng: row.positionLng,
+    shipType: row.shipType,
+    sourceStations: parseSourceStations(row.sourceStationsJson),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }))
+}
+
 export async function getPublicVesselByUsernameAndSlug(
   event: H3Event,
   username: string,
@@ -220,11 +264,7 @@ export async function getPublicVesselByUsernameAndSlug(
     .get()
 }
 
-export async function getPublicVesselBySlug(
-  event: H3Event,
-  userId: string,
-  vesselSlug: string,
-) {
+export async function getPublicVesselBySlug(event: H3Event, userId: string, vesselSlug: string) {
   const db = useAppDatabase(event)
   return db
     .select()
@@ -354,13 +394,20 @@ export async function getPublicInstallationsForVesselIds(event: H3Event, vesselI
       vesselSlug: vessels.slug,
       vesselName: vessels.name,
       label: vesselInstallations.label,
+      isPrimary: vesselInstallations.isPrimary,
+      signalKUrl: vesselInstallations.signalKUrl,
       connectionState: vesselInstallations.connectionState,
       lastSeenAt: vesselInstallations.lastSeenAt,
       eventCount: vesselInstallations.eventCount,
     })
     .from(vesselInstallations)
     .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
-    .where(inArray(vesselInstallations.vesselId, vesselIds))
+    .where(
+      and(
+        inArray(vesselInstallations.vesselId, vesselIds),
+        isNull(vesselInstallations.archivedAt),
+      ),
+    )
     .orderBy(desc(vesselInstallations.updatedAt))
     .all()
 }

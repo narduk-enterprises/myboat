@@ -5,13 +5,13 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Dashboard',
-  description: 'Monitor vessel identity, installations, telemetry readiness, and sharing surfaces.',
+  description: 'Monitor your boat, live feeds, and public page.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'MyBoat dashboard',
-  description: 'Monitor vessel identity, installations, telemetry readiness, and sharing surfaces.',
+  description: 'Monitor your boat, live feeds, and public page.',
 })
 
 const { data, pending } = await useDashboardOverview()
@@ -29,21 +29,21 @@ const latestPassage = computed(
 const setupFocus = computed(() => {
   if (!overview.value) return ''
   if (!overview.value.profile) {
-    return 'Complete the captain profile to unlock the public route, vessel sharing, and the rest of the owner board.'
+    return 'Finish setup to unlock the public page, boat record, and live feed.'
   }
   if (!overview.value.vessels.length) {
-    return 'Add the first vessel so telemetry, passages, and public sharing can anchor to a real boat profile.'
+    return 'Add your first boat so maps, trips, and sharing have something to anchor to.'
   }
   if (!overview.value.installations.length) {
-    return 'Register the first onboard install so the ingest edge can start receiving live data from the boat.'
+    return 'Add your first install to start receiving live data.'
   }
   if (!overview.value.stats.liveInstallationCount) {
-    return 'The install is registered, but no live feed is reporting yet. Bring one collector online to light up the live surfaces.'
+    return 'Your install is saved. Bring one feed online to light up the live view.'
   }
   if (latestPassage.value) {
-    return `Latest route memory is "${latestPassage.value.title}". Keep the dashboard fresh with the next passage, harbor note, or media moment.`
+    return `Latest trip: "${latestPassage.value.title}". Add the next trip or media note to keep the public page current.`
   }
-  return 'The command surface is ready. Add the next passage or media note to keep the public vessel story active.'
+  return 'Setup is complete. Add a trip or photo when the boat moves again.'
 })
 
 watchEffect(() => {
@@ -99,7 +99,7 @@ watchEffect(() => {
               <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
                 {{
                   overview.profile
-                    ? `Welcome aboard, ${overview.profile.captainName}`
+                    ? `Welcome back, ${overview.profile.captainName}`
                     : 'Set up your boat profile'
                 }}
               </h1>
@@ -107,7 +107,7 @@ watchEffect(() => {
                 {{
                   overview.profile
                     ? `Public handle @${overview.profile.username} · ${overview.vessels.length} vessel${overview.vessels.length === 1 ? '' : 's'} under management`
-                    : 'Finish the captain profile, vessel profile, and first install before inviting the public or issuing ingest keys.'
+                    : 'Finish setup to add your boat and first live feed.'
                 }}
               </p>
             </div>
@@ -154,7 +154,7 @@ watchEffect(() => {
               >
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p class="text-xs uppercase tracking-[0.24em] text-muted">Captain briefing</p>
+                    <p class="text-xs uppercase tracking-[0.24em] text-muted">Next up</p>
                     <p class="mt-2 font-display text-2xl text-default">
                       {{ primaryVessel?.name || 'Boat setup pending' }}
                     </p>
@@ -177,30 +177,29 @@ watchEffect(() => {
 
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                   <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
-                    <p class="text-xs uppercase tracking-[0.22em] text-muted">Primary vessel</p>
+                    <p class="text-xs uppercase tracking-[0.22em] text-muted">Primary boat</p>
                     <p class="mt-2 font-medium text-default">
-                      {{ primaryVessel?.homePort || 'Home port still being defined' }}
+                      {{ primaryVessel?.name || 'Boat setup pending' }}
                     </p>
                     <p class="mt-1 text-xs text-muted">
                       {{
-                        primaryVessel?.vesselType ||
-                        'Finish the vessel profile to add type and operating context.'
+                        [primaryVessel?.vesselType, primaryVessel?.homePort]
+                          .filter(Boolean)
+                          .join(' · ') || 'Add the boat name, type, and home port.'
                       }}
                     </p>
                   </div>
 
                   <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
-                    <p class="text-xs uppercase tracking-[0.22em] text-muted">
-                      Latest route memory
-                    </p>
+                    <p class="text-xs uppercase tracking-[0.22em] text-muted">Latest trip</p>
                     <p class="mt-2 font-medium text-default">
-                      {{ latestPassage?.title || 'No passage logged yet' }}
+                      {{ latestPassage?.title || 'No trip logged yet' }}
                     </p>
                     <p class="mt-1 text-xs text-muted">
                       {{
                         latestPassage
                           ? `${latestPassage.departureName || 'Departure'} → ${latestPassage.arrivalName || 'Arrival pending'}`
-                          : 'The public story gets stronger once the first passage is attached to this boat.'
+                          : 'Add the first trip to give the boat page some history.'
                       }}
                     </p>
                   </div>
@@ -209,28 +208,25 @@ watchEffect(() => {
 
               <div class="grid gap-3">
                 <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
-                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Public route</p>
+                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Public page</p>
                   <p class="mt-2 font-display text-2xl text-default">
                     {{ overview.profile ? `@${overview.profile.username}` : 'Pending' }}
                   </p>
                   <p class="mt-2 text-xs text-muted">
                     {{
-                      overview.profile?.headline ||
-                      'Claim the captain handle to open the shareable public surface.'
+                      overview.profile?.headline || 'Claim a handle to open your shareable page.'
                     }}
                   </p>
                 </div>
 
                 <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
-                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Edge posture</p>
+                  <p class="text-xs uppercase tracking-[0.24em] text-muted">Live feeds</p>
                   <p class="mt-2 font-display text-2xl text-default">
                     {{ overview.stats.liveInstallationCount }}/{{
                       overview.stats.installationCount
                     }}
                   </p>
-                  <p class="mt-2 text-xs text-muted">
-                    Live installs currently reporting through the ingest edge.
-                  </p>
+                  <p class="mt-2 text-xs text-muted">Installs reporting right now.</p>
                 </div>
               </div>
             </div>
@@ -238,40 +234,32 @@ watchEffect(() => {
 
           <div class="grid self-start gap-3 sm:grid-cols-2">
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Public sharing</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Public page</p>
               <p class="mt-3 font-display text-2xl text-default">
-                {{ overview.profile ? 'Ready' : 'Pending' }}
+                {{ overview.profile ? 'Ready' : 'Setup needed' }}
               </p>
-              <p class="mt-2 text-xs text-muted">
-                The captain route and public vessel surfaces follow the owner profile.
-              </p>
+              <p class="mt-2 text-xs text-muted">Shareable captain and boat pages.</p>
             </div>
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
               <p class="text-xs uppercase tracking-[0.24em] text-muted">Live installs</p>
               <p class="mt-3 font-display text-2xl text-default">
                 {{ overview.stats.liveInstallationCount }}
               </p>
-              <p class="mt-2 text-xs text-muted">
-                Installs currently reporting data through the ingest edge.
-              </p>
+              <p class="mt-2 text-xs text-muted">Feeds reporting right now.</p>
             </div>
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary vessel</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Primary boat</p>
               <p class="mt-3 font-display text-2xl text-default">
                 {{ overview.vessels[0]?.name || 'Pending' }}
               </p>
-              <p class="mt-2 text-xs text-muted">
-                The primary boat anchors the live map, passages, and public story.
-              </p>
+              <p class="mt-2 text-xs text-muted">Linked to maps, trips, and media.</p>
             </div>
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">Recent passages</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Trips</p>
               <p class="mt-3 font-display text-2xl text-default">
                 {{ overview.recentPassages.length }}
               </p>
-              <p class="mt-2 text-xs text-muted">
-                Route memory stays connected to current telemetry and vessel history.
-              </p>
+              <p class="mt-2 text-xs text-muted">Trips saved in this account.</p>
             </div>
           </div>
         </div>
@@ -335,9 +323,7 @@ watchEffect(() => {
             <template #header>
               <div>
                 <h3 class="font-display text-xl text-default">Install readiness</h3>
-                <p class="mt-1 text-sm text-muted">
-                  Edge installs, SignalK streams, and ingest posture.
-                </p>
+                <p class="mt-1 text-sm text-muted">Feeds, keys, and connection status.</p>
               </div>
             </template>
 
@@ -380,7 +366,7 @@ watchEffect(() => {
                     variant="soft"
                     icon="i-lucide-key-round"
                   >
-                    Manage install
+                    Open install
                   </UButton>
                 </div>
               </div>
@@ -390,7 +376,7 @@ watchEffect(() => {
               v-else
               icon="i-lucide-cpu"
               title="No installs defined"
-              description="Create the first boat install in onboarding to start issuing ingest keys."
+              description="Finish setup to issue your first ingest key."
               compact
             >
               <UButton to="/dashboard/onboarding" color="primary">Complete onboarding</UButton>
@@ -401,9 +387,7 @@ watchEffect(() => {
             <template #header>
               <div>
                 <h3 class="font-display text-xl text-default">Recent public moments</h3>
-                <p class="mt-1 text-sm text-muted">
-                  The media layer for public memory and passage storytelling.
-                </p>
+                <p class="mt-1 text-sm text-muted">Latest photos and notes on the public page.</p>
               </div>
             </template>
 
@@ -423,7 +407,7 @@ watchEffect(() => {
               v-else
               icon="i-lucide-images"
               title="No media attached yet"
-              description="The gallery is ready for geo-linked photos and notes from anchorages, crossings, and harbor entries."
+              description="Add photos or notes to start a gallery."
               compact
             />
           </UCard>

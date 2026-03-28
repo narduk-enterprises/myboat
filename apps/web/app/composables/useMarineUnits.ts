@@ -40,12 +40,13 @@ export function useMarineUnits() {
     return preferences.value.temperature === 'c' ? celsius : celsius * (9 / 5) + 32
   }
 
-  function convertAngle(radians: number | null | undefined) {
-    if (radians === null || radians === undefined) {
+  function convertAngle(angle: number | null | undefined) {
+    if (angle === null || angle === undefined) {
       return null
     }
 
-    return (radians * 180) / Math.PI
+    const degrees = Math.abs(angle) > Math.PI * 2 ? angle : (angle * 180) / Math.PI
+    return ((degrees % 360) + 360) % 360
   }
 
   const speedUnitLabel = computed(() => {

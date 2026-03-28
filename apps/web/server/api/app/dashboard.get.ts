@@ -2,12 +2,14 @@ import { requireAuth } from '#layer/server/utils/auth'
 import { applySignalKRelayDefaults, getDefaultSignalKUrlForUser } from '#server/utils/signalkRelay'
 import {
   getCaptainProfileByUserId,
+  getFollowedVesselsForUser,
   getInstallationsForUser,
   getMediaForVesselIds,
   getPassagesForVesselIds,
   getSnapshotsForVesselIds,
   getUserVessels,
   getWaypointsForVesselIds,
+  serializeFollowedVessels,
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
@@ -15,9 +17,10 @@ import {
 export default defineEventHandler(async (event) => {
   const user = await requireAuth(event)
 
-  const [profileRow, vesselRows, installations] = await Promise.all([
+  const [profileRow, vesselRows, followedVesselRows, installations] = await Promise.all([
     getCaptainProfileByUserId(event, user.id),
     getUserVessels(event, user.id),
+    getFollowedVesselsForUser(event, user.id),
     getInstallationsForUser(event, user.id),
   ])
   const [resolvedInstallations, defaultSignalKUrl] = await Promise.all([
@@ -44,6 +47,7 @@ export default defineEventHandler(async (event) => {
   return {
     profile: profileRow ? toCaptainProfileSummary(profileRow) : null,
     vessels: vesselCards,
+    followedVessels: serializeFollowedVessels(followedVesselRows),
     installations: resolvedInstallations,
     defaultSignalKUrl,
     recentPassages: passageRows.slice(0, 3),

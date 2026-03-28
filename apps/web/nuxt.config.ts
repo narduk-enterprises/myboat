@@ -66,6 +66,9 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // AIS Hub uses the `username` query param in its API URL; the canonical
+    // Doppler secret name for that credential is `AIS_HUB_KEY`.
+    aisHubKey: process.env.AIS_HUB_KEY || '',
     authBackend,
     authAuthorityUrl,
     authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',
@@ -73,7 +76,7 @@ export default defineNuxtConfig({
     authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',
     signalkRelayUpstreamUrl:
       process.env.SIGNALK_RELAY_UPSTREAM_URL ||
-      'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none',
+      'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
     signalkRelayOwnerAppleId: process.env.SIGNALK_RELAY_OWNER_APPLE_ID || '',
     signalkRelayOwnerEmail: process.env.SIGNALK_RELAY_OWNER_EMAIL || '',
     signalkRelayOwnerUserId: process.env.SIGNALK_RELAY_OWNER_USER_ID || '',

@@ -7,6 +7,8 @@ export interface PublicProfileSummary {
 }
 
 export interface VesselSnapshotSummary {
+  vesselId?: string
+  source?: string | null
   observedAt: string | null
   positionLat: number | null
   positionLng: number | null
@@ -20,6 +22,7 @@ export interface VesselSnapshotSummary {
   batteryVoltage: number | null
   engineRpm: number | null
   statusNote: string | null
+  updatedAt?: string | null
 }
 
 export interface PassageSummary {
@@ -88,15 +91,80 @@ export interface InstallationSummary {
   eventCount: number
 }
 
+export interface AisContactSummary {
+  id: string
+  name: string | null
+  mmsi: string | null
+  shipType: number | null
+  lat: number | null
+  lng: number | null
+  cog: number | null
+  sog: number | null
+  heading: number | null
+  destination: string | null
+  callSign: string | null
+  length: number | null
+  beam: number | null
+  draft: number | null
+  navState: string | null
+  lastUpdateAt: number
+}
+
+export interface FollowedVesselSummary {
+  id: string
+  source: 'aishub'
+  matchMode: 'mmsi' | 'name'
+  mmsi: string
+  imo: string | null
+  name: string
+  callSign: string | null
+  destination: string | null
+  lastReportAt: string | null
+  positionLat: number | null
+  positionLng: number | null
+  shipType: number | null
+  sourceStations: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AisHubSearchResult {
+  source: 'aishub'
+  matchMode: 'mmsi' | 'name'
+  mmsi: string
+  imo: string | null
+  name: string
+  callSign: string | null
+  destination: string | null
+  lastReportAt: string | null
+  positionLat: number | null
+  positionLng: number | null
+  shipType: number | null
+  sourceStations: string[]
+}
+
+export interface AisHubSearchResponse {
+  query: string
+  matchMode: 'mmsi' | 'name'
+  source: 'local' | 'cache' | 'upstream'
+  cachedAt: string | null
+  results: AisHubSearchResult[]
+}
+
 export interface PublicInstallationSummary {
   id: string
   vesselId: string
   vesselSlug: string
   vesselName: string
   label: string
+  isPrimary: boolean
   connectionState: string
   lastSeenAt: string | null
   eventCount: number
+  signalKUrl?: string | null
+  collectorSignalKUrl?: string | null
+  relaySignalKUrl?: string | null
+  signalKAccessMode?: 'direct' | 'relay' | 'unset'
 }
 
 export interface InstallationKeySummary {
@@ -111,6 +179,7 @@ export interface InstallationKeySummary {
 export interface DashboardOverview {
   profile: PublicProfileSummary | null
   vessels: VesselCardSummary[]
+  followedVessels: FollowedVesselSummary[]
   installations: InstallationSummary[]
   defaultSignalKUrl?: string | null
   recentPassages: PassageSummary[]
@@ -162,6 +231,7 @@ export interface PublicVesselDetailResponse {
 export interface PublicProfileResponse {
   profile: PublicProfileSummary
   vessels: VesselCardSummary[]
+  followedVessels: FollowedVesselSummary[]
   installations: PublicInstallationSummary[]
 }
 

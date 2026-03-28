@@ -1,8 +1,6 @@
 export const SIGNALK_RELAY_PATH = '/api/signalk/relay'
 export const DEFAULT_SIGNALK_RELAY_UPSTREAM_URL =
-  'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=none'
-export const DEMO_ACCOUNT_EMAIL = 'demo@example.com'
-export const DEFAULT_LOCAL_DEMO_SIGNALK_URL = `ws://localhost:3000${SIGNALK_RELAY_PATH}`
+  'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all'
 
 export type SignalKAccessMode = 'direct' | 'relay' | 'unset'
 
@@ -24,10 +22,6 @@ function isTideyePublicSignalKUrl(url: string | null) {
   } catch {
     return url === DEFAULT_SIGNALK_RELAY_UPSTREAM_URL
   }
-}
-
-export function isDemoAccountEmail(email: string | null | undefined) {
-  return email?.trim().toLowerCase() === DEMO_ACCOUNT_EMAIL
 }
 
 export function resolveSignalKRelayUrl(baseUrl: string, relayPath = SIGNALK_RELAY_PATH) {
@@ -64,16 +58,11 @@ export function resolveInstallationSignalKConfig(options: {
 }) {
   const currentSignalKUrl = normalizeSignalKUrl(options.currentSignalKUrl)
   const relaySignalKUrl = normalizeSignalKUrl(options.relaySignalKUrl)
-  const relayFallbackTargets = new Set(
-    [DEFAULT_LOCAL_DEMO_SIGNALK_URL, relaySignalKUrl].filter((value): value is string =>
-      Boolean(value),
-    ),
-  )
 
   if (
     relaySignalKUrl &&
     (!currentSignalKUrl ||
-      relayFallbackTargets.has(currentSignalKUrl) ||
+      currentSignalKUrl === relaySignalKUrl ||
       isTideyePublicSignalKUrl(currentSignalKUrl))
   ) {
     return {
@@ -101,48 +90,37 @@ export function resolveInstallationSignalKConfig(options: {
   }
 }
 
+export function resolvePublicInstallationSignalKConfig(options: {
+  appOrigin: string
+  currentSignalKUrl?: string | null
+}) {
+  const currentSignalKUrl = normalizeSignalKUrl(options.currentSignalKUrl)
+
+  if (currentSignalKUrl && isTideyePublicSignalKUrl(currentSignalKUrl)) {
+    return resolveInstallationSignalKConfig({
+      currentSignalKUrl,
+      relaySignalKUrl: resolveSignalKRelayUrl(options.appOrigin),
+    })
+  }
+
+  return {
+    signalKUrl: null,
+    collectorSignalKUrl: null,
+    relaySignalKUrl: null,
+    signalKAccessMode: 'unset' as const,
+  }
+}
+
 export function resolveScopedSignalKUrl(options: {
   appOrigin: string
   currentSignalKUrl?: string | null
-  fallbackToRelay?: boolean
   forceRelay?: boolean
 }) {
-  const {
-    appOrigin,
-    currentSignalKUrl = null,
-    fallbackToRelay = false,
-    forceRelay = false,
-  } = options
+  const { appOrigin, currentSignalKUrl = null, forceRelay = false } = options
 
   if (forceRelay) {
     return resolveSignalKRelayUrl(appOrigin)
   }
 
-  if (
-    fallbackToRelay &&
-    (!currentSignalKUrl || currentSignalKUrl === DEFAULT_LOCAL_DEMO_SIGNALK_URL)
-  ) {
-    return resolveSignalKRelayUrl(appOrigin)
-  }
-
   return currentSignalKUrl
-}
-
-export function resolveDemoSignalKUrl(options: {
-  appOrigin: string
-  currentSignalKUrl?: string | null
-  isDev: boolean
-  userEmail?: string | null
-}) {
-  const { appOrigin, currentSignalKUrl = null, isDev, userEmail } = options
-
-  if (!isDev || !isDemoAccountEmail(userEmail)) {
-    return currentSignalKUrl
-  }
-
-  return resolveScopedSignalKUrl({
-    appOrigin,
-    currentSignalKUrl,
-    fallbackToRelay: true,
-  })
 }

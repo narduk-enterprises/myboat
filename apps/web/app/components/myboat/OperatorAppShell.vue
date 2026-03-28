@@ -41,11 +41,10 @@ const topLinks = computed<MyBoatShellLink[]>(() =>
     : [
         { label: 'Home', to: '/', icon: 'i-lucide-house' },
         { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
+        { label: 'Buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         { label: 'Setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
         { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
-        ...(isAdmin.value
-          ? [{ label: 'Admin', to: '/admin', icon: 'i-lucide-shield-check' }]
-          : []),
+        ...(isAdmin.value ? [{ label: 'Admin', to: '/admin', icon: 'i-lucide-shield-check' }] : []),
       ],
 )
 
@@ -60,8 +59,13 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
       ]
     : [
         { label: 'Command board', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Find buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         { label: 'Boat setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
-        { label: 'Captain settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
+        {
+          label: 'Captain settings',
+          to: '/dashboard/settings',
+          icon: 'i-lucide-sliders-horizontal',
+        },
         { label: 'Public explore', to: '/explore', icon: 'i-lucide-compass' },
         ...(isAdmin.value
           ? [{ label: 'Admin console', to: '/admin', icon: 'i-lucide-shield-check' }]
@@ -80,6 +84,7 @@ const mobileLinks = computed<MyBoatShellLink[]>(() =>
       ]
     : [
         { label: 'Board', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
         { label: 'Setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
         { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
@@ -123,7 +128,11 @@ const context = computed(() =>
                 <AppBrandMark compact />
               </NuxtLink>
 
-              <div class="hidden items-center gap-1 xl:flex" role="navigation" aria-label="Workspace navigation">
+              <div
+                class="hidden items-center gap-1 xl:flex"
+                role="navigation"
+                aria-label="Workspace navigation"
+              >
                 <NuxtLink
                   v-for="link in topLinks"
                   :key="link.to"
@@ -166,7 +175,9 @@ const context = computed(() =>
         </div>
       </template>
 
-      <div class="mx-auto grid max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:px-8 lg:py-8">
+      <div
+        class="mx-auto grid max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:px-8 lg:py-8"
+      >
         <aside class="hidden lg:block">
           <div class="marine-operator-panel rounded-[2rem] p-5">
             <div class="marine-kicker w-fit">{{ context.eyebrow }}</div>
@@ -201,16 +212,16 @@ const context = computed(() =>
           </div>
 
           <div class="marine-operator-panel mt-4 rounded-[1.75rem] p-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted">
-              Signed in
-            </p>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted">Signed in</p>
             <p class="mt-3 font-display text-xl text-default">
               {{ user?.name || user?.email || 'Captain account' }}
             </p>
             <p class="mt-2 text-sm leading-6 text-muted">
-              {{ props.mode === 'admin'
-                ? 'Keep emergency actions explicit and review stale telemetry before touching public visibility.'
-                : 'Use setup for identity changes, settings for preferences, and keep public sharing deliberate.' }}
+              {{
+                props.mode === 'admin'
+                  ? 'Keep emergency actions explicit and review stale telemetry before touching public visibility.'
+                  : 'Use setup for identity changes, settings for preferences, and keep public sharing deliberate.'
+              }}
             </p>
           </div>
         </aside>

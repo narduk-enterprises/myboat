@@ -1,5 +1,8 @@
 import type {
+  AisHubSearchResponse,
+  AisHubSearchResult,
   DashboardOverview,
+  FollowedVesselSummary,
   PublicExploreResponse,
   InstallationKeySummary,
   InstallationSummary,
@@ -31,6 +34,56 @@ export function usePublicVesselDetail(username: string, vesselSlug: string) {
   return useFetch<PublicVesselDetailResponse>(`/api/public/${username}/${vesselSlug}`, {
     key: `myboat-public-vessel-${username}-${vesselSlug}`,
   })
+}
+
+const PUBLIC_VESSEL_REFRESH_MS = 10_000
+
+export async function useLivePublicVesselDetail(username: string, vesselSlug: string) {
+  let refreshTimer: number | null = null
+
+  function clearRefreshTimer() {
+    if (!refreshTimer) {
+      return
+    }
+
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+
+  onMounted(() => {
+    if (!import.meta.client) {
+      return
+    }
+
+    refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') {
+        return
+      }
+
+      void refreshDetail()
+    }, PUBLIC_VESSEL_REFRESH_MS)
+  })
+
+  onBeforeUnmount(() => {
+    clearRefreshTimer()
+  })
+
+  const request = await usePublicVesselDetail(username, vesselSlug)
+  const lastRefreshCompletedAt = shallowRef<string | null>(
+    request.data.value ? new Date().toISOString() : null,
+  )
+
+  async function refreshDetail() {
+    await request.refresh()
+    lastRefreshCompletedAt.value = new Date().toISOString()
+  }
+
+  return {
+    ...request,
+    refreshDetail,
+    refreshIntervalMs: PUBLIC_VESSEL_REFRESH_MS,
+    lastRefreshCompletedAt: readonly(lastRefreshCompletedAt),
+  }
 }
 
 export function useVesselDetail(vesselSlug: string) {
@@ -68,6 +121,73 @@ export function useSaveOnboarding() {
   return {
     pending: readonly(pending),
     saveOnboarding,
+  }
+}
+
+export function useSearchAisHubVessels() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function search(query: string) {
+    pending.value = true
+
+    try {
+      return await appFetch<AisHubSearchResponse>('/api/app/aishub/search', {
+        query: { q: query },
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    pending: readonly(pending),
+    search,
+  }
+}
+
+export function useFollowVessel() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function followVessel(vessel: AisHubSearchResult) {
+    pending.value = true
+
+    try {
+      return await appFetch<{ ok: true; mmsi: string }>('/api/app/fleet-friends', {
+        method: 'POST',
+        body: vessel,
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    followVessel,
+    pending: readonly(pending),
+  }
+}
+
+export function useRemoveFollowedVessel() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function removeFollowedVessel(followedVessel: Pick<FollowedVesselSummary, 'id'>) {
+    pending.value = true
+
+    try {
+      return await appFetch<{ ok: true }>(`/api/app/fleet-friends/${followedVessel.id}`, {
+        method: 'DELETE',
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    removeFollowedVessel,
+    pending: readonly(pending),
   }
 }
 

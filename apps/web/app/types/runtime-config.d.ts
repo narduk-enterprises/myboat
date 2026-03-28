@@ -1,5 +1,6 @@
 declare module 'nuxt/schema' {
   interface RuntimeConfig {
+    aisHubKey: string
     authBackend: 'local' | 'supabase'
     authAuthorityUrl: string
     authAnonKey: string

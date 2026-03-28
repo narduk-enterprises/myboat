@@ -66,6 +66,14 @@ async function sha256(value: string) {
     .join('')
 }
 
+function normalizeAngleDegrees(value: unknown) {
+  if (typeof value !== 'number') {
+    return null
+  }
+
+  return Math.abs(value) > Math.PI * 2 ? value : (value * 180) / Math.PI
+}
+
 function applyDeltaValues(
   snapshot: SnapshotDraft,
   values: Array<{ path: string; value: unknown }>,
@@ -91,7 +99,7 @@ function applyDeltaValues(
     }
 
     if (path === 'navigation.headingMagnetic') {
-      snapshot.headingMagnetic = typeof value === 'number' ? value : null
+      snapshot.headingMagnetic = normalizeAngleDegrees(value)
       continue
     }
 
@@ -111,7 +119,7 @@ function applyDeltaValues(
     }
 
     if (path === 'environment.wind.angleApparent') {
-      snapshot.windAngleApparent = typeof value === 'number' ? value : null
+      snapshot.windAngleApparent = normalizeAngleDegrees(value)
       continue
     }
 

@@ -3,19 +3,17 @@ definePageMeta({ layout: 'landing' })
 
 useSeo({
   title: 'MyBoat',
-  description:
-    'A bluewater command surface for captain identity, live telemetry, passages, media, and public boat sharing.',
+  description: 'Track your boat, manage onboard installs, and share a clean public vessel page.',
   ogImage: {
     title: 'MyBoat',
     description:
-      'A calm operational surface for live vessel tracking, passage history, device installs, and disciplined public sharing.',
+      'Live vessel tracking, trip history, and public sharing with private controls kept in the dashboard.',
   },
 })
 
 useWebPageSchema({
   name: 'MyBoat',
-  description:
-    'A bluewater command surface for captain identity, live telemetry, passages, media, and public boat sharing.',
+  description: 'Track your boat, manage onboard installs, and share a clean public vessel page.',
 })
 
 const { loggedIn } = useUserSession()
@@ -23,90 +21,95 @@ const { loggedIn } = useUserSession()
 const capabilityCards = [
   {
     icon: 'i-lucide-anchor',
-    eyebrow: 'Public identity',
-    signal: '@captain route',
-    title: 'Captain and vessel identity',
-    description:
-      'Lock the public captain handle, define the primary vessel, and keep one authoritative home for the boat profile.',
+    eyebrow: 'Public page',
+    signal: '@captain/boat',
+    title: 'Claim one shareable home',
+    description: 'Your captain handle and primary boat stay on one clean public link.',
   },
   {
     icon: 'i-lucide-radio',
-    eyebrow: 'Operational telemetry',
-    signal: 'Live + historical',
-    title: 'Live telemetry with context',
-    description:
-      'Treat current position, onboard signals, passages, and historical track memory as one operational record.',
+    eyebrow: 'Live view',
+    signal: 'Now + history',
+    title: 'See the full picture',
+    description: 'Position, onboard signals, and trip history sit in the same place.',
   },
   {
     icon: 'i-lucide-eye',
-    eyebrow: 'Disciplined sharing',
-    signal: 'Public by choice',
-    title: 'Public sharing with discipline',
+    eyebrow: 'Private controls',
+    signal: 'Share by choice',
+    title: 'Keep the right things private',
     description:
-      'Publish the surfaces worth sharing while keeping install controls, admin actions, and private history inside the owner dashboard.',
+      'Installs, keys, and admin actions stay in the dashboard while public pages stay simple.',
   },
 ]
 
 const quickSignals = [
   {
-    label: 'Public captain URL',
-    value: '@captain',
-    detail: 'One canonical home for the public-facing vessel story.',
+    label: 'Public page',
+    value: '@captain/boat',
+    detail: 'One link to share.',
   },
   {
-    label: 'SignalK ingest',
-    value: 'Ready',
-    detail: 'Edge installs, credentials, and reporting posture stay aligned.',
+    label: 'Live feed',
+    value: 'SignalK ready',
+    detail: 'Connect when hardware is ready.',
   },
   {
-    label: 'Passage memory',
+    label: 'Trips',
     value: 'Live + logbook',
-    detail: 'Current motion and historical crossings sit in the same system.',
+    detail: 'See what is happening now and what happened last.',
   },
 ]
 
 const workflow = [
-  'Create the captain account and claim the public handle.',
-  'Define the primary vessel and register the first onboard install.',
-  'Issue an ingest key and connect the edge collector or SignalK source.',
-  'Review live position, record passages, and publish a clean public captain page.',
+  {
+    title: 'Create your account',
+    detail: 'Claim your captain handle.',
+  },
+  {
+    title: 'Add your boat',
+    detail: 'Set the name, type, and home port.',
+  },
+  {
+    title: 'Connect a feed',
+    detail: 'Use SignalK or the relay URL.',
+  },
+  {
+    title: 'Share when ready',
+    detail: 'Open the dashboard and publish the public page.',
+  },
 ]
 
 const productSurfaces = [
   {
     badge: 'Private',
-    title: 'Owner dashboard',
-    description:
-      'Operational board for telemetry posture, installs, passages, and vessel-level detail.',
+    title: 'Dashboard',
+    description: 'Manage boats, trips, media, and installs.',
   },
   {
     badge: 'Public',
-    title: 'Public captain page',
-    description: 'A shareable route for vessel identity, current readiness, and recent movement.',
+    title: 'Boat page',
+    description: 'Share the boat, current status, and recent movement.',
   },
   {
     badge: 'Edge',
-    title: 'Install control plane',
-    description:
-      'The ingest edge for API keys, hostnames, SignalK endpoints, and live connection state.',
+    title: 'Install setup',
+    description: 'Keep keys, hostnames, and feed settings in one place.',
   },
 ]
 
 const boundaryRules = [
   {
-    title: 'Captain-owned identity',
-    description:
-      'Public handles, captain headlines, and vessel presence stay tied to one explicit owner record.',
+    title: 'One owner record',
+    description: 'The captain profile and primary boat stay connected.',
   },
   {
-    title: 'Telemetry plus logbook',
-    description:
-      'Live fixes and voyage memory share the same operating model instead of splitting into separate tools.',
+    title: 'Live plus history',
+    description: 'Current fixes and saved trips live together.',
   },
   {
-    title: 'Private edge controls',
-    description:
-      'Install credentials, relay posture, and admin actions stay inside the operational workspace.',
+    title: 'Private install controls',
+    description: 'Keys and device settings stay in the dashboard.',
   },
 ]
 </script>
@@ -123,11 +126,10 @@ const boundaryRules = [
               <h1
                 class="max-w-4xl font-display text-5xl leading-none tracking-tight text-default sm:text-6xl lg:text-7xl"
               >
-                Know where the boat is. Share only what matters.
+                Track the boat. Share the right parts.
               </h1>
               <p class="max-w-2xl text-lg text-muted sm:text-xl">
-                MyBoat is the calm operating surface for captain identity, live telemetry, passages,
-                onboard installs, and the public story that follows the boat.
+                MyBoat keeps live position, trips, installs, and a public boat page in one place.
               </p>
             </div>
 
@@ -172,9 +174,9 @@ const boundaryRules = [
               <template #header>
                 <div class="relative z-10 flex items-center justify-between">
                   <div>
-                    <p class="font-display text-2xl text-default">Operational board</p>
+                    <p class="font-display text-2xl text-default">Live vessel board</p>
                     <p class="mt-1 text-sm text-muted">
-                      One product surface for vessel state, telemetry posture, and public presence.
+                      A quick read on position, speed, wind, and depth.
                     </p>
                   </div>
                   <UBadge color="primary" variant="soft">Live-capable</UBadge>
@@ -205,15 +207,22 @@ const boundaryRules = [
 
             <UCard class="chart-surface rounded-[1.75rem]">
               <template #header>
-                <p class="font-display text-lg text-default">Typical operating rhythm</p>
+                <p class="font-display text-lg text-default">Start in four steps</p>
               </template>
               <ol class="space-y-3 text-sm text-muted">
-                <li v-for="step in workflow" :key="step" class="flex gap-3">
+                <li
+                  v-for="(step, index) in workflow"
+                  :key="step.title"
+                  class="flex gap-3 rounded-[1.2rem] border border-default/70 bg-default/60 px-3 py-3"
+                >
                   <span
                     class="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary"
-                    >•</span
+                    >{{ index + 1 }}</span
                   >
-                  <span>{{ step }}</span>
+                  <div class="min-w-0">
+                    <p class="font-medium text-default">{{ step.title }}</p>
+                    <p class="mt-1 text-sm text-muted">{{ step.detail }}</p>
+                  </div>
                 </li>
               </ol>
             </UCard>
@@ -252,10 +261,9 @@ const boundaryRules = [
       <UCard class="chart-surface rounded-[1.75rem]">
         <template #header>
           <div>
-            <p class="font-display text-2xl text-default">What the product actually contains</p>
+            <p class="font-display text-2xl text-default">What you get</p>
             <p class="mt-2 text-sm text-muted">
-              MyBoat is not a generic starter. It is a marine-aware system with clear public and
-              private boundaries.
+              A private dashboard, a public page, and a clean install path.
             </p>
           </div>
         </template>
@@ -275,9 +283,9 @@ const boundaryRules = [
       <UCard data-testid="landing-surface-grid" class="chart-surface rounded-[1.75rem]">
         <template #header>
           <div>
-            <p class="font-display text-2xl text-default">Three surfaces, one system</p>
+            <p class="font-display text-2xl text-default">One boat, three views</p>
             <p class="mt-2 text-sm text-muted">
-              Each part of the product has a job, but the underlying model stays coherent.
+              Private controls, public sharing, and onboard setup stay connected.
             </p>
           </div>
         </template>
