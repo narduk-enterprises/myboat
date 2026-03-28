@@ -173,7 +173,12 @@ async function confirmMfa() {
           </div>
         </template>
 
-        <UForm :schema="passwordSchema" :state="passwordState" class="space-y-5" @submit.prevent="onChangePassword">
+        <UForm
+          :schema="passwordSchema"
+          :state="passwordState"
+          class="space-y-5"
+          @submit.prevent="onChangePassword"
+        >
           <UFormField name="currentPassword" label="Current password">
             <UInput v-model="passwordState.currentPassword" type="password" class="w-full" />
           </UFormField>
@@ -194,7 +199,9 @@ async function confirmMfa() {
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Account posture</h2>
-            <p class="mt-1 text-sm text-muted">Identity and session metadata for the current captain.</p>
+            <p class="mt-1 text-sm text-muted">
+              Identity and session metadata for the current captain.
+            </p>
           </div>
         </template>
 
@@ -243,7 +250,12 @@ async function confirmMfa() {
               account. Start a new enrollment to rotate or add a factor.
             </p>
 
-            <UForm :schema="mfaSchema" :state="mfaState" class="space-y-4" @submit.prevent="beginMfaEnrollment">
+            <UForm
+              :schema="mfaSchema"
+              :state="mfaState"
+              class="space-y-4"
+              @submit.prevent="beginMfaEnrollment"
+            >
               <UFormField name="friendlyName" label="Friendly name">
                 <UInput
                   v-model="mfaState.friendlyName"
@@ -253,7 +265,12 @@ async function confirmMfa() {
               </UFormField>
 
               <div class="flex flex-wrap gap-3">
-                <UButton type="submit" color="primary" :loading="mfaLoading" icon="i-lucide-qr-code">
+                <UButton
+                  type="submit"
+                  color="primary"
+                  :loading="mfaLoading"
+                  icon="i-lucide-qr-code"
+                >
                   Start enrollment
                 </UButton>
                 <UButton
@@ -277,7 +294,7 @@ async function confirmMfa() {
                 :src="mfaSetup.qrCodeDataUrl"
                 alt="MFA QR code"
                 class="max-w-64 rounded-2xl border border-default bg-white p-3"
-              >
+              />
             </div>
 
             <div class="mt-4 space-y-3 text-sm">
@@ -288,7 +305,12 @@ async function confirmMfa() {
                 </p>
               </div>
 
-              <UForm :schema="mfaCodeSchema" :state="mfaState" class="space-y-3" @submit.prevent="confirmMfa">
+              <UForm
+                :schema="mfaCodeSchema"
+                :state="mfaState"
+                class="space-y-3"
+                @submit.prevent="confirmMfa"
+              >
                 <UFormField name="code" label="Verification code">
                   <UInput v-model="mfaState.code" class="w-full" inputmode="numeric" />
                 </UFormField>
@@ -307,7 +329,10 @@ async function confirmMfa() {
             </div>
           </div>
 
-          <div v-else class="rounded-[1.5rem] border border-dashed border-default/70 bg-muted/20 p-5">
+          <div
+            v-else
+            class="rounded-[1.5rem] border border-dashed border-default/70 bg-muted/20 p-5"
+          >
             <p class="font-medium text-default">No enrollment started</p>
             <p class="mt-2 text-sm text-muted">
               Generate a QR code when you are ready to bind a second factor to the captain account.

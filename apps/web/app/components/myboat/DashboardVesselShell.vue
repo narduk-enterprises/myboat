@@ -45,7 +45,9 @@ const postureLabel = computed(() => {
     return `${passageCount} passage${passageCount === 1 ? '' : 's'} recorded`
   }
 
-  return props.detail.vessel.liveSnapshot?.observedAt ? 'Live telemetry available' : 'Awaiting live telemetry'
+  return props.detail.vessel.liveSnapshot?.observedAt
+    ? 'Live telemetry available'
+    : 'Awaiting live telemetry'
 })
 </script>
 
@@ -105,9 +107,7 @@ const postureLabel = computed(() => {
             <UBadge color="neutral" variant="soft">
               {{ detail.waypoints.length }} waypoints
             </UBadge>
-            <UBadge color="neutral" variant="soft">
-              {{ detail.media.length }} media
-            </UBadge>
+            <UBadge color="neutral" variant="soft"> {{ detail.media.length }} media </UBadge>
           </div>
         </div>
       </section>

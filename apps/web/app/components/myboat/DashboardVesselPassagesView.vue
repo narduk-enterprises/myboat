@@ -6,7 +6,9 @@ const props = defineProps<{
   detail: VesselDetailResponse
 }>()
 
-const latestPassage = computed(() => props.detail.passages[0] || props.detail.vessel.latestPassage || null)
+const latestPassage = computed(
+  () => props.detail.passages[0] || props.detail.vessel.latestPassage || null,
+)
 const totalDistanceNm = computed(() =>
   props.detail.passages.reduce((sum, passage) => sum + (passage.distanceNm || 0), 0),
 )

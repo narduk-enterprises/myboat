@@ -54,10 +54,7 @@ function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const lat2Rad = (lat2 * Math.PI) / 180
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1Rad) *
-      Math.cos(lat2Rad) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2)
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
 
   const meters = 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return meters / 1852
@@ -85,12 +82,8 @@ function canUseSelfOverlay(
   }
 
   return (
-    haversineNm(
-      fallback.positionLat,
-      fallback.positionLng,
-      live.positionLat,
-      live.positionLng,
-    ) <= SELF_OVERLAY_MAX_DISTANCE_NM
+    haversineNm(fallback.positionLat, fallback.positionLng, live.positionLat, live.positionLng) <=
+    SELF_OVERLAY_MAX_DISTANCE_NM
   )
 }
 
@@ -150,9 +143,7 @@ const signalKUrlCandidates = computed(() => {
 })
 
 const publicLiveFeedAvailable = computed(() => signalKUrlCandidates.value.length > 0)
-const liveFeedEnabled = computed(
-  () => isClientMounted.value && publicLiveFeedAvailable.value,
-)
+const liveFeedEnabled = computed(() => isClientMounted.value && publicLiveFeedAvailable.value)
 
 const {
   activeUrl: liveFeedActiveUrl,
@@ -180,9 +171,7 @@ const recentPassages = computed(() => props.detail.passages.slice(0, 3))
 const latestPassage = computed(
   () => props.detail.vessel.latestPassage || props.detail.passages[0] || null,
 )
-const publicPath = computed(
-  () => `/${props.detail.profile.username}/${props.detail.vessel.slug}`,
-)
+const publicPath = computed(() => `/${props.detail.profile.username}/${props.detail.vessel.slug}`)
 const trafficMode = computed(() =>
   isClientMounted.value && publicLiveFeedAvailable.value ? 'auto' : 'off',
 )
@@ -205,8 +194,8 @@ const liveFeedStatus = computed(() => {
     case 'connected':
       return liveOverlayCompatible.value
         ? liveFeedLastDeltaAt.value
-            ? `Signal K live and merged into this vessel view · delta ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
-            : 'Signal K live and merged into this vessel view.'
+          ? `Signal K live and merged into this vessel view · delta ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
+          : 'Signal K live and merged into this vessel view.'
         : liveFeedLastDeltaAt.value
           ? `Nearby traffic live · delta ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
           : 'Nearby traffic live through the public feed.'
@@ -276,13 +265,17 @@ const opsMetrics = computed(() => [
   {
     label: 'Waypoints saved',
     value: String(props.detail.waypoints.length),
-    hint: props.detail.waypoints.length ? 'Saved route markers remain visible.' : 'No route markers yet.',
+    hint: props.detail.waypoints.length
+      ? 'Saved route markers remain visible.'
+      : 'No route markers yet.',
     icon: 'i-lucide-map-pinned',
   },
   {
     label: 'Media log',
     value: String(props.detail.media.length),
-    hint: props.detail.media.length ? 'Recent captured moments are attached below.' : 'No public media yet.',
+    hint: props.detail.media.length
+      ? 'Recent captured moments are attached below.'
+      : 'No public media yet.',
     icon: 'i-lucide-camera',
   },
   {
@@ -350,16 +343,15 @@ const opsMetrics = computed(() => [
             </UButton>
           </div>
 
-          <div class="rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-5 shadow-card backdrop-blur">
+          <div
+            class="rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-5 shadow-card backdrop-blur"
+          >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p class="text-xs uppercase tracking-[0.24em] text-muted">Live source</p>
                 <p class="mt-2 font-display text-2xl text-default">{{ liveFeedLabel }}</p>
               </div>
-              <UBadge
-                :color="liveSourceBadgeTone"
-                variant="soft"
-              >
+              <UBadge :color="liveSourceBadgeTone" variant="soft">
                 {{ liveSourceBadgeLabel }}
               </UBadge>
             </div>
@@ -401,7 +393,8 @@ const opsMetrics = computed(() => [
             <div>
               <h2 class="font-display text-2xl text-default">Environment board</h2>
               <p class="mt-1 text-sm text-muted">
-                Public-ready vessel telemetry with speed, wind, heading, depth, water temperature, power, and engine state.
+                Public-ready vessel telemetry with speed, wind, heading, depth, water temperature,
+                power, and engine state.
               </p>
             </div>
           </template>
@@ -415,10 +408,13 @@ const opsMetrics = computed(() => [
               <div>
                 <h2 class="font-display text-2xl text-default">Route memory</h2>
                 <p class="mt-1 text-sm text-muted">
-                  Recent public passages stay close to the live chart so followers can connect present conditions with the boat&apos;s recent movement.
+                  Recent public passages stay close to the live chart so followers can connect
+                  present conditions with the boat&apos;s recent movement.
                 </p>
               </div>
-              <span class="rounded-full border border-default/70 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted">
+              <span
+                class="rounded-full border border-default/70 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted"
+              >
                 {{ detail.passages.length }} passages
               </span>
             </div>
@@ -456,7 +452,9 @@ const opsMetrics = computed(() => [
               <p class="text-xs uppercase tracking-wide text-muted">Public route</p>
               <p class="mt-2 font-medium text-default">{{ publicPath }}</p>
               <p class="mt-1 text-xs text-muted">
-                {{ primaryInstallation?.label || 'Public live view with stored telemetry refresh.' }}
+                {{
+                  primaryInstallation?.label || 'Public live view with stored telemetry refresh.'
+                }}
               </p>
             </div>
 
@@ -521,7 +519,9 @@ const opsMetrics = computed(() => [
                       Primary
                     </UBadge>
                     <UBadge
-                      :color="getConnectionTone(installation.connectionState, installation.lastSeenAt)"
+                      :color="
+                        getConnectionTone(installation.connectionState, installation.lastSeenAt)
+                      "
                       variant="soft"
                     >
                       {{ installation.connectionState }}

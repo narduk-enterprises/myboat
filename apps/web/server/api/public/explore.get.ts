@@ -47,7 +47,9 @@ export default defineEventHandler(async (event) => {
 
   const items = vesselCards
     .map((vessel) => {
-      const profile = profileMap.get(vesselRows.find((row) => row.id === vessel.id)?.ownerUserId || '')
+      const profile = profileMap.get(
+        vesselRows.find((row) => row.id === vessel.id)?.ownerUserId || '',
+      )
       if (!profile) {
         return null
       }

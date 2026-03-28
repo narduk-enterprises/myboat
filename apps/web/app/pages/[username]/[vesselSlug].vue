@@ -5,19 +5,15 @@ const route = useRoute()
 const username = computed(() => String(route.params.username || ''))
 const vesselSlug = computed(() => String(route.params.vesselSlug || ''))
 
-const {
-  data,
-  error,
-  pending,
-  refreshDetail,
-  lastRefreshCompletedAt,
-  refreshIntervalMs,
-} = await useLivePublicVesselDetail(username.value, vesselSlug.value)
+const { data, error, pending, refreshDetail, lastRefreshCompletedAt, refreshIntervalMs } =
+  await useLivePublicVesselDetail(username.value, vesselSlug.value)
 
 const detail = computed(() => data.value ?? null)
 
 useSeo({
-  title: detail.value ? `${detail.value.vessel.name} · @${detail.value.profile.username}` : 'Public vessel',
+  title: detail.value
+    ? `${detail.value.vessel.name} · @${detail.value.profile.username}`
+    : 'Public vessel',
   description:
     detail.value?.vessel.summary ||
     'Public MyBoat vessel detail with live status, route memory, and captain-approved sharing.',

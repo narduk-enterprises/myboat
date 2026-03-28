@@ -38,7 +38,13 @@ export default defineEventHandler(async (event) => {
     getPublicInstallationsForVesselIds(event, vesselIds),
   ])
 
-  const vessel = serializeVesselCards([vesselRow], snapshotRows, passageRows, mediaRows, waypointRows)[0]
+  const vessel = serializeVesselCards(
+    [vesselRow],
+    snapshotRows,
+    passageRows,
+    mediaRows,
+    waypointRows,
+  )[0]
   const resolvedInstallations = applyPublicSignalKDefaults(event, installations)
 
   if (!vessel) {

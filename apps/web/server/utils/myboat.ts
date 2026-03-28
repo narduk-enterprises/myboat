@@ -403,10 +403,7 @@ export async function getPublicInstallationsForVesselIds(event: H3Event, vesselI
     .from(vesselInstallations)
     .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
     .where(
-      and(
-        inArray(vesselInstallations.vesselId, vesselIds),
-        isNull(vesselInstallations.archivedAt),
-      ),
+      and(inArray(vesselInstallations.vesselId, vesselIds), isNull(vesselInstallations.archivedAt)),
     )
     .orderBy(desc(vesselInstallations.updatedAt))
     .all()

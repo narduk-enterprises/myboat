@@ -51,7 +51,9 @@ watchEffect(() => {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="metric-shell rounded-[1.35rem] p-4">
             <p class="text-xs uppercase tracking-[0.24em] text-muted">Name</p>
-            <p class="mt-3 font-display text-xl text-default">{{ currentUser?.name || 'Unknown' }}</p>
+            <p class="mt-3 font-display text-xl text-default">
+              {{ currentUser?.name || 'Unknown' }}
+            </p>
           </div>
           <div class="metric-shell rounded-[1.35rem] p-4">
             <p class="text-xs uppercase tracking-[0.24em] text-muted">Email</p>

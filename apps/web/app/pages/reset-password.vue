@@ -130,9 +130,7 @@ function toUserFacingError(error: unknown, fallback: string) {
 </script>
 
 <template>
-  <div
-    class="mx-auto flex min-h-[100dvh] max-w-xl items-center justify-center px-4 py-12"
-  >
+  <div class="mx-auto flex min-h-[100dvh] max-w-xl items-center justify-center px-4 py-12">
     <UCard class="w-full">
       <template #header>
         <div class="space-y-2 text-center">

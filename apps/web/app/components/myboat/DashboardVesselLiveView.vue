@@ -73,7 +73,9 @@ function mergeSnapshots(
   }
 }
 
-const liveSnapshot = computed(() => mergeSnapshots(props.detail.vessel.liveSnapshot, selfSnapshot.value))
+const liveSnapshot = computed(() =>
+  mergeSnapshots(props.detail.vessel.liveSnapshot, selfSnapshot.value),
+)
 const liveVessel = computed(() => ({
   ...props.detail.vessel,
   liveSnapshot: liveSnapshot.value,
@@ -124,7 +126,8 @@ const liveFeedStatus = computed(() => {
             <div>
               <h2 class="font-display text-2xl text-default">Live vessel data</h2>
               <p class="mt-1 text-sm text-muted">
-                Default bridge metrics for the current vessel feed, with wind, depth, temperatures, and power in one place.
+                Default bridge metrics for the current vessel feed, with wind, depth, temperatures,
+                and power in one place.
               </p>
             </div>
           </template>
@@ -138,7 +141,8 @@ const liveFeedStatus = computed(() => {
               <div>
                 <h2 class="font-display text-2xl text-default">Recent route memory</h2>
                 <p class="mt-1 text-sm text-muted">
-                  The live view keeps a short route recap nearby, while the full passage log lives on its own page.
+                  The live view keeps a short route recap nearby, while the full passage log lives
+                  on its own page.
                 </p>
               </div>
 

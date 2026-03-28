@@ -21,7 +21,10 @@ const { data } = await useDashboardOverview('myboat-admin-telemetry')
 
 const overview = computed(() => data.value)
 const primaryVessel = computed(
-  () => overview.value?.vessels.find((vessel) => vessel.isPrimary) || overview.value?.vessels[0] || null,
+  () =>
+    overview.value?.vessels.find((vessel) => vessel.isPrimary) ||
+    overview.value?.vessels[0] ||
+    null,
 )
 
 watchEffect(() => {

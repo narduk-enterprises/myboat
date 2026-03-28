@@ -164,10 +164,7 @@ function asKnots(value: unknown) {
   return numericValue === null ? null : numericValue * 1.94384
 }
 
-function extractNumberField(
-  value: unknown,
-  fields: string[],
-): number | null {
+function extractNumberField(value: unknown, fields: string[]): number | null {
   if (!value || typeof value !== 'object') {
     return asNumber(value)
   }
@@ -183,10 +180,7 @@ function extractNumberField(
   return asNumber(cursor)
 }
 
-function extractTextField(
-  value: unknown,
-  fields: string[],
-): string | null {
+function extractTextField(value: unknown, fields: string[]): string | null {
   if (!value || typeof value !== 'object') {
     return asText(value)
   }

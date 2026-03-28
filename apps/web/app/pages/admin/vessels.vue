@@ -20,8 +20,12 @@ const currentUser = computed(() => session.user.value as AuthUser | null)
 const { data } = await useDashboardOverview('myboat-admin-vessels')
 
 const overview = computed(() => data.value)
-const primaryVesselName = computed(() => overview.value?.vessels.find((vessel) => vessel.isPrimary)?.name || 'Pending')
-const publicVesselCount = computed(() => overview.value?.vessels.filter((vessel) => vessel.sharePublic).length || 0)
+const primaryVesselName = computed(
+  () => overview.value?.vessels.find((vessel) => vessel.isPrimary)?.name || 'Pending',
+)
+const publicVesselCount = computed(
+  () => overview.value?.vessels.filter((vessel) => vessel.sharePublic).length || 0,
+)
 const passageCount = computed(() => overview.value?.stats.passageCount ?? 0)
 const mediaCount = computed(() => overview.value?.stats.mediaCount ?? 0)
 
@@ -46,26 +50,14 @@ watchEffect(() => {
     </UPageHero>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <MarineMetricCard
-        label="Primary vessel"
-        :value="primaryVesselName"
-        icon="i-lucide-ship"
-      />
+      <MarineMetricCard label="Primary vessel" :value="primaryVesselName" icon="i-lucide-ship" />
       <MarineMetricCard
         label="Public vessels"
         :value="String(publicVesselCount)"
         icon="i-lucide-share-2"
       />
-      <MarineMetricCard
-        label="Passages"
-        :value="String(passageCount)"
-        icon="i-lucide-route"
-      />
-      <MarineMetricCard
-        label="Media items"
-        :value="String(mediaCount)"
-        icon="i-lucide-camera"
-      />
+      <MarineMetricCard label="Passages" :value="String(passageCount)" icon="i-lucide-route" />
+      <MarineMetricCard label="Media items" :value="String(mediaCount)" icon="i-lucide-camera" />
     </div>
 
     <section class="grid gap-5 lg:grid-cols-2">
@@ -76,7 +68,9 @@ watchEffect(() => {
       <template #header>
         <div>
           <h2 class="font-display text-2xl text-default">Visibility notes</h2>
-          <p class="mt-1 text-sm text-muted">Public vs private posture for each vessel at a glance.</p>
+          <p class="mt-1 text-sm text-muted">
+            Public vs private posture for each vessel at a glance.
+          </p>
         </div>
       </template>
 

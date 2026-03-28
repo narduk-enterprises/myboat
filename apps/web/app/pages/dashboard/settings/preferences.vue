@@ -17,10 +17,18 @@ useWebPageSchema({
 
 const { data } = await useDashboardOverview('myboat-settings-preferences')
 const overview = computed(() => data.value)
-const primarySnapshot = computed(() => overview.value?.vessels.find((vessel) => vessel.isPrimary)?.liveSnapshot || null)
+const primarySnapshot = computed(
+  () => overview.value?.vessels.find((vessel) => vessel.isPrimary)?.liveSnapshot || null,
+)
 const { preferences, updatePreferences } = useMarinePreferences()
-const { convertDepth, convertSpeed, convertTemperature, depthUnitLabel, speedUnitLabel, temperatureUnitLabel } =
-  useMarineUnits()
+const {
+  convertDepth,
+  convertSpeed,
+  convertTemperature,
+  depthUnitLabel,
+  speedUnitLabel,
+  temperatureUnitLabel,
+} = useMarineUnits()
 
 const unitCards = [
   {

@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { AisContactSummary, PassageSummary, VesselCardSummary, WaypointSummary } from '~/types/myboat'
+import type {
+  AisContactSummary,
+  PassageSummary,
+  VesselCardSummary,
+  WaypointSummary,
+} from '~/types/myboat'
 import { buildTrackFeatureCollection, formatRelativeTime, formatTimestamp } from '~/utils/marine'
 
 interface MarineMapHandle {
@@ -249,7 +254,9 @@ const nearbyAisContacts = computed(() => {
         return true
       }
 
-      return !(distanceNm <= AIS_DUPLICATE_RADIUS_NM && contact.name.trim().toLowerCase() === focusName)
+      return !(
+        distanceNm <= AIS_DUPLICATE_RADIUS_NM && contact.name.trim().toLowerCase() === focusName
+      )
     })
     .sort((left, right) => left.distanceNm - right.distanceNm)
     .slice(0, 32)
@@ -313,7 +320,9 @@ const emptyStateDescription = computed(() =>
     : 'Your map will render the current vessel fix, passage history, and saved places once telemetry is attached to this vessel.',
 )
 
-const selectedPin = computed(() => allPins.value.find((item) => item.id === selectedId.value) || null)
+const selectedPin = computed(
+  () => allPins.value.find((item) => item.id === selectedId.value) || null,
+)
 const selectedVessel = computed(() => {
   const selected = selectedPin.value
   if (!selected || selected.pinKind !== 'vessel') return null
@@ -325,7 +334,9 @@ const selectedAisPin = computed(() => {
 })
 const focusVessel = computed(() => selectedVessel.value || primaryVessel.value)
 const showsDenseLabels = computed(() => props.vessels.length <= 3)
-const clusteringIdentifier = computed(() => (items.value.length >= 8 ? 'marine-track-map' : undefined))
+const clusteringIdentifier = computed(() =>
+  items.value.length >= 8 ? 'marine-track-map' : undefined,
+)
 
 const focusedSummary = computed(() => {
   if (selectedPin.value?.pinKind === 'waypoint') {
@@ -459,7 +470,11 @@ const stats = computed(() => {
     { label: 'Waypoints', value: String(waypointPins.value.length) },
     {
       label: trafficAllowed.value ? 'Traffic' : 'Scope',
-      value: trafficAllowed.value ? trafficStatus.value : isSingleVesselSurface.value ? 'Single vessel' : 'Fleet',
+      value: trafficAllowed.value
+        ? trafficStatus.value
+        : isSingleVesselSurface.value
+          ? 'Single vessel'
+          : 'Fleet',
     },
   ]
 })
@@ -481,7 +496,11 @@ const fallbackCenter = computed(() => {
 })
 
 const annotationSize = computed(() =>
-  items.value.length > 10 ? { width: 92, height: 72 } : showsDenseLabels.value ? { width: 116, height: 78 } : { width: 84, height: 68 },
+  items.value.length > 10
+    ? { width: 92, height: 72 }
+    : showsDenseLabels.value
+      ? { width: 116, height: 78 }
+      : { width: 84, height: 68 },
 )
 
 function normalizeSignalKSocketUrl(rawUrl: string | null | undefined) {
@@ -520,9 +539,7 @@ function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const dLng = ((lng2 - lng1) * Math.PI) / 180
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
 
   return (earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1852
 }
@@ -557,7 +574,12 @@ function buildAisVectorFeatureCollection(pins: MarineMapAisPin[]) {
       .map((pin) => {
         const speedOverGround = pin.sog
         const course = pin.cog ?? pin.heading
-        if (course === null || course === undefined || speedOverGround === null || speedOverGround === undefined) {
+        if (
+          course === null ||
+          course === undefined ||
+          speedOverGround === null ||
+          speedOverGround === undefined
+        ) {
           return null
         }
 
@@ -579,10 +601,7 @@ function buildAisVectorFeatureCollection(pins: MarineMapAisPin[]) {
           },
           geometry: {
             type: 'LineString' as const,
-            coordinates: [
-              [pin.lng, pin.lat],
-              projectedPoint,
-            ],
+            coordinates: [[pin.lng, pin.lat], projectedPoint],
           },
         }
       })
@@ -655,12 +674,14 @@ function aisDisplayName(contact: AisContactSummary) {
 }
 
 function getAisCategory(shipType: number | null, sog: number | null) {
-  if (shipType === 30) return { label: 'Fishing', color: 'rgb(14 165 233)', fill: 'rgb(224 242 254)' }
+  if (shipType === 30)
+    return { label: 'Fishing', color: 'rgb(14 165 233)', fill: 'rgb(224 242 254)' }
   if (shipType !== null && shipType >= 31 && shipType <= 33) {
     return { label: 'Tow', color: 'rgb(245 158 11)', fill: 'rgb(254 243 199)' }
   }
   if (shipType === 36) return { label: 'Sail', color: 'rgb(6 182 212)', fill: 'rgb(207 250 254)' }
-  if (shipType === 37) return { label: 'Pleasure', color: 'rgb(168 85 247)', fill: 'rgb(243 232 255)' }
+  if (shipType === 37)
+    return { label: 'Pleasure', color: 'rgb(168 85 247)', fill: 'rgb(243 232 255)' }
   if (shipType !== null && shipType >= 60 && shipType <= 69) {
     return { label: 'Passenger', color: 'rgb(59 130 246)', fill: 'rgb(219 234 254)' }
   }
@@ -670,7 +691,8 @@ function getAisCategory(shipType: number | null, sog: number | null) {
   if (shipType !== null && shipType >= 80 && shipType <= 89) {
     return { label: 'Tanker', color: 'rgb(239 68 68)', fill: 'rgb(254 226 226)' }
   }
-  if (shipType === 35) return { label: 'Military', color: 'rgb(15 23 42)', fill: 'rgb(226 232 240)' }
+  if (shipType === 35)
+    return { label: 'Military', color: 'rgb(15 23 42)', fill: 'rgb(226 232 240)' }
   if (shipType !== null && shipType >= 40 && shipType <= 55) {
     return { label: 'Service', color: 'rgb(249 115 22)', fill: 'rgb(255 237 213)' }
   }
@@ -984,12 +1006,16 @@ watch(showTraffic, (enabled) => {
   }
 })
 
-watch(trafficAllowed, (enabled) => {
-  if (!enabled) {
-    showTraffic.value = false
-    showTrafficVectors.value = false
-  }
-}, { immediate: true })
+watch(
+  trafficAllowed,
+  (enabled) => {
+    if (!enabled) {
+      showTraffic.value = false
+      showTrafficVectors.value = false
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   if (!import.meta.client) return
@@ -1005,7 +1031,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="card-base overflow-hidden">
-    <div class="flex flex-col gap-4 border-b border-default px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <div
+      class="flex flex-col gap-4 border-b border-default px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
+    >
       <div>
         <p class="text-sm font-medium text-default">{{ focusedSummary.eyebrow }}</p>
         <p class="mt-1 font-display text-xl text-default">{{ focusedSummary.title }}</p>
@@ -1028,7 +1056,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="hasMapData" ref="mapHost" class="relative">
-      <div class="absolute left-4 top-4 z-10 max-w-[18rem] rounded-[1.5rem] border border-default/70 bg-default/88 p-4 shadow-card backdrop-blur-xl">
+      <div
+        class="absolute left-4 top-4 z-10 max-w-[18rem] rounded-[1.5rem] border border-default/70 bg-default/88 p-4 shadow-card backdrop-blur-xl"
+      >
         <p class="text-[11px] uppercase tracking-[0.22em] text-muted">
           {{
             selectedPin?.pinKind === 'waypoint'
@@ -1048,10 +1078,7 @@ onBeforeUnmount(() => {
         >
           Logged {{ formatTimestamp(selectedPin.visitedAt) }}
         </p>
-        <p
-          v-else-if="selectedPin?.pinKind === 'ais'"
-          class="mt-3 text-xs text-muted"
-        >
+        <p v-else-if="selectedPin?.pinKind === 'ais'" class="mt-3 text-xs text-muted">
           Updated {{ formatRelativeTime(new Date(selectedPin.lastUpdateAt).toISOString()) }}
           <span v-if="selectedPin.callSign"> · {{ selectedPin.callSign }}</span>
         </p>
@@ -1115,7 +1142,9 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="absolute inset-x-4 bottom-4 z-10 flex flex-wrap items-center justify-between gap-3">
+      <div
+        class="absolute inset-x-4 bottom-4 z-10 flex flex-wrap items-center justify-between gap-3"
+      >
         <div class="flex flex-wrap gap-2">
           <UButton
             icon="i-lucide-ship"

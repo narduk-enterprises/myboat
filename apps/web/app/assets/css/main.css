@@ -356,7 +356,11 @@ body {
     radial-gradient(circle at top right, rgb(34 197 94 / 0.1), transparent 18%),
     linear-gradient(rgb(148 163 184 / 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgb(148 163 184 / 0.06) 1px, transparent 1px);
-  background-size: auto, auto, 56px 56px, 56px 56px;
+  background-size:
+    auto,
+    auto,
+    56px 56px,
+    56px 56px;
   mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.6), transparent 85%);
 }
 
