@@ -6,10 +6,12 @@ import type {
   WaypointSummary,
 } from '~/types/myboat'
 import { buildTrackFeatureCollection, formatRelativeTime, formatTimestamp } from '~/utils/marine'
+import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 
 interface MarineMapHandle {
   setRegion: (center: { lat: number; lng: number }, span?: { lat: number; lng: number }) => void
   zoomToFit: (zoomOutLevels?: number) => void
+  getMap: () => MapKitMapSurface | null
 }
 
 interface MarineMapInstallation {
@@ -64,7 +66,8 @@ interface MarineMapAisPin {
   lastUpdateAt: number
 }
 
-type MarineMapPin = MarineMapVesselPin | MarineMapWaypointPin | MarineMapAisPin
+type MarineMapSurfacePin = MarineMapVesselPin | MarineMapWaypointPin
+type MarineMapPin = MarineMapSurfacePin | MarineMapAisPin
 
 const AIS_NEARBY_RADIUS_NM = 24
 const AIS_VECTOR_LOOKAHEAD_MINUTES = 12
@@ -102,10 +105,11 @@ const showVessels = shallowRef(true)
 const showRoutes = shallowRef(true)
 const showWaypoints = shallowRef(true)
 const showTraffic = shallowRef(props.trafficMode === 'auto' && props.vessels.length === 1)
-const showTrafficVectors = shallowRef(true)
+const showTrafficVectors = shallowRef(false)
 const showPointsOfInterest = shallowRef(true)
 const isFullscreen = shallowRef(false)
 const isCompactViewport = useCompactViewport()
+const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
 const persistKey = computed(() => {
   if (props.persistKey?.trim()) {
@@ -287,16 +291,14 @@ const aisPins = computed<MarineMapAisPin[]>(() =>
   })),
 )
 
-const items = computed<MarineMapPin[]>(() => [
+const mapItems = computed<MarineMapSurfacePin[]>(() => [
   ...(showVessels.value ? vesselPins.value : []),
   ...(showWaypoints.value ? waypointPins.value : []),
-  ...(showTraffic.value ? aisPins.value : []),
 ])
 
 const allPins = computed<MarineMapPin[]>(() => [
-  ...vesselPins.value,
-  ...waypointPins.value,
-  ...aisPins.value,
+  ...mapItems.value,
+  ...(showTraffic.value ? aisPins.value : []),
 ])
 
 const baseGeojson = computed(() => buildTrackFeatureCollection(props.passages))
@@ -311,7 +313,7 @@ const geojson = computed(() => ({
 
 const hasMapData = computed(
   () =>
-    items.value.length > 0 ||
+    mapItems.value.length > 0 ||
     baseGeojson.value.features.length > 0 ||
     trafficVectorGeojson.value.features.length > 0,
 )
@@ -336,7 +338,7 @@ const selectedAisPin = computed(() => {
 const focusVessel = computed(() => selectedVessel.value || primaryVessel.value)
 const showsDenseLabels = computed(() => props.vessels.length <= 3)
 const clusteringIdentifier = computed(() =>
-  items.value.length >= 8 ? 'marine-track-map' : undefined,
+  mapItems.value.length >= 8 ? 'marine-track-map' : undefined,
 )
 
 const focusedSummary = computed(() => {
@@ -538,7 +540,7 @@ const fallbackCenter = computed(() => {
 })
 
 const annotationSize = computed(() =>
-  items.value.length > 10
+  mapItems.value.length > 10
     ? { width: 92, height: 72 }
     : showsDenseLabels.value
       ? { width: 116, height: 78 }
@@ -901,62 +903,64 @@ function createWaypointPinElement(item: MarineMapWaypointPin, isSelected: boolea
 function createAisPinElement(item: MarineMapAisPin, isSelected: boolean) {
   const category = getAisCategory(item.shipType, item.sog)
 
-  const shell = document.createElement('div')
-  shell.style.cssText =
-    'display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;pointer-events:none;'
-
-  const marker = document.createElement('div')
-  marker.style.cssText = [
+  const element = document.createElement('div')
+  element.style.cssText = [
     'position:relative',
     'display:flex',
-    'height:38px',
-    'width:38px',
+    'height:24px',
+    'width:24px',
     'align-items:center',
     'justify-content:center',
-    'border-radius:999px',
-    'border:1px solid rgb(255 255 255 / 0.82)',
-    `background:${isSelected ? `${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.95)')}` : 'rgb(15 23 42 / 0.86)'}`,
-    `box-shadow:${isSelected ? `0 14px 28px ${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.25)')}` : '0 10px 24px rgb(15 23 42 / 0.22)'}`,
-    `transform:${isSelected ? 'scale(1.06)' : 'scale(1)'}`,
-    'transition:transform 180ms ease, box-shadow 180ms ease',
+    'pointer-events:none',
   ].join(';')
+
+  if (isSelected) {
+    const halo = document.createElement('div')
+    halo.style.cssText = [
+      'position:absolute',
+      'inset:-5px',
+      'border-radius:999px',
+      `background:${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.16)')}`,
+      `box-shadow:0 8px 18px ${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.24)')}`,
+    ].join(';')
+    element.appendChild(halo)
+  }
 
   const ship = document.createElement('div')
   ship.style.cssText = [
     'position:relative',
     'z-index:1',
-    `transform:rotate(${Math.round(item.heading ?? item.cog ?? 0)}deg)`,
+    `transform:rotate(${Math.round(item.heading ?? item.cog ?? 0)}deg) scale(${isSelected ? 1.05 : 1})`,
     'transition:transform 180ms ease',
-    'filter:drop-shadow(0 2px 4px rgb(15 23 42 / 0.3))',
+    'filter:drop-shadow(0 1px 3px rgb(15 23 42 / 0.24))',
   ].join(';')
   ship.innerHTML = `
-    <svg viewBox="0 0 32 32" width="24" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg viewBox="0 0 32 32" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path
-        d="M16 3 L22 23 Q22 28 16 28 Q10 28 10 23 Z"
-        fill="${category.fill}"
+        d="M16 4 L22 24 Q22 28 16 28 Q10 28 10 24 Z"
+        fill="${category.color}"
         stroke="white"
-        stroke-width="1.25"
+        stroke-width="1.15"
         stroke-linejoin="round"
       />
-      <circle cx="16" cy="17" r="2" fill="${category.color}" opacity="0.8" />
+      <circle cx="16" cy="17" r="2" fill="${category.fill}" opacity="0.85" />
     </svg>
   `
-  marker.appendChild(ship)
+  element.appendChild(ship)
 
   const tone = document.createElement('div')
   tone.style.cssText = [
     'position:absolute',
-    'right:2px',
-    'top:2px',
-    'height:8px',
-    'width:8px',
+    'right:1px',
+    'top:1px',
+    'z-index:2',
+    'height:7px',
+    'width:7px',
     'border-radius:999px',
-    'border:1px solid rgb(255 255 255 / 0.82)',
+    'border:1px solid rgb(255 255 255 / 0.85)',
     `background:${aisFreshnessTone(item.lastUpdateAt)}`,
   ].join(';')
-  marker.appendChild(tone)
-
-  shell.appendChild(marker)
+  element.appendChild(tone)
 
   const shouldShowLabel =
     isSelected || (!isCompactViewport.value && aisPins.value.length <= 5 && item.distanceNm <= 4)
@@ -964,35 +968,48 @@ function createAisPinElement(item: MarineMapAisPin, isSelected: boolean) {
   if (shouldShowLabel) {
     const label = document.createElement('div')
     label.style.cssText = [
-      'max-width:156px',
+      'position:absolute',
+      'top:100%',
+      'left:50%',
+      'margin-top:3px',
+      'max-width:144px',
+      'transform:translateX(-50%)',
       'overflow:hidden',
       'text-overflow:ellipsis',
       'white-space:nowrap',
       'border-radius:999px',
-      'border:1px solid rgb(255 255 255 / 0.7)',
-      `background:${isSelected ? 'rgb(15 23 42 / 0.94)' : 'rgb(255 255 255 / 0.92)'}`,
+      'border:1px solid rgb(255 255 255 / 0.72)',
+      `background:${isSelected ? 'rgb(15 23 42 / 0.94)' : 'rgb(255 255 255 / 0.9)'}`,
       `color:${isSelected ? 'rgb(248 250 252)' : 'rgb(15 23 42)'}`,
-      'padding:4px 10px',
-      'font-size:11px',
+      'padding:2px 7px',
+      'font-size:9px',
       'font-weight:700',
       'letter-spacing:0.01em',
-      'box-shadow:0 10px 24px rgb(15 23 42 / 0.14)',
-      'backdrop-filter:blur(12px)',
+      'box-shadow:0 8px 20px rgb(15 23 42 / 0.14)',
+      'backdrop-filter:blur(10px)',
     ].join(';')
     label.textContent = item.title
-    shell.appendChild(label)
+    element.appendChild(label)
   }
 
-  return { element: shell }
+  return { element }
 }
 
-function createPinElement(item: MarineMapPin, isSelected: boolean) {
+function createAisPinFingerprint(item: MarineMapAisPin, isSelected: boolean) {
+  const category = getAisCategory(item.shipType, item.sog)
+  const freshness = aisFreshnessTone(item.lastUpdateAt)
+  const headingBucket = Math.round((item.heading ?? item.cog ?? 0) / 10)
+  const labelMode =
+    isSelected || (!isCompactViewport.value && aisPins.value.length <= 5 && item.distanceNm <= 4)
+      ? 'label'
+      : 'dot'
+
+  return [item.title, category.label, freshness, headingBucket, labelMode, isSelected].join(':')
+}
+
+function createPinElement(item: MarineMapSurfacePin, isSelected: boolean) {
   if (item.pinKind === 'vessel') {
     return createVesselPinElement(item, isSelected)
-  }
-
-  if (item.pinKind === 'ais') {
-    return createAisPinElement(item, isSelected)
   }
 
   return createWaypointPinElement(item, isSelected)
@@ -1055,6 +1072,8 @@ function handleRegionChange(region: {
 }
 
 function handleMapReady() {
+  mapInstance.value = mapRef.value?.getMap() ?? null
+
   const region = savedRegion.value || getSavedRegion()
   if (!region) return
 
@@ -1066,7 +1085,7 @@ function handleMapReady() {
 
 watch([showVessels, showWaypoints, showTraffic], () => {
   if (!selectedId.value) return
-  if (items.value.some((item) => item.id === selectedId.value)) return
+  if (allPins.value.some((item) => item.id === selectedId.value)) return
   selectedId.value = null
 })
 
@@ -1087,6 +1106,16 @@ watch(
   { immediate: true },
 )
 
+useMarineAisOverlay({
+  map: mapInstance,
+  pins: aisPins,
+  enabled: computed(() => showTraffic.value && trafficAllowed.value),
+  selectedId,
+  createPinElement: createAisPinElement,
+  renderFingerprint: createAisPinFingerprint,
+  renderKey: computed(() => (isCompactViewport.value ? 'compact' : 'full')),
+})
+
 onMounted(() => {
   if (!import.meta.client) return
   defaultSignalKSocketUrl.value = buildDefaultSignalKSocketUrl()
@@ -1095,6 +1124,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  mapInstance.value = null
   if (!import.meta.client) return
   document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
@@ -1319,7 +1349,7 @@ onBeforeUnmount(() => {
               ref="mapSurface"
               v-model:selected-id="selectedId"
               class="h-full"
-              :items="items"
+              :items="mapItems"
               :geojson="geojson"
               :create-pin-element="createPinElement"
               :overlay-style-fn="routeOverlayStyle"

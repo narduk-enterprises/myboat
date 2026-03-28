@@ -1,4 +1,4 @@
-Status: LOCKED
+Status: UNLOCKED
 
 # MyBoat Product Contract
 
@@ -10,10 +10,18 @@ Status: LOCKED
 - `/login`
 - `/register`
 - `/dashboard`
+- `/dashboard/map`
+- `/dashboard/fleet-friends`
+- `/dashboard/settings`
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
 - `/dashboard/installations/[installationId]`
+- `/dashboard/settings/profile`
+- `/dashboard/settings/security`
+- `/dashboard/settings/preferences`
+- `/dashboard/settings/sharing`
 - `/:username`
+- `/:username/:vesselSlug`
 
 ### API routes
 
@@ -32,16 +40,29 @@ Status: LOCKED
 - branded hero
 - capability cards
 - product workflow summary
+- logged-in requests redirect to `/dashboard`
 
 ### `/dashboard`
 
+- hero/status summary
+- compact current-location map card
+- live vessel data cards
+- compact operational context cards
+
+### `/dashboard/map`
+
 - hero
-- top stats row
-- vessel cards
-- map panel
-- passage panel
-- install readiness panel
-- recent media/public moments panel
+- large operational chart
+- AIS traffic with selected-contact detail
+- compact diagnostics panel
+- deeper live metric board
+
+### `/dashboard/fleet-friends`
+
+- route header
+- search-and-save controls
+- map-first buddy-boat search surface
+- saved buddy boats list and saved boats map
 
 ### `/dashboard/onboarding`
 
@@ -62,6 +83,16 @@ Status: LOCKED
 - hero
 - installation credential panel
 
+### `/dashboard/settings`
+
+- hero
+- captain profile section
+- vessel profile section
+- live-feed setup section
+- sharing section
+- security section
+- local preferences section
+
 ### `/:username`
 
 - captain identity hero
@@ -69,12 +100,20 @@ Status: LOCKED
 - public map
 - public install readiness section
 
+### `/:username/:vesselSlug`
+
+- vessel hero
+- public live data board
+- public map
+- public route and media context
+
 ## Naming rules
 
 - use `vessel`, not `boat` or `install` interchangeably inside the same feature
 - use `installation` for device deployments
 - use `public profile` for `/:username`
 - use `captain` for the human owner/operator identity
+- use `Buddy Boats` as the user-facing label for `/dashboard/fleet-friends`
 - route params must stay descriptive: `[vesselSlug]`, `[installationId]`,
   `[username]`
 
@@ -127,3 +166,4 @@ Status: LOCKED
 - do not add raw SignalK or raw Influx browser proxies
 - do not create new pages that compete with existing vessel/install/public
   profile terminology
+- do not reintroduce installation-first primary navigation for launch

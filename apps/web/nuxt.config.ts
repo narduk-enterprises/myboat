@@ -96,7 +96,7 @@ export default defineNuxtConfig({
       authConfirmPath: '/auth/confirm',
       authResetPath: '/reset-password',
       authLogoutPath: '/logout',
-      authRedirectPath: '/dashboard/',
+      authRedirectPath: '/dashboard',
       authProviders,
       authPublicSignup: process.env.AUTH_PUBLIC_SIGNUP !== 'false',
       authRequireMfa: process.env.AUTH_REQUIRE_MFA === 'true',

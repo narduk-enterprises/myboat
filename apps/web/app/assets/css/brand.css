@@ -1,25 +1,25 @@
 @theme {
-  --font-sans: 'Source Sans 3', system-ui, sans-serif;
-  --font-display: 'Lexend', system-ui, sans-serif;
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
 
-  --color-primary-50: 239 246 255;
-  --color-primary-100: 219 234 254;
-  --color-primary-200: 191 219 254;
-  --color-primary-300: 147 197 253;
-  --color-primary-400: 96 165 250;
-  --color-primary-500: 59 130 246;
-  --color-primary-600: 37 99 235;
-  --color-primary-700: 29 78 216;
-  --color-primary-800: 30 64 175;
-  --color-primary-900: 30 58 138;
-  --color-primary-950: 23 37 84;
+  --color-primary-50: 240 249 255;
+  --color-primary-100: 224 242 254;
+  --color-primary-200: 186 230 253;
+  --color-primary-300: 125 211 252;
+  --color-primary-400: 56 189 248;
+  --color-primary-500: 14 165 233;
+  --color-primary-600: 2 132 199;
+  --color-primary-700: 3 105 161;
+  --color-primary-800: 7 89 133;
+  --color-primary-900: 12 74 110;
+  --color-primary-950: 8 47 73;
 
   --radius-card: 1.75rem;
   --radius-button: 9999px;
   --radius-badge: 9999px;
   --radius-input: 1rem;
 
-  --shadow-card: 0 20px 50px -34px rgb(15 23 42 / 0.22);
-  --shadow-elevated: 0 28px 72px -36px rgb(15 23 42 / 0.28);
-  --shadow-overlay: 0 40px 120px -54px rgb(15 23 42 / 0.38);
+  --shadow-card: 0 22px 56px -38px rgb(8 47 73 / 0.2);
+  --shadow-elevated: 0 30px 84px -42px rgb(8 47 73 / 0.24);
+  --shadow-overlay: 0 46px 140px -60px rgb(8 47 73 / 0.32);
 }

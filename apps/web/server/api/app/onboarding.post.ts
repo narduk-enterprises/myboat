@@ -184,7 +184,7 @@ export default defineUserMutation(
 
     return {
       ok: true,
-      redirectTo: `/dashboard/vessels/${vesselSlug}`,
+      redirectTo: '/dashboard',
       username: body.username,
     }
   },

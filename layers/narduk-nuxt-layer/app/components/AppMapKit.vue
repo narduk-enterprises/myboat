@@ -161,6 +161,7 @@ const mapkitStatusDetail = computed(() => {
 const mapContainer = ref<HTMLElement | null>(null)
 
 const pinCleanups: Array<() => void> = []
+const pinAnnotationRefs: Array<InstanceType<typeof mapkit.Annotation>> = []
 let map: InstanceType<typeof mapkit.Map> | null = null
 let overviewRegion: InstanceType<typeof mapkit.CoordinateRegion> | null = null
 const overlayFeatureMap = new WeakMap<object, GeoJSONFeature>()
@@ -500,6 +501,14 @@ function clearPinCleanups() {
   pinCleanups.length = 0
 }
 
+function clearPinAnnotations() {
+  if (map && pinAnnotationRefs.length > 0) {
+    map.removeAnnotations(pinAnnotationRefs)
+  }
+
+  pinAnnotationRefs.length = 0
+}
+
 function addAnnotations() {
   if (!map || !props.items.length || !props.createPinElement) return
 
@@ -537,12 +546,13 @@ function addAnnotations() {
     )
   })
   map.addAnnotations(annotations)
+  pinAnnotationRefs.push(...annotations)
 }
 
 function rebuildAnnotations() {
   if (!map) return
   clearPinCleanups()
-  map.removeAnnotations(map.annotations)
+  clearPinAnnotations()
   addAnnotations()
 }
 
@@ -729,14 +739,14 @@ watch(
     if (!map) return
     if (props.preserveRegion) {
       clearPinCleanups()
-      map.removeAnnotations(map.annotations)
+      clearPinAnnotations()
       addAnnotations()
       return
     }
 
     selectedId.value = null
     clearPinCleanups()
-    map.removeAnnotations(map.annotations)
+    clearPinAnnotations()
     overviewRegion = computeBoundingRegion()
     map.setRegionAnimated(overviewRegion, true)
     addAnnotations()
@@ -788,6 +798,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearPinCleanups()
+  clearPinAnnotations()
   if (map) {
     map.destroy()
     map = null
@@ -822,7 +833,11 @@ function zoomToFit(zoomOutLevels = 0) {
   )
 }
 
-defineExpose({ scrollIntoView, setRegion, zoomToFit })
+function getMap() {
+  return map
+}
+
+defineExpose({ scrollIntoView, setRegion, zoomToFit, getMap })
 </script>
 
 <template>

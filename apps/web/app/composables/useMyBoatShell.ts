@@ -22,12 +22,8 @@ export function useMyBoatShell() {
   const publicNavLinks = computed<MyBoatShellLink[]>(() =>
     loggedIn.value
       ? [
-          { label: 'Home', to: '/', icon: 'i-lucide-house' },
           { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
           { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
-          { label: 'Buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-          { label: 'Setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
-          { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
         ]
       : [
           { label: 'Home', to: '/', icon: 'i-lucide-house' },
@@ -38,15 +34,12 @@ export function useMyBoatShell() {
 
   const userMenuLinks = computed<MyBoatShellLink[]>(() => {
     const links: MyBoatShellLink[] = [
-      { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
-      { label: 'Buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-      { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
-      { label: 'Boat setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
       {
         label: 'Settings',
         to: '/dashboard/settings',
         icon: 'i-lucide-sliders-horizontal',
       },
+      { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
     ]
 
     if (isAdmin.value) {
@@ -71,8 +64,9 @@ export function useMyBoatShell() {
     {
       title: 'Captain',
       links: [
-        { label: 'Boat setup', to: '/dashboard/onboarding' },
-        { label: 'Buddy boats', to: '/dashboard/fleet-friends' },
+        { label: 'Dashboard', to: '/dashboard' },
+        { label: 'Live map', to: '/dashboard/map' },
+        { label: 'Buddy Boats', to: '/dashboard/fleet-friends' },
         { label: 'Settings', to: '/dashboard/settings' },
         {
           label: loggedIn.value ? 'Sign out' : 'Sign in',

@@ -30,24 +30,6 @@ function isActive(to: string) {
   return route.path === to || route.path.startsWith(`${to}/`)
 }
 
-const topLinks = computed<MyBoatShellLink[]>(() =>
-  props.mode === 'admin'
-    ? [
-        { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
-        { label: 'Users', to: '/admin/users', icon: 'i-lucide-user-cog' },
-        { label: 'Vessels', to: '/admin/vessels', icon: 'i-lucide-ship' },
-        { label: 'Telemetry', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
-      ]
-    : [
-        { label: 'Home', to: '/', icon: 'i-lucide-house' },
-        { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
-        { label: 'Buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-        { label: 'Setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
-        { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
-        ...(isAdmin.value ? [{ label: 'Admin', to: '/admin', icon: 'i-lucide-shield-check' }] : []),
-      ],
-)
-
 const railLinks = computed<MyBoatShellLink[]>(() =>
   props.mode === 'admin'
     ? [
@@ -58,15 +40,10 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
         { label: 'Telemetry', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
       ]
     : [
-        { label: 'Command board', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
-        { label: 'Find buddy boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-        { label: 'Boat setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
-        {
-          label: 'Captain settings',
-          to: '/dashboard/settings',
-          icon: 'i-lucide-sliders-horizontal',
-        },
-        { label: 'Public explore', to: '/explore', icon: 'i-lucide-compass' },
+        { label: 'Overview', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Live Map', to: '/dashboard/map', icon: 'i-lucide-map' },
+        { label: 'Buddy Boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
+        { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
         ...(isAdmin.value
           ? [{ label: 'Admin console', to: '/admin', icon: 'i-lucide-shield-check' }]
           : []),
@@ -83,18 +60,14 @@ const mobileLinks = computed<MyBoatShellLink[]>(() =>
         { label: 'Signal', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
       ]
     : [
-        { label: 'Board', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Overview', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Map', to: '/dashboard/map', icon: 'i-lucide-map' },
         { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-        { label: 'Explore', to: '/explore', icon: 'i-lucide-compass' },
-        { label: 'Setup', to: '/dashboard/onboarding', icon: 'i-lucide-anchor' },
         { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
-        {
-          label: isAdmin.value ? 'Admin' : 'Home',
-          to: isAdmin.value ? '/admin' : '/',
-          icon: isAdmin.value ? 'i-lucide-shield-check' : 'i-lucide-house',
-        },
       ],
 )
+
+const shellHomePath = computed(() => (props.mode === 'admin' ? '/admin' : '/dashboard'))
 
 const context = computed(() =>
   props.mode === 'admin'
@@ -108,7 +81,7 @@ const context = computed(() =>
     : {
         chip: 'Captain workspace',
         description:
-          'Run the vessel setup, inspect install posture, and keep the public story aligned with live telemetry.',
+          'Run the primary vessel, open the live map when traffic matters, and keep settings as the canonical place for captain and source decisions.',
         eyebrow: 'Owner board',
         title: 'Operate the boat, not the shell',
       },
@@ -124,30 +97,9 @@ const context = computed(() =>
             class="mx-auto flex max-w-[96rem] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
           >
             <div class="flex min-w-0 items-center gap-4">
-              <NuxtLink to="/" class="shrink-0">
+              <NuxtLink :to="shellHomePath" class="shrink-0">
                 <AppBrandMark compact />
               </NuxtLink>
-
-              <div
-                class="hidden items-center gap-1 xl:flex"
-                role="navigation"
-                aria-label="Workspace navigation"
-              >
-                <NuxtLink
-                  v-for="link in topLinks"
-                  :key="link.to"
-                  :to="link.to"
-                  class="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition"
-                  :class="
-                    isActive(link.to)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted hover:bg-default/70 hover:text-default'
-                  "
-                >
-                  <UIcon :name="link.icon" class="size-4" />
-                  {{ link.label }}
-                </NuxtLink>
-              </div>
             </div>
 
             <div class="flex items-center gap-2">
@@ -220,7 +172,7 @@ const context = computed(() =>
               {{
                 props.mode === 'admin'
                   ? 'Keep emergency actions explicit and review stale telemetry before touching public visibility.'
-                  : 'Use setup for identity changes, settings for preferences, and keep public sharing deliberate.'
+                  : 'Use the live map for traffic, settings for captain and source changes, and contextual detail pages only when you need depth.'
               }}
             </p>
           </div>

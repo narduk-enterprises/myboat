@@ -9,6 +9,10 @@ Status: UNLOCKED
 - One admin shell for system and moderation work.
 - Public and private vessel pages should feel related, but the private vessel
   page is denser and more operational.
+- The authenticated shell has one primary navigation model:
+  - desktop: persistent left sidebar
+  - mobile: bottom nav with the same core destinations
+  - top header: brand, account, and context actions only
 
 ## Route hierarchy
 
@@ -30,13 +34,15 @@ Status: UNLOCKED
 ### Captain dashboard
 
 - `/dashboard`
+- `/dashboard/map`
+- `/dashboard/fleet-friends`
+- `/dashboard/settings`
+
+### Contextual and legacy captain routes
+
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
 - `/dashboard/installations/[installationId]`
-
-### Captain settings
-
-- `/dashboard/settings`
 - `/dashboard/settings/profile`
 - `/dashboard/settings/security`
 - `/dashboard/settings/preferences`
@@ -54,15 +60,20 @@ Status: UNLOCKED
 ## Global navigation
 
 - Public header nav:
-  - `Home`
-  - `Public profile` when signed in
-  - `Sign in` or `Dashboard`
+  - logged out: `Home`, `Explore`, `Create account`
+  - logged in: brand plus a reduced public nav; dashboard destinations live in
+    the account menu instead of the public header
 - Dashboard nav:
   - `Overview`
+  - `Live Map`
+  - `Buddy Boats`
   - `Settings`
-  - admin entry only for admins
-- Vessel and installation pages should use local in-page navigation and action
-  links rather than a second competing global subnav.
+  - admin entry only for admins and only as an extra item
+- Dashboard header must not duplicate dashboard route buttons.
+- Onboarding is not primary navigation; show it only as a contextual action when
+  setup is incomplete.
+- Vessel, installation, and settings-subpages should use local in-page
+  navigation and action links rather than a second competing global subnav.
 - Admin routes should have a distinct but minimal nav:
   - `Overview`
   - `Users`
@@ -76,8 +87,8 @@ Status: UNLOCKED
 ### `/`
 
 - Purpose:
-  - acquisition and product framing
-  - explain live vessel identity, telemetry, history, and public sharing
+  - acquisition and product framing for logged-out visitors
+  - logged-in visitors redirect to `/dashboard`
 - Primary sections:
   - hero
   - capability cards
@@ -163,26 +174,66 @@ Status: UNLOCKED
 ### `/dashboard`
 
 - Purpose:
-  - captain overview across all vessels and installations
+  - captain home for the single-vessel launch product
+- Primary sections:
+  - calm hero/status summary
+  - compact current-location map card
+  - live vessel data cards for the primary vessel
+  - compact operational context cards
+- Primary CTA:
+  - open live map
+- Secondary CTA:
+  - finish setup when captain, vessel, or live source is missing
+  - open settings
+  - open contextual vessel detail
+- Empty:
+  - no captain setup yet
+  - no vessel yet
+  - no live telemetry yet
+- Error:
+  - dashboard fetch alert with preserved shell
+
+### `/dashboard/map`
+
+- Purpose:
+  - deep live-ops map for the active vessel
 - Primary sections:
   - hero
-  - top stats row
-  - vessel cards
-  - fleet map
-  - recent passage panel
-  - installation readiness panel
-  - recent media or public moments panel
+  - large operational chart
+  - AIS traffic with selected-contact detail
+  - compact diagnostics for "what is wrong right now"
+  - deeper live metric board than `/dashboard`
 - Primary CTA:
-  - open vessel
+  - open contextual vessel or installation detail
 - Secondary CTA:
-  - onboarding when no vessel exists
+  - return to `/dashboard`
   - open settings
 - Empty:
   - no vessel yet
-  - no live telemetry yet
-  - no passages or media yet
+  - no live source linked yet
+  - no stored live fix yet
 - Error:
-  - dashboard fetch alert with preserved shell
+  - dashboard shell preserved with map-specific error state
+
+### `/dashboard/fleet-friends`
+
+- Purpose:
+  - buddy-boat map workspace
+- Primary sections:
+  - route header
+  - search-and-save controls
+  - map-first search results
+  - saved buddy boats list and saved boats map
+- Primary CTA:
+  - save a buddy boat
+- Secondary CTA:
+  - remove a buddy boat
+  - return to dashboard
+- Empty:
+  - no saved buddy boats yet
+  - no AIS matches yet
+- Error:
+  - search or workspace failure alert
 
 ### `/dashboard/onboarding`
 
@@ -251,17 +302,24 @@ Status: UNLOCKED
 ### `/dashboard/settings`
 
 - Purpose:
-  - settings hub and entry point into account controls
+  - canonical long-form captain settings surface
 - Primary sections:
-  - settings overview cards
-  - links into profile, security, preferences, and sharing
+  - hero
+  - captain profile section
+  - vessel profile section
+  - live-feed setup section
+  - sharing section
+  - security section
+  - local preferences section
 - Primary CTA:
-  - open a settings section
+  - open the relevant settings action
+- Secondary CTA:
+  - contextual links into legacy settings subpages and installation detail
 
 ### `/dashboard/settings/profile`
 
 - Purpose:
-  - captain identity and public profile editing
+  - contextual legacy page for captain identity editing
 - Primary sections:
   - captain name
   - username
@@ -277,7 +335,7 @@ Status: UNLOCKED
 ### `/dashboard/settings/security`
 
 - Purpose:
-  - security and account-hardening controls
+  - contextual legacy page for security and account-hardening controls
 - Primary sections:
   - password change
   - MFA posture
@@ -292,7 +350,7 @@ Status: UNLOCKED
 ### `/dashboard/settings/preferences`
 
 - Purpose:
-  - personal operating preferences
+  - contextual legacy page for personal operating preferences
 - Primary sections:
   - unit preferences
   - map behavior
@@ -304,7 +362,7 @@ Status: UNLOCKED
 ### `/dashboard/settings/sharing`
 
 - Purpose:
-  - control public visibility and live-sharing defaults
+  - contextual legacy page for public visibility and live-sharing defaults
 - Primary sections:
   - public profile visibility
   - vessel sharing defaults

@@ -3,9 +3,9 @@
   <desc id="desc">Wordmark for the MyBoat bluewater intelligence platform.</desc>
   <defs>
     <linearGradient id="ocean" x1="4" y1="3" x2="40" y2="43" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#93c5fd" />
-      <stop offset="45%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#1e3a8a" />
+      <stop offset="0%" stop-color="#7dd3fc" />
+      <stop offset="45%" stop-color="#0ea5e9" />
+      <stop offset="100%" stop-color="#0c4a6e" />
     </linearGradient>
   </defs>
   <rect width="40" height="40" x="2" y="4" rx="14" fill="url(#ocean)" />
@@ -13,7 +13,7 @@
   <path d="M11.8 26.2C15 21.6 18.5 19.3 22 19.3s7 2.1 10.2 6" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.6" />
   <path d="M12.2 30.1C15.1 33.6 18.4 35.4 22 35.4c3.6 0 6.8-1.7 9.8-5" fill="none" opacity=".82" stroke="#f8fafc" stroke-linecap="round" stroke-width="2" />
   <path d="M22 14.3v21.1" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-width="2.1" />
-  <circle cx="22" cy="14.3" r="2.1" fill="#fbbf24" />
-  <text x="52" y="21" fill="#0f172a" font-family="Lexend, Source Sans 3, system-ui, sans-serif" font-size="18" font-weight="700">MyBoat</text>
-  <text x="52" y="35" fill="#475569" font-family="Source Sans 3, system-ui, sans-serif" font-size="9.5" letter-spacing="2">BLUEWATER VESSEL INTELLIGENCE</text>
+  <circle cx="22" cy="14.3" r="2.1" fill="#e0f2fe" />
+  <text x="52" y="21" fill="#082f49" font-family="Sora, Manrope, system-ui, sans-serif" font-size="18" font-weight="700">MyBoat</text>
+  <text x="52" y="35" fill="#155e75" font-family="Manrope, system-ui, sans-serif" font-size="9.5" letter-spacing="2">BLUEWATER VESSEL INTELLIGENCE</text>
 </svg>

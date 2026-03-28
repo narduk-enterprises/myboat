@@ -3,8 +3,9 @@ export default defineAppConfig({
     redirectPath: '/dashboard',
   },
   ui: {
-    primary: 'blue',
-    neutral: 'slate',
-    strategy: 'override',
+    colors: {
+      primary: 'sky',
+      neutral: 'slate',
+    },
   },
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'landing' })
+definePageMeta({ layout: 'landing', middleware: ['guest'] })
 
 useSeo({
   title: 'MyBoat',
@@ -15,8 +15,6 @@ useWebPageSchema({
   name: 'MyBoat',
   description: 'Track your boat, manage onboard installs, and share a clean public vessel page.',
 })
-
-const { loggedIn } = useUserSession()
 
 const capabilityCards = [
   {
@@ -135,21 +133,21 @@ const boundaryRules = [
 
             <div class="flex flex-wrap gap-3">
               <UButton
-                :to="loggedIn ? '/dashboard' : '/register'"
+                to="/register"
                 color="primary"
                 size="xl"
                 icon="i-lucide-ship-wheel"
               >
-                {{ loggedIn ? 'Open dashboard' : 'Create account' }}
+                Create account
               </UButton>
               <UButton
-                :to="loggedIn ? '/dashboard/onboarding' : '/explore'"
+                to="/explore"
                 color="neutral"
                 variant="soft"
                 size="xl"
-                :icon="loggedIn ? 'i-lucide-navigation' : 'i-lucide-compass'"
+                icon="i-lucide-compass"
               >
-                {{ loggedIn ? 'Refine boat setup' : 'Explore public boats' }}
+                Explore public boats
               </UButton>
             </div>
 

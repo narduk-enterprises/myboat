@@ -2,13 +2,13 @@
 definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
-  title: 'Find Buddy Boats',
+  title: 'Buddy Boats',
   description: 'Search, save, and chart the buddy boats this captain follows.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
-  name: 'Find Buddy Boats',
+  name: 'Buddy Boats',
   description: 'Search, save, and chart the buddy boats this captain follows.',
 })
 
@@ -35,10 +35,9 @@ const overview = computed(() => data.value)
         class="flex flex-col gap-4 rounded-[1.75rem] border border-default/70 bg-default/85 px-5 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <h1 class="font-display text-3xl text-default">Buddy boats</h1>
+          <h1 class="font-display text-3xl text-default">Buddy Boats</h1>
           <p class="mt-1 text-sm text-muted">
-            Search the local AIS library, pull from AIS Hub only when needed, and save the boats you
-            want on this captain page.
+            Search the local AIS library, pull from AIS Hub only when needed, and save the boats you want on this captain page.
           </p>
         </div>
 

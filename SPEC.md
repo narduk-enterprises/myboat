@@ -8,11 +8,11 @@ MyBoat is a vessel-first platform for captains and crew who want one canonical
 home for:
 
 - public boat identity
-- authenticated vessel operations
+- authenticated captain operations
 - live telemetry snapshots
 - passages and route memory
 - geo-linked media and notes
-- edge install and ingest-key management
+- one canonical live-data source per vessel at launch
 
 This repo is the canonical successor to the earlier `loganrenz/myboat` starter
 work. The product now lives in one Nuxt 4 application at `apps/web/`, backed by
@@ -20,6 +20,16 @@ the Narduk Nuxt layer for auth, D1, SEO, analytics, and Cloudflare-safe runtime
 conventions. Identity is anchored to the shared Narduk auth authority, and the
 app remains the canonical product surface for owner, public, and telemetry
 views.
+
+Launch scope is intentionally narrow:
+
+- one captain
+- one primary vessel
+- one canonical live-data source for that vessel
+
+The app still keeps `installation` in the data model, but installations are not
+a first-class launch navigation object. Multi-vessel and multi-install
+management are deferred until the single-vessel operator console is stable.
 
 ## Runtime architecture
 
@@ -41,8 +51,8 @@ views.
 - Couples, crew, and families who need current location, install status, and
   passage history
 - Technical boat owners running SignalK or adjacent onboard telemetry
-- Future collaborators who need a stable schema and route system for telemetry,
-  media, and public sharing
+- Future collaborators who need a stable schema and route system for a
+  single-vessel launch product before broader fleet concepts return
 
 ## Public vs private surfaces
 
@@ -50,6 +60,7 @@ views.
 
 - `/`
 - `/:username`
+- `/:username/:vesselSlug`
 
 Public surfaces must show only captain-approved identity, vessel summaries, and
 any live or historical context already marked public.
@@ -59,9 +70,20 @@ any live or historical context already marked public.
 - `/login`
 - `/register`
 - `/dashboard`
+- `/dashboard/map`
+- `/dashboard/fleet-friends`
+- `/dashboard/settings`
+
+Contextual and legacy private routes remain valid in this pass, but they are
+not primary navigation:
+
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
 - `/dashboard/installations/[installationId]`
+- `/dashboard/settings/profile`
+- `/dashboard/settings/security`
+- `/dashboard/settings/preferences`
+- `/dashboard/settings/sharing`
 
 Private surfaces are for vessel ownership, install configuration, ingest
 credentials, and internal telemetry views.
@@ -76,10 +98,10 @@ credentials, and internal telemetry views.
 
 ### 2. Vessel identity
 
-- a captain can define one or more vessels
-- one vessel is marked primary
+- launch supports one primary vessel per captain
 - vessel metadata includes name, type, home port, summary, and public-sharing
   flag
+- future multi-vessel management is explicitly deferred
 
 ### 3. Live vessel state
 
@@ -92,17 +114,27 @@ credentials, and internal telemetry views.
 - browsers must not depend on direct connections to a vessel's private SignalK
   websocket
 
-### 4. Install management
+### 4. Live-source management
 
 - installs represent real onboard or near-boat device deployments
 - installs hold hostnames, SignalK stream URLs, connectivity state, event
   counts, and last-seen timestamps
 - install pages can issue ingest keys tied to the install
+- one install is treated as the canonical live-data source for the vessel at
+  launch
+- installation selection and setup live inside vessel/settings workflows rather
+  than acting as a first-class route family in the primary IA
 - installs may use either:
   - a direct SignalK stream URL configured by the owner
   - a MyBoat edge agent delivered as a Docker image or Raspberry Pi image
 
-### 7. Telemetry transport and storage
+### 5. Buddy boats
+
+- captains can search AIS data and save a small set of buddy boats
+- buddy boats live on one map-first private tool
+- saved buddy boats can appear on public captain surfaces when enabled
+
+### 6. Telemetry transport and storage
 
 - a single collector path should normalize SignalK data before fanout or
   storage
@@ -118,14 +150,14 @@ credentials, and internal telemetry views.
 - public and dashboard clients read telemetry through MyBoat APIs and managed
   live channels, not through raw SignalK or raw Influx browser access
 
-### 5. Passages
+### 7. Passages
 
 - passages represent meaningful historical movement or voyage slices
 - each passage can include summary copy, endpoints, distance, wind, and optional
   route geometry
 - passages are historical context, not raw timeseries dumps
 
-### 6. Media and annotations
+### 8. Media and annotations
 
 - media items are geo-aware vessel memories tied to passages or places
 - waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or
@@ -133,14 +165,27 @@ credentials, and internal telemetry views.
 
 ## Page inventory
 
-- `/`: public product overview
+- `/`: public product overview for logged-out visitors; logged-in visitors
+  redirect to `/dashboard`
 - `/login`: branded auth entry
 - `/register`: branded account creation
-- `/dashboard`: operational overview
-- `/dashboard/onboarding`: captain, vessel, and install setup
-- `/dashboard/vessels/[vesselSlug]`: vessel detail
-- `/dashboard/installations/[installationId]`: install and ingest key detail
+- `/dashboard`: calm live-data board for the active captain and primary vessel
+- `/dashboard/map`: dedicated live-ops chart with AIS traffic and diagnostics
+- `/dashboard/fleet-friends`: buddy-boat monitoring and search/save workflow
+- `/dashboard/settings`: canonical long-form captain settings surface
 - `/:username`: public captain profile
+- `/:username/:vesselSlug`: public vessel detail
+
+Contextual and legacy pages remain in the product but outside the primary
+authenticated IA:
+
+- `/dashboard/onboarding`: temporary setup flow
+- `/dashboard/vessels/[vesselSlug]`: contextual vessel detail
+- `/dashboard/installations/[installationId]`: contextual install detail
+- `/dashboard/settings/profile`
+- `/dashboard/settings/security`
+- `/dashboard/settings/preferences`
+- `/dashboard/settings/sharing`
 
 ## Core flows
 
@@ -151,11 +196,11 @@ credentials, and internal telemetry views.
 3. Lock the public handle.
 4. Define the vessel.
 5. Define the first install.
-6. Land on vessel detail.
+6. Land on `/dashboard`.
 
 ### Install activation
 
-1. Open installation detail.
+1. Open settings or vessel context and reach the current installation detail.
 2. Generate an ingest key.
 3. Copy the collector command template.
 4. Point a collector or bridge service at `/api/ingest/v1/delta`.
@@ -172,6 +217,15 @@ credentials, and internal telemetry views.
 3. Move between the public profile and the private dashboard without route
    confusion.
 
+### Dashboard operations
+
+1. Land on `/dashboard`.
+2. Read the current vessel state and compact location map.
+3. Open `/dashboard/map` for full AIS traffic and issue context.
+4. Open `Buddy Boats` when tracking other vessels matters.
+5. Use `/dashboard/settings` for captain profile, vessel defaults, live-source
+   setup, sharing, security, and local preferences.
+
 ## Domain model
 
 - `public_profiles`: public captain handle and profile metadata
@@ -179,6 +233,7 @@ credentials, and internal telemetry views.
 - `vessel_installations`: onboard device installs
 - `vessel_installation_api_keys`: mapping from install to layer-owned API keys
 - `vessel_live_snapshots`: last known live state per vessel
+- `followed_vessels`: saved buddy boats for captain surfaces
 - `passages`: voyage summaries and optional route geometry
 - `waypoints`: geo-linked annotations and visited places
 - `media_items`: geo-linked images and notes
@@ -206,6 +261,8 @@ credentials, and internal telemetry views.
 - raw SignalK or raw Influx browser proxies
 - giant marketing-site expansion unrelated to the product
 - telemetry charts beyond the current live snapshot and passage framing
+- multi-vessel launch navigation
+- multi-install launch navigation
 
 ## Acceptance criteria
 
@@ -215,6 +272,7 @@ credentials, and internal telemetry views.
 - the spec reflects the external Narduk auth authority and rollback hostname
 - the spec reflects Cloudflare Queues as the telemetry backlog and Influx as
   historical time-series storage
+- logged-in visits to `/` redirect to `/dashboard`
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
 - no placeholder home/about/contact scaffold remains
 - docs describe the real migrated product, not the provision brief
