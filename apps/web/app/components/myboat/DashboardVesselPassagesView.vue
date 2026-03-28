@@ -22,7 +22,7 @@ const totalDistanceNm = computed(() =>
           :vessels="[detail.vessel]"
           :passages="detail.passages"
           :waypoints="detail.waypoints"
-          height-class="h-[32rem]"
+          height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
           traffic-mode="off"
         />
       </div>

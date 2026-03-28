@@ -1,4 +1,6 @@
 import process from 'node:process'
+import { createServer } from 'node:http'
+import { WebSocketServer, type WebSocket as ServerWebSocket } from 'ws'
 
 type SignalKValue = {
   path: string
@@ -25,6 +27,8 @@ type CollectorConfig = {
   signalkWsUrl: string
   ingestUrl: string
   ingestKey: string
+  streamPort: number
+  streamPath: string
   batchSize: number
   flushIntervalMs: number
   minPostIntervalMs: number
@@ -44,6 +48,10 @@ let isShuttingDown = false
 let batch: BatchItem[] = []
 let lastPostStartedAt = 0
 let nextPostNotBefore = 0
+let lastPublishedAt: string | null = null
+let lastPublishedDeltaRaw: string | null = null
+
+const liveClients = new Set<ServerWebSocket>()
 
 class IngestHttpError extends Error {
   readonly status: number
@@ -77,6 +85,16 @@ function withDefaultSignalKSubscription(rawUrl: string) {
   return url.toString()
 }
 
+function normalizeStreamPath(rawPath: string | null | undefined) {
+  const normalizedPath = rawPath?.trim()
+
+  if (!normalizedPath) {
+    return '/myboat/v1/stream'
+  }
+
+  return normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`
+}
+
 function loadConfig(): CollectorConfig {
   const signalkWsUrl = withDefaultSignalKSubscription(
     process.env.SIGNALK_WS_URL?.trim() || 'ws://localhost:3000/signalk/v1/stream',
@@ -92,6 +110,8 @@ function loadConfig(): CollectorConfig {
     signalkWsUrl,
     ingestUrl,
     ingestKey,
+    streamPort: parsePositiveInteger('MYBOAT_STREAM_PORT', 4011),
+    streamPath: normalizeStreamPath(process.env.MYBOAT_STREAM_PATH),
     // Larger batches + spacing keep ingest POSTs well under authApiKeys (60/min).
     batchSize: parsePositiveInteger('COLLECTOR_BATCH_SIZE', 100),
     flushIntervalMs: parsePositiveInteger('COLLECTOR_FLUSH_INTERVAL_MS', 3000),
@@ -105,6 +125,30 @@ function loadConfig(): CollectorConfig {
 }
 
 const config = loadConfig()
+const streamServer = createServer((request, response) => {
+  const host = request.headers.host || 'localhost'
+  const url = new URL(request.url || '/', `http://${host}`)
+
+  if (url.pathname === '/healthz') {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        ok: true,
+        connectedClients: liveClients.size,
+        ingestUrl: config.ingestUrl,
+        lastPublishedAt,
+        signalkWsUrl: config.signalkWsUrl,
+        streamPath: config.streamPath,
+        streamPort: config.streamPort,
+      }),
+    )
+    return
+  }
+
+  response.writeHead(404, { 'content-type': 'application/json' })
+  response.end(JSON.stringify({ ok: false }))
+})
+const streamSocketServer = new WebSocketServer({ noServer: true })
 
 function log(message: string, detail?: unknown) {
   const prefix = `[edge-collector ${new Date().toISOString()}]`
@@ -124,6 +168,70 @@ function warn(message: string, detail?: unknown) {
   }
 
   console.warn(prefix, message, detail)
+}
+
+function broadcastToLiveClients(message: string) {
+  lastPublishedAt = new Date().toISOString()
+  lastPublishedDeltaRaw = message
+
+  for (const client of liveClients) {
+    if (client.readyState !== client.OPEN) {
+      liveClients.delete(client)
+      continue
+    }
+
+    client.send(message)
+  }
+}
+
+function buildCollectorHelloMessage() {
+  return JSON.stringify({
+    name: 'myboat-edge-collector',
+    self: 'vessels.self',
+    version: '0.1.0',
+  })
+}
+
+function startMyBoatStreamServer() {
+  streamSocketServer.on('connection', (client: ServerWebSocket) => {
+    liveClients.add(client)
+    client.send(buildCollectorHelloMessage())
+
+    if (lastPublishedDeltaRaw) {
+      client.send(lastPublishedDeltaRaw)
+    }
+
+    client.on('close', () => {
+      liveClients.delete(client)
+    })
+
+    client.on('error', (error: Error) => {
+      warn('MyBoat stream client error', error instanceof Error ? error.message : error)
+      liveClients.delete(client)
+    })
+  })
+
+  streamServer.on('upgrade', (request, socketHandle, head) => {
+    const host = request.headers.host || 'localhost'
+    const url = new URL(request.url || '/', `http://${host}`)
+
+    if (url.pathname !== config.streamPath) {
+      socketHandle.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n')
+      socketHandle.destroy()
+      return
+    }
+
+    streamSocketServer.handleUpgrade(request, socketHandle, head, (client: ServerWebSocket) => {
+      streamSocketServer.emit('connection', client, request)
+    })
+  })
+
+  streamServer.listen(config.streamPort, () => {
+    log(
+      'Publishing MyBoat stream',
+      `ws://0.0.0.0:${config.streamPort}${config.streamPath}`,
+    )
+  })
 }
 
 function isSignalKDeltaMessage(value: unknown): value is SignalKDeltaMessage {
@@ -241,6 +349,7 @@ async function handleSocketMessage(data: unknown) {
     const parsed = JSON.parse(raw) as unknown
 
     if (isSignalKDeltaMessage(parsed)) {
+      broadcastToLiveClients(raw)
       enqueueDelta(parsed)
       return
     }
@@ -369,6 +478,20 @@ async function shutdown(signal: string) {
     socket.close(1000, 'shutdown')
   }
 
+  for (const client of liveClients) {
+    if (client.readyState < client.CLOSING) {
+      client.close(1000, 'shutdown')
+    }
+  }
+
+  await new Promise<void>((resolve) => {
+    streamSocketServer.close(() => resolve())
+  })
+
+  await new Promise<void>((resolve) => {
+    streamServer.close(() => resolve())
+  })
+
   await flushBatch()
 }
 
@@ -380,4 +503,5 @@ process.on('SIGTERM', () => {
   void shutdown('SIGTERM').finally(() => process.exit(0))
 })
 
+startMyBoatStreamServer()
 connect()

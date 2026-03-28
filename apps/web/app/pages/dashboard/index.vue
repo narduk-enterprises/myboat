@@ -312,7 +312,7 @@ watchEffect(() => {
           <MarineTrackMap
             :vessels="overview.vessels"
             :passages="overview.recentPassages"
-            height-class="h-[28rem]"
+            height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
           />
 
           <PassageTimeline :passages="overview.recentPassages" />

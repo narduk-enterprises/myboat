@@ -286,7 +286,7 @@ function handleViewportChange(mmsis: string[]) {
         :vessels="items"
         title="Saved boats map"
         description="A zoomed-out chart view of the buddy boats already pinned to this captain."
-        height-class="h-[22rem]"
+        height-class="h-[18rem] sm:h-[20rem] lg:h-[22rem]"
       />
 
       <FleetFriendSavedList

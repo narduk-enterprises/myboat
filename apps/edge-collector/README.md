@@ -1,7 +1,9 @@
 # MyBoat Edge Collector
 
 Small Node-based forwarder that subscribes to a SignalK websocket and relays
-delta updates to the MyBoat ingest endpoint.
+delta updates to the MyBoat ingest endpoint. It also republishes those deltas
+on a MyBoat-owned websocket so the app can consume the same simulated
+boat-side feed that the collector is ingesting.
 
 ## Throughput and rate limits
 
@@ -37,6 +39,10 @@ the edge device is tight.
 - `MYBOAT_INGEST_URL`: MyBoat ingest endpoint. Defaults to
   `https://mybo.at/api/ingest/v1/delta`.
 - `MYBOAT_INGEST_KEY`: Required ingest bearer token.
+- `MYBOAT_STREAM_PORT`: Port for the collector-published MyBoat websocket feed.
+  Default `4011`.
+- `MYBOAT_STREAM_PATH`: Path for the collector-published MyBoat websocket feed.
+  Default `/myboat/v1/stream`.
 - `COLLECTOR_BATCH_SIZE`: Minimum buffered deltas before an eager flush is
   attempted (may exceed this while throttled). Default `100`.
 - `COLLECTOR_FLUSH_INTERVAL_MS`: Upper bound on how long deltas sit before a
@@ -67,5 +73,11 @@ docker run --rm \
   -e SIGNALK_WS_URL=wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all \
   -e MYBOAT_INGEST_URL=https://mybo.at/api/ingest/v1/delta \
   -e MYBOAT_INGEST_KEY=nk_replace_me \
+  -p 4011:4011 \
   myboat-edge-collector
 ```
+
+Published MyBoat websocket:
+
+- `ws://localhost:4011/myboat/v1/stream`
+- Health probe: `http://localhost:4011/healthz`

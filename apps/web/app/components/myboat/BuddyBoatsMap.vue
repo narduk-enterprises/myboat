@@ -29,7 +29,7 @@ const props = withDefaults(
   {
     title: 'Buddy boats map',
     description: 'A wider fleet view of the buddy boats that currently have AIS positions.',
-    heightClass: 'h-[30rem]',
+    heightClass: 'h-[20rem] sm:h-[26rem] lg:h-[30rem]',
     emptyTitle: 'No mapped buddy boats yet',
     emptyDescription:
       'Saved buddy boats will appear here once AIS Hub returns a current position for them.',
@@ -38,6 +38,7 @@ const props = withDefaults(
 
 const mapRef = useTemplateRef<BuddyBoatMapHandle>('mapSurface')
 const selectedId = shallowRef<string | null>(null)
+const isCompactViewport = useCompactViewport()
 
 const pins = computed<BuddyBoatPin[]>(() =>
   props.vessels
@@ -169,7 +170,9 @@ function createPinElement(item: BuddyBoatPin, isSelected: boolean) {
   marker.appendChild(tone)
   shell.appendChild(marker)
 
-  if (isSelected || pins.value.length <= 6) {
+  const shouldShowLabel = isSelected || (!isCompactViewport.value && pins.value.length <= 6)
+
+  if (shouldShowLabel) {
     const label = document.createElement('div')
     label.style.cssText = [
       'max-width:160px',
@@ -215,7 +218,9 @@ function handleMapReady() {
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div
+          class="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+        >
           <UBadge color="primary" variant="soft">{{ pins.length }} mapped</UBadge>
           <UBadge v-if="hiddenCount" color="warning" variant="soft">
             {{ hiddenCount }} without live coordinates
@@ -254,7 +259,33 @@ function handleMapReady() {
         </div>
       </div>
 
-      <div class="grid gap-3 lg:grid-cols-4">
+      <div v-if="selectedPin" class="grid gap-3 sm:hidden">
+        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+          <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
+          <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
+          <p class="mt-1 text-xs text-muted">{{ focusSubtitle }}</p>
+          <p class="mt-3 text-sm font-medium text-default">{{ destinationLabel }}</p>
+          <p class="mt-1 text-xs text-muted">{{ callSignLabel }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{ formatRelativeTime(selectedReportAt) }}
+            </p>
+            <p class="mt-1 text-xs text-muted">{{ formatTimestamp(selectedReportAt) }}</p>
+          </div>
+
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Coordinates</p>
+            <p class="mt-2 text-sm font-medium text-default">{{ latitudeLabel }}</p>
+            <p class="mt-1 text-xs text-muted">{{ longitudeLabel }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
           <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
           <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
@@ -288,11 +319,14 @@ function handleMapReady() {
         :description="hiddenDescription"
       />
 
-      <div class="flex flex-wrap gap-2">
+      <div
+        class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+      >
         <UButton
           v-for="pin in pins"
           :key="pin.id"
           size="xs"
+          class="shrink-0"
           :color="selectedId === pin.id ? 'primary' : 'neutral'"
           :variant="selectedId === pin.id ? 'soft' : 'outline'"
           @click="selectedId = selectedId === pin.id ? null : pin.id"

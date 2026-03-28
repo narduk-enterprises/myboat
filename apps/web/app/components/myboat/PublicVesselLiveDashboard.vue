@@ -381,7 +381,7 @@ const opsMetrics = computed(() => [
         :passages="detail.passages"
         :waypoints="detail.waypoints"
         :installations="detail.installations"
-        height-class="h-[32rem]"
+        height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
         :traffic-mode="trafficMode"
       />
     </div>
@@ -391,10 +391,10 @@ const opsMetrics = computed(() => [
         <UCard class="chart-surface rounded-[1.75rem] shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Environment board</h2>
+              <h2 class="font-display text-2xl text-default">Live data board</h2>
               <p class="mt-1 text-sm text-muted">
-                Public-ready vessel telemetry with speed, wind, heading, depth, water temperature,
-                power, and engine state.
+                Public-ready live telemetry with latitude, longitude, SOG, STW, apparent wind,
+                heading, depth, water temperature, power, and engine state.
               </p>
             </div>
           </template>
@@ -432,7 +432,8 @@ const opsMetrics = computed(() => [
             <div>
               <h2 class="font-display text-2xl text-default">Bridge watch</h2>
               <p class="mt-1 text-sm text-muted">
-                Quick read on coordinates, feed state, and the latest public route context.
+                Quick read on coordinates, feed state, and the latest public route context from the
+                Narduk-side live feed.
               </p>
             </div>
           </template>

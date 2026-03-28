@@ -144,7 +144,7 @@ const discoveryRules = [
           v-if="filteredItems.length"
           :vessels="mapVessels"
           :passages="mapPassages"
-          height-class="h-[34rem]"
+          height-class="h-[22rem] sm:h-[28rem] lg:h-[34rem]"
           traffic-mode="off"
         />
 

@@ -55,13 +55,16 @@ export function resolveSignalKRelayOrigin(baseUrl: string) {
 export function resolveInstallationSignalKConfig(options: {
   currentSignalKUrl?: string | null
   relaySignalKUrl?: string | null
+  preferRelay?: boolean
 }) {
   const currentSignalKUrl = normalizeSignalKUrl(options.currentSignalKUrl)
   const relaySignalKUrl = normalizeSignalKUrl(options.relaySignalKUrl)
+  const preferRelay = options.preferRelay === true
 
   if (
     relaySignalKUrl &&
-    (!currentSignalKUrl ||
+    (preferRelay ||
+      !currentSignalKUrl ||
       currentSignalKUrl === relaySignalKUrl ||
       isTideyePublicSignalKUrl(currentSignalKUrl))
   ) {
@@ -96,11 +99,15 @@ export function resolvePublicInstallationSignalKConfig(options: {
 }) {
   const currentSignalKUrl = normalizeSignalKUrl(options.currentSignalKUrl)
 
-  if (currentSignalKUrl && isTideyePublicSignalKUrl(currentSignalKUrl)) {
-    return resolveInstallationSignalKConfig({
-      currentSignalKUrl,
-      relaySignalKUrl: resolveSignalKRelayUrl(options.appOrigin),
-    })
+  if (currentSignalKUrl) {
+    const relaySignalKUrl = resolveSignalKRelayUrl(options.appOrigin)
+
+    return {
+      signalKUrl: null,
+      collectorSignalKUrl: relaySignalKUrl,
+      relaySignalKUrl,
+      signalKAccessMode: 'relay' as const,
+    }
   }
 
   return {

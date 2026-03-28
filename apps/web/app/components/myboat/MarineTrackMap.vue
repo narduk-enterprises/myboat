@@ -87,7 +87,7 @@ const props = withDefaults(
     passages: () => [],
     waypoints: () => [],
     installations: () => [],
-    heightClass: 'h-[24rem]',
+    heightClass: 'h-[22rem] sm:h-[24rem]',
     persistKey: null,
     trafficMode: 'auto',
   },
@@ -105,6 +105,7 @@ const showTraffic = shallowRef(props.trafficMode === 'auto' && props.vessels.len
 const showTrafficVectors = shallowRef(true)
 const showPointsOfInterest = shallowRef(true)
 const isFullscreen = shallowRef(false)
+const isCompactViewport = useCompactViewport()
 
 const persistKey = computed(() => {
   if (props.persistKey?.trim()) {
@@ -384,6 +385,47 @@ const focusedSummary = computed(() => {
       ? 'Saved passages, waypoints, live vessel fixes, and nearby AIS traffic render here when available.'
       : 'Saved passages, waypoints, and live vessel fixes render here when available.',
   }
+})
+
+const focusPanelLabel = computed(() => {
+  if (selectedPin.value?.pinKind === 'waypoint') {
+    return 'Waypoint focus'
+  }
+
+  if (selectedPin.value?.pinKind === 'ais') {
+    return 'AIS contact'
+  }
+
+  return 'Map focus'
+})
+
+const focusPanelMeta = computed(() => {
+  if (selectedPin.value?.pinKind === 'waypoint' && selectedPin.value.visitedAt) {
+    return `Logged ${formatTimestamp(selectedPin.value.visitedAt)}`
+  }
+
+  if (selectedPin.value?.pinKind === 'ais') {
+    const relativeUpdate = formatRelativeTime(
+      new Date(selectedPin.value.lastUpdateAt).toISOString(),
+    )
+    return selectedPin.value.callSign
+      ? `Updated ${relativeUpdate} · ${selectedPin.value.callSign}`
+      : `Updated ${relativeUpdate}`
+  }
+
+  if (trafficAllowed.value) {
+    if (aisLastDeltaAt.value) {
+      return `${trafficStatus.value} · Feed ${formatRelativeTime(new Date(aisLastDeltaAt.value).toISOString())}`
+    }
+
+    return trafficStatus.value
+  }
+
+  if (isSingleVesselSurface.value) {
+    return 'Route focus follows the current vessel fix and remembered camera position.'
+  }
+
+  return null
 })
 
 const trafficStatus = computed(() => {
@@ -775,7 +817,11 @@ function createVesselPinElement(item: MarineMapVesselPin, isSelected: boolean) {
 
   shell.appendChild(marker)
 
-  if (showsDenseLabels.value || isSelected || item.isPrimary) {
+  const shouldShowLabel = isCompactViewport.value
+    ? isSelected
+    : showsDenseLabels.value || isSelected || item.isPrimary
+
+  if (shouldShowLabel) {
     const label = document.createElement('div')
     label.style.cssText = [
       'max-width:140px',
@@ -801,6 +847,27 @@ function createVesselPinElement(item: MarineMapVesselPin, isSelected: boolean) {
 }
 
 function createWaypointPinElement(item: MarineMapWaypointPin, isSelected: boolean) {
+  if (isCompactViewport.value && !isSelected) {
+    const compactElement = document.createElement('div')
+    compactElement.style.cssText = [
+      'display:flex',
+      'height:30px',
+      'width:30px',
+      'align-items:center',
+      'justify-content:center',
+      'border-radius:999px',
+      'border:1px solid rgb(255 255 255 / 0.78)',
+      'background:rgb(15 23 42 / 0.88)',
+      'color:rgb(248 250 252)',
+      'font-size:12px',
+      'font-weight:700',
+      'box-shadow:0 10px 24px rgb(15 23 42 / 0.18)',
+      'backdrop-filter:blur(10px)',
+    ].join(';')
+    compactElement.textContent = waypointGlyph(item.kind)
+    return { element: compactElement }
+  }
+
   const element = document.createElement('div')
   element.style.cssText = [
     'display:flex',
@@ -891,7 +958,10 @@ function createAisPinElement(item: MarineMapAisPin, isSelected: boolean) {
 
   shell.appendChild(marker)
 
-  if (isSelected || (aisPins.value.length <= 5 && item.distanceNm <= 4)) {
+  const shouldShowLabel =
+    isSelected || (!isCompactViewport.value && aisPins.value.length <= 5 && item.distanceNm <= 4)
+
+  if (shouldShowLabel) {
     const label = document.createElement('div')
     label.style.cssText = [
       'max-width:156px',
@@ -1020,6 +1090,7 @@ watch(
 onMounted(() => {
   if (!import.meta.client) return
   defaultSignalKSocketUrl.value = buildDefaultSignalKSocketUrl()
+  syncFullscreenState()
   document.addEventListener('fullscreenchange', syncFullscreenState)
 })
 
@@ -1041,7 +1112,9 @@ onBeforeUnmount(() => {
           {{ focusedSummary.description }}
         </p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div
+        class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+      >
         <UBadge color="primary" variant="soft">{{ vesselPins.length }} vessels</UBadge>
         <UBadge color="neutral" variant="soft">{{ baseGeojson.features.length }} routes</UBadge>
         <UBadge color="neutral" variant="soft">{{ waypointPins.length }} waypoints</UBadge>
@@ -1055,96 +1128,216 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="hasMapData" ref="mapHost" class="relative">
-      <div
-        class="absolute left-4 top-4 z-10 max-w-[18rem] rounded-[1.5rem] border border-default/70 bg-default/88 p-4 shadow-card backdrop-blur-xl"
-      >
-        <p class="text-[11px] uppercase tracking-[0.22em] text-muted">
-          {{
-            selectedPin?.pinKind === 'waypoint'
-              ? 'Waypoint focus'
-              : selectedPin?.pinKind === 'ais'
-                ? 'AIS contact'
-                : 'Map focus'
-          }}
-        </p>
-        <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
-        <p class="mt-2 text-sm text-muted">
-          {{ focusedSummary.description }}
-        </p>
-        <p
-          v-if="selectedPin?.pinKind === 'waypoint' && selectedPin.visitedAt"
-          class="mt-3 text-xs text-muted"
+    <div v-if="hasMapData" ref="mapHost">
+      <div class="space-y-3 border-b border-default/70 px-4 py-3 lg:hidden">
+        <div
+          class="rounded-[1.25rem] border border-default/70 bg-default/82 px-4 py-3 shadow-card backdrop-blur-xl"
         >
-          Logged {{ formatTimestamp(selectedPin.visitedAt) }}
-        </p>
-        <p v-else-if="selectedPin?.pinKind === 'ais'" class="mt-3 text-xs text-muted">
-          Updated {{ formatRelativeTime(new Date(selectedPin.lastUpdateAt).toISOString()) }}
-          <span v-if="selectedPin.callSign"> · {{ selectedPin.callSign }}</span>
-        </p>
-        <p v-else-if="trafficAllowed" class="mt-3 text-xs text-muted">
-          {{ trafficStatus }}
-          <span v-if="aisLastDeltaAt">
-            · Feed {{ formatRelativeTime(new Date(aisLastDeltaAt).toISOString()) }}
-          </span>
-        </p>
-        <p v-else-if="isSingleVesselSurface" class="mt-3 text-xs text-muted">
-          Route focus follows the current vessel fix and remembered camera position.
-        </p>
+          <p class="text-[11px] uppercase tracking-[0.22em] text-muted">{{ focusPanelLabel }}</p>
+          <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
+          <p class="mt-2 text-sm text-muted">{{ focusedSummary.description }}</p>
+          <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            icon="i-lucide-scan-search"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            @click="fitToContent(0)"
+          >
+            Fit map
+          </UButton>
+          <UButton
+            icon="i-lucide-crosshair"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            @click="centerOnFocusVessel"
+          >
+            Focus vessel
+          </UButton>
+          <UButton
+            :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
+            :color="showPointsOfInterest ? 'primary' : 'neutral'"
+            :variant="showPointsOfInterest ? 'soft' : 'outline'"
+            size="xs"
+            @click="showPointsOfInterest = !showPointsOfInterest"
+          >
+            {{ showPointsOfInterest ? 'Labels on' : 'Labels off' }}
+          </UButton>
+          <UButton
+            v-if="savedRegion"
+            icon="i-lucide-rotate-ccw"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            @click="resetRememberedView"
+          >
+            Reset view
+          </UButton>
+          <UButton
+            :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            @click="toggleFullscreen"
+          >
+            {{ isFullscreen ? 'Exit full screen' : 'Full screen' }}
+          </UButton>
+        </div>
       </div>
 
-      <div class="absolute right-4 top-4 z-10 flex flex-wrap justify-end gap-2">
-        <UButton
-          icon="i-lucide-scan-search"
-          color="neutral"
-          variant="soft"
-          size="sm"
-          title="Fit map to all visible content"
-          aria-label="Fit map to all visible content"
-          @click="fitToContent(0)"
-        />
-        <UButton
-          icon="i-lucide-crosshair"
-          color="neutral"
-          variant="soft"
-          size="sm"
-          title="Center on the focused vessel"
-          aria-label="Center on the focused vessel"
-          @click="centerOnFocusVessel"
-        />
-        <UButton
-          :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
-          :color="showPointsOfInterest ? 'primary' : 'neutral'"
-          :variant="showPointsOfInterest ? 'soft' : 'outline'"
-          size="sm"
-          title="Toggle map context labels"
-          aria-label="Toggle map context labels"
-          @click="showPointsOfInterest = !showPointsOfInterest"
-        />
-        <UButton
-          v-if="savedRegion"
-          icon="i-lucide-rotate-ccw"
-          color="neutral"
-          variant="soft"
-          size="sm"
-          title="Clear remembered camera position"
-          aria-label="Clear remembered camera position"
-          @click="resetRememberedView"
-        />
-        <UButton
-          :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
-          color="neutral"
-          variant="soft"
-          size="sm"
-          title="Toggle fullscreen map"
-          aria-label="Toggle fullscreen map"
-          @click="toggleFullscreen"
-        />
+      <div class="relative">
+        <div
+          class="absolute left-4 top-4 z-10 hidden max-w-[18rem] rounded-[1.5rem] border border-default/70 bg-default/88 p-4 shadow-card backdrop-blur-xl lg:block"
+        >
+          <p class="text-[11px] uppercase tracking-[0.22em] text-muted">{{ focusPanelLabel }}</p>
+          <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
+          <p class="mt-2 text-sm text-muted">{{ focusedSummary.description }}</p>
+          <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
+        </div>
+
+        <div class="absolute right-4 top-4 z-10 hidden flex-wrap justify-end gap-2 lg:flex">
+          <UButton
+            icon="i-lucide-scan-search"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            title="Fit map to all visible content"
+            aria-label="Fit map to all visible content"
+            @click="fitToContent(0)"
+          />
+          <UButton
+            icon="i-lucide-crosshair"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            title="Center on the focused vessel"
+            aria-label="Center on the focused vessel"
+            @click="centerOnFocusVessel"
+          />
+          <UButton
+            :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
+            :color="showPointsOfInterest ? 'primary' : 'neutral'"
+            :variant="showPointsOfInterest ? 'soft' : 'outline'"
+            size="sm"
+            title="Toggle map context labels"
+            aria-label="Toggle map context labels"
+            @click="showPointsOfInterest = !showPointsOfInterest"
+          />
+          <UButton
+            v-if="savedRegion"
+            icon="i-lucide-rotate-ccw"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            title="Clear remembered camera position"
+            aria-label="Clear remembered camera position"
+            @click="resetRememberedView"
+          />
+          <UButton
+            :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            title="Toggle fullscreen map"
+            aria-label="Toggle fullscreen map"
+            @click="toggleFullscreen"
+          />
+        </div>
+
+        <div
+          class="absolute inset-x-4 bottom-4 z-10 hidden items-end justify-between gap-3 lg:flex"
+        >
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              icon="i-lucide-ship"
+              :color="showVessels ? 'primary' : 'neutral'"
+              :variant="showVessels ? 'soft' : 'outline'"
+              size="xs"
+              @click="showVessels = !showVessels"
+            >
+              Vessels {{ vesselPins.length ? `(${vesselPins.length})` : '' }}
+            </UButton>
+            <UButton
+              icon="i-lucide-route"
+              :color="showRoutes ? 'primary' : 'neutral'"
+              :variant="showRoutes ? 'soft' : 'outline'"
+              size="xs"
+              @click="showRoutes = !showRoutes"
+            >
+              Routes {{ baseGeojson.features.length ? `(${baseGeojson.features.length})` : '' }}
+            </UButton>
+            <UButton
+              icon="i-lucide-map-pinned"
+              :color="showWaypoints ? 'primary' : 'neutral'"
+              :variant="showWaypoints ? 'soft' : 'outline'"
+              size="xs"
+              @click="showWaypoints = !showWaypoints"
+            >
+              Waypoints {{ waypointPins.length ? `(${waypointPins.length})` : '' }}
+            </UButton>
+            <UButton
+              v-if="trafficAllowed"
+              icon="i-lucide-radar"
+              :color="showTraffic ? 'primary' : 'neutral'"
+              :variant="showTraffic ? 'soft' : 'outline'"
+              size="xs"
+              @click="showTraffic = !showTraffic"
+            >
+              Traffic {{ aisPins.length ? `(${aisPins.length})` : '' }}
+            </UButton>
+            <UButton
+              v-if="trafficAllowed && showTraffic"
+              icon="i-lucide-navigation-2"
+              :color="showTrafficVectors ? 'primary' : 'neutral'"
+              :variant="showTrafficVectors ? 'soft' : 'outline'"
+              size="xs"
+              @click="showTrafficVectors = !showTrafficVectors"
+            >
+              Vectors
+            </UButton>
+          </div>
+
+          <div class="grid flex-1 gap-2 sm:grid-cols-4 xl:max-w-3xl">
+            <div
+              v-for="stat in stats"
+              :key="stat.label"
+              class="rounded-[1.15rem] border border-default/70 bg-default/84 px-3 py-2 shadow-card backdrop-blur-xl"
+            >
+              <p class="text-[10px] uppercase tracking-[0.2em] text-muted">{{ stat.label }}</p>
+              <p class="mt-1 text-sm font-semibold text-default">{{ stat.value }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div :class="heightClass">
+          <ClientOnly>
+            <AppMapKit
+              ref="mapSurface"
+              v-model:selected-id="selectedId"
+              class="h-full"
+              :items="items"
+              :geojson="geojson"
+              :create-pin-element="createPinElement"
+              :overlay-style-fn="routeOverlayStyle"
+              :fallback-center="fallbackCenter"
+              :annotation-size="annotationSize"
+              :zoom-span="{ lat: 0.018, lng: 0.022 }"
+              :bounding-padding="0.22"
+              :preserve-region="true"
+              :shows-points-of-interest="showPointsOfInterest"
+              :clustering-identifier="clusteringIdentifier"
+              @map-ready="handleMapReady"
+              @region-change="handleRegionChange"
+            />
+          </ClientOnly>
+        </div>
       </div>
 
-      <div
-        class="absolute inset-x-4 bottom-4 z-10 flex flex-wrap items-center justify-between gap-3"
-      >
+      <div class="space-y-3 border-t border-default/70 px-4 py-3 lg:hidden">
         <div class="flex flex-wrap gap-2">
           <UButton
             icon="i-lucide-ship"
@@ -1195,7 +1388,7 @@ onBeforeUnmount(() => {
           </UButton>
         </div>
 
-        <div class="grid flex-1 gap-2 sm:grid-cols-4 xl:max-w-3xl">
+        <div class="grid grid-cols-2 gap-2">
           <div
             v-for="stat in stats"
             :key="stat.label"
@@ -1205,29 +1398,6 @@ onBeforeUnmount(() => {
             <p class="mt-1 text-sm font-semibold text-default">{{ stat.value }}</p>
           </div>
         </div>
-      </div>
-
-      <div :class="heightClass">
-        <ClientOnly>
-          <AppMapKit
-            ref="mapSurface"
-            v-model:selected-id="selectedId"
-            class="h-full"
-            :items="items"
-            :geojson="geojson"
-            :create-pin-element="createPinElement"
-            :overlay-style-fn="routeOverlayStyle"
-            :fallback-center="fallbackCenter"
-            :annotation-size="annotationSize"
-            :zoom-span="{ lat: 0.018, lng: 0.022 }"
-            :bounding-padding="0.22"
-            :preserve-region="true"
-            :shows-points-of-interest="showPointsOfInterest"
-            :clustering-identifier="clusteringIdentifier"
-            @map-ready="handleMapReady"
-            @region-change="handleRegionChange"
-          />
-        </ClientOnly>
       </div>
     </div>
 

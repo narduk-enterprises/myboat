@@ -1,4 +1,6 @@
 import process from 'node:process';
+import { createServer } from 'node:http';
+import { WebSocketServer } from 'ws';
 let socket = null;
 let reconnectTimer = null;
 let flushTimer = null;
@@ -8,6 +10,9 @@ let isShuttingDown = false;
 let batch = [];
 let lastPostStartedAt = 0;
 let nextPostNotBefore = 0;
+let lastPublishedAt = null;
+let lastPublishedDeltaRaw = null;
+const liveClients = new Set();
 class IngestHttpError extends Error {
     status;
     retryAfterMs;
@@ -35,6 +40,13 @@ function withDefaultSignalKSubscription(rawUrl) {
     }
     return url.toString();
 }
+function normalizeStreamPath(rawPath) {
+    const normalizedPath = rawPath?.trim();
+    if (!normalizedPath) {
+        return '/myboat/v1/stream';
+    }
+    return normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+}
 function loadConfig() {
     const signalkWsUrl = withDefaultSignalKSubscription(process.env.SIGNALK_WS_URL?.trim() || 'ws://localhost:3000/signalk/v1/stream');
     const ingestUrl = process.env.MYBOAT_INGEST_URL?.trim() || 'https://mybo.at/api/ingest/v1/delta';
@@ -46,6 +58,8 @@ function loadConfig() {
         signalkWsUrl,
         ingestUrl,
         ingestKey,
+        streamPort: parsePositiveInteger('MYBOAT_STREAM_PORT', 4011),
+        streamPath: normalizeStreamPath(process.env.MYBOAT_STREAM_PATH),
         // Larger batches + spacing keep ingest POSTs well under authApiKeys (60/min).
         batchSize: parsePositiveInteger('COLLECTOR_BATCH_SIZE', 100),
         flushIntervalMs: parsePositiveInteger('COLLECTOR_FLUSH_INTERVAL_MS', 3000),
@@ -58,6 +72,26 @@ function loadConfig() {
     };
 }
 const config = loadConfig();
+const streamServer = createServer((request, response) => {
+    const host = request.headers.host || 'localhost';
+    const url = new URL(request.url || '/', `http://${host}`);
+    if (url.pathname === '/healthz') {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({
+            ok: true,
+            connectedClients: liveClients.size,
+            ingestUrl: config.ingestUrl,
+            lastPublishedAt,
+            signalkWsUrl: config.signalkWsUrl,
+            streamPath: config.streamPath,
+            streamPort: config.streamPort,
+        }));
+        return;
+    }
+    response.writeHead(404, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ ok: false }));
+});
+const streamSocketServer = new WebSocketServer({ noServer: true });
 function log(message, detail) {
     const prefix = `[edge-collector ${new Date().toISOString()}]`;
     if (detail === undefined) {
@@ -73,6 +107,55 @@ function warn(message, detail) {
         return;
     }
     console.warn(prefix, message, detail);
+}
+function broadcastToLiveClients(message) {
+    lastPublishedAt = new Date().toISOString();
+    lastPublishedDeltaRaw = message;
+    for (const client of liveClients) {
+        if (client.readyState !== client.OPEN) {
+            liveClients.delete(client);
+            continue;
+        }
+        client.send(message);
+    }
+}
+function buildCollectorHelloMessage() {
+    return JSON.stringify({
+        name: 'myboat-edge-collector',
+        self: 'vessels.self',
+        version: '0.1.0',
+    });
+}
+function startMyBoatStreamServer() {
+    streamSocketServer.on('connection', (client) => {
+        liveClients.add(client);
+        client.send(buildCollectorHelloMessage());
+        if (lastPublishedDeltaRaw) {
+            client.send(lastPublishedDeltaRaw);
+        }
+        client.on('close', () => {
+            liveClients.delete(client);
+        });
+        client.on('error', (error) => {
+            warn('MyBoat stream client error', error instanceof Error ? error.message : error);
+            liveClients.delete(client);
+        });
+    });
+    streamServer.on('upgrade', (request, socketHandle, head) => {
+        const host = request.headers.host || 'localhost';
+        const url = new URL(request.url || '/', `http://${host}`);
+        if (url.pathname !== config.streamPath) {
+            socketHandle.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+            socketHandle.destroy();
+            return;
+        }
+        streamSocketServer.handleUpgrade(request, socketHandle, head, (client) => {
+            streamSocketServer.emit('connection', client, request);
+        });
+    });
+    streamServer.listen(config.streamPort, () => {
+        log('Publishing MyBoat stream', `ws://0.0.0.0:${config.streamPort}${config.streamPath}`);
+    });
 }
 function isSignalKDeltaMessage(value) {
     if (!value || typeof value !== 'object')
@@ -172,6 +255,7 @@ async function handleSocketMessage(data) {
     try {
         const parsed = JSON.parse(raw);
         if (isSignalKDeltaMessage(parsed)) {
+            broadcastToLiveClients(raw);
             enqueueDelta(parsed);
             return;
         }
@@ -282,6 +366,17 @@ async function shutdown(signal) {
     if (socket && socket.readyState < WebSocket.CLOSING) {
         socket.close(1000, 'shutdown');
     }
+    for (const client of liveClients) {
+        if (client.readyState < client.CLOSING) {
+            client.close(1000, 'shutdown');
+        }
+    }
+    await new Promise((resolve) => {
+        streamSocketServer.close(() => resolve());
+    });
+    await new Promise((resolve) => {
+        streamServer.close(() => resolve());
+    });
     await flushBatch();
 }
 process.on('SIGINT', () => {
@@ -290,4 +385,5 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
     void shutdown('SIGTERM').finally(() => process.exit(0));
 });
+startMyBoatStreamServer();
 connect();

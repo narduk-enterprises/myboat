@@ -116,7 +116,7 @@ const liveFeedStatus = computed(() => {
             :passages="detail.passages"
             :waypoints="detail.waypoints"
             :installations="detail.installations"
-            height-class="h-[32rem]"
+            height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
             traffic-mode="auto"
           />
         </div>
@@ -124,10 +124,10 @@ const liveFeedStatus = computed(() => {
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Live vessel data</h2>
+              <h2 class="font-display text-2xl text-default">Live data board</h2>
               <p class="mt-1 text-sm text-muted">
-                Default bridge metrics for the current vessel feed, with wind, depth, temperatures,
-                and power in one place.
+                Dense bridge metrics for the current vessel feed, with live fix, wind, depth,
+                temperatures, and power in one place.
               </p>
             </div>
           </template>

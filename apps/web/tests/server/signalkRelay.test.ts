@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolveInstallationSignalKConfig,
+  resolvePublicInstallationSignalKConfig,
   resolveSignalKRelayOrigin,
   resolveScopedSignalKUrl,
   resolveSignalKRelayUrl,
@@ -55,6 +56,21 @@ describe('signalk relay helpers', () => {
     })
   })
 
+  it('can prefer the relay for owner-scoped installs even with a custom upstream', () => {
+    expect(
+      resolveInstallationSignalKConfig({
+        currentSignalKUrl: 'ws://vps.tideye.com:4011/myboat/v1/stream',
+        relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
+        preferRelay: true,
+      }),
+    ).toEqual({
+      signalKUrl: 'ws://vps.tideye.com:4011/myboat/v1/stream',
+      collectorSignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      signalKAccessMode: 'relay',
+    })
+  })
+
   it('keeps explicit direct Signal K URLs when the collector should bypass the relay', () => {
     expect(
       resolveInstallationSignalKConfig({
@@ -74,6 +90,32 @@ describe('signalk relay helpers', () => {
       resolveInstallationSignalKConfig({
         currentSignalKUrl: null,
         relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      }),
+    ).toEqual({
+      signalKUrl: null,
+      collectorSignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      signalKAccessMode: 'relay',
+    })
+  })
+
+  it('always exposes the app relay for public installs with an upstream feed', () => {
+    expect(
+      resolvePublicInstallationSignalKConfig({
+        appOrigin: 'https://mybo.at',
+        currentSignalKUrl: 'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
+      }),
+    ).toEqual({
+      signalKUrl: null,
+      collectorSignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      relaySignalKUrl: 'wss://mybo.at/api/signalk/relay',
+      signalKAccessMode: 'relay',
+    })
+
+    expect(
+      resolvePublicInstallationSignalKConfig({
+        appOrigin: 'https://mybo.at',
+        currentSignalKUrl: 'wss://signalk.tideye.com/signalk/v1/stream',
       }),
     ).toEqual({
       signalKUrl: null,

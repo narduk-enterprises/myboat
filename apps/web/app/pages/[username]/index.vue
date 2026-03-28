@@ -92,7 +92,7 @@ useWebPageSchema({
       <MarineTrackMap
         :vessels="profile.vessels"
         :passages="publicPassages"
-        height-class="h-[28rem]"
+        height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
         traffic-mode="off"
       />
 
@@ -110,7 +110,7 @@ useWebPageSchema({
         :vessels="profile.followedVessels"
         title="Buddy boats map"
         description="A wider chart view of the boats this captain follows through AIS Hub."
-        height-class="h-[28rem]"
+        height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
       />
 
       <UCard

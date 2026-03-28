@@ -100,6 +100,7 @@ function buildInstallationSignalKConfig(options: {
   return resolveInstallationSignalKConfig({
     currentSignalKUrl: options.currentSignalKUrl,
     relaySignalKUrl,
+    preferRelay: options.forceRelay,
   })
 }
 

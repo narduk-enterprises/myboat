@@ -12,6 +12,10 @@ FROM node:22-alpine
 
 WORKDIR /app
 ENV NODE_ENV=production
+EXPOSE 4011
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 

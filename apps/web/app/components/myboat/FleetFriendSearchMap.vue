@@ -35,6 +35,7 @@ const selectedMmsi = defineModel<string | null>('selectedMmsi', { default: null 
 const mapRef = useTemplateRef<SearchMapHandle>('mapSurface')
 const hasViewport = shallowRef(false)
 const visibleMmsis = shallowRef<string[]>([])
+const isCompactViewport = useCompactViewport()
 
 function hasCoordinates(result: AisHubSearchResult) {
   return (
@@ -170,7 +171,9 @@ function createPinElement(item: SearchResultPin, isSelected: boolean) {
   marker.appendChild(tone)
   shell.appendChild(marker)
 
-  if (isSelected || pins.value.length <= 8) {
+  const shouldShowLabel = isSelected || (!isCompactViewport.value && pins.value.length <= 8)
+
+  if (shouldShowLabel) {
     const label = document.createElement('div')
     label.style.cssText = [
       'max-width:164px',
@@ -238,7 +241,9 @@ function handleRegionChange(region: {
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div
+          class="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+        >
           <UBadge color="primary" variant="soft">{{ pins.length }} mapped</UBadge>
           <UBadge color="neutral" variant="soft">{{ inViewCount }} in view</UBadge>
           <UBadge v-if="offChartCount" color="warning" variant="soft">
@@ -259,7 +264,7 @@ function handleRegionChange(region: {
 
     <div v-if="pins.length" class="space-y-4">
       <div class="overflow-hidden rounded-[1.5rem] border border-default/70">
-        <div class="h-[32rem]">
+        <div class="h-[22rem] sm:h-[28rem] lg:h-[32rem]">
           <ClientOnly>
             <AppMapKit
               ref="mapSurface"
@@ -280,9 +285,69 @@ function handleRegionChange(region: {
         </div>
       </div>
 
+      <div v-if="fallbackResult" class="grid gap-3 sm:hidden">
+        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+          <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus boat</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <p class="font-display text-lg text-default">{{ fallbackResult.name }}</p>
+            <UBadge color="neutral" variant="soft">MMSI {{ fallbackResult.mmsi }}</UBadge>
+          </div>
+          <p class="mt-3 text-sm text-default">{{ focusDestination }}</p>
+          <p class="mt-1 text-xs text-muted">{{ focusCallSign }}</p>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              color="primary"
+              icon="i-lucide-user-round-plus"
+              :disabled="followedMmsis.has(fallbackResult.mmsi)"
+              :loading="followPending && activeAddMmsi === fallbackResult.mmsi"
+              @click="emit('add', fallbackResult)"
+            >
+              {{ followedMmsis.has(fallbackResult.mmsi) ? 'Saved' : 'Add buddy boat' }}
+            </UButton>
+            <UBadge
+              :color="followedMmsis.has(fallbackResult.mmsi) ? 'primary' : 'neutral'"
+              variant="soft"
+            >
+              {{ followedMmsis.has(fallbackResult.mmsi) ? 'Already saved' : 'Ready to add' }}
+            </UBadge>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{ formatRelativeTime(fallbackResult.lastReportAt) }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{ formatTimestamp(fallbackResult.lastReportAt) }}
+            </p>
+          </div>
+
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Coverage</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{ fallbackResult.matchMode === 'mmsi' ? 'Exact MMSI match' : 'Name search match' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">{{ stationLabel }}</p>
+          </div>
+
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Latitude</p>
+            <p class="mt-2 text-sm font-medium text-default">{{ latitudeLabel }}</p>
+          </div>
+
+          <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.22em] text-muted">Longitude</p>
+            <p class="mt-2 text-sm font-medium text-default">{{ longitudeLabel }}</p>
+          </div>
+        </div>
+      </div>
+
       <div
         v-if="fallbackResult"
-        class="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]"
+        class="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]"
       >
         <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
           <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus boat</p>
