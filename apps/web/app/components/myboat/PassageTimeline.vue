@@ -11,33 +11,35 @@ defineProps<{
   <UCard class="chart-surface rounded-[1.75rem] shadow-card">
     <template #header>
       <div>
-        <h3 class="font-display text-xl text-default">Passages</h3>
+        <h3 class="font-display text-lg text-default sm:text-xl">Passages</h3>
         <p class="mt-1 text-sm text-muted">Recent moves, route history, and historical context.</p>
       </div>
     </template>
 
-    <div v-if="passages.length" class="space-y-4">
+    <div v-if="passages.length" class="space-y-3 sm:space-y-4">
       <article
         v-for="passage in passages"
         :key="passage.id"
         class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
       >
-        <div class="flex items-center justify-between gap-3">
-          <div>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0">
             <p class="font-medium text-default">{{ passage.title }}</p>
-            <p class="mt-1 text-sm text-muted">
+            <p class="mt-1 text-sm text-muted break-words">
               {{ passage.departureName || 'Departure' }}
               <span class="text-dimmed">→</span>
               {{ passage.arrivalName || 'Arrival pending' }}
             </p>
           </div>
-          <UBadge color="neutral" variant="subtle">
+          <UBadge color="neutral" variant="subtle" class="self-start">
             {{ passage.distanceNm ? `${passage.distanceNm.toFixed(0)} nm` : 'Draft route' }}
           </UBadge>
         </div>
 
-        <p v-if="passage.summary" class="mt-3 text-sm text-muted">{{ passage.summary }}</p>
-        <p class="mt-3 text-xs text-muted">
+        <p v-if="passage.summary" class="mt-3 text-sm leading-6 text-muted">
+          {{ passage.summary }}
+        </p>
+        <p class="mt-3 text-xs leading-5 text-muted">
           {{ formatTimestamp(passage.startedAt) }}
           <span v-if="passage.endedAt"> · Arrived {{ formatTimestamp(passage.endedAt) }}</span>
         </p>
