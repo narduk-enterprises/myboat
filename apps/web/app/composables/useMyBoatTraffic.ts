@@ -2,9 +2,12 @@ import type { Ref } from 'vue'
 import type { AisContactSummary } from '~/types/myboat'
 import type {
   PublicTrafficContactDetailResponse,
+  TrafficNearbyResponse,
   VesselTrafficContactDetailResponse,
 } from '~/types/traffic'
 import { mergeTrafficContactSummary, needsTrafficContactEnrichment } from '~/utils/traffic'
+
+const TRAFFIC_NEARBY_REFRESH_MS = 20_000
 
 function buildTrafficEnrichmentKey(contacts: AisContactSummary[]) {
   return contacts
@@ -95,6 +98,101 @@ function useEnrichedTrafficContacts(options: {
   }
 }
 
+function useNearbyTrafficHydrator(options: {
+  endpoint: Readonly<Ref<string | null>>
+  enabled: Readonly<Ref<boolean>>
+  namespace: 'auth' | 'public'
+  entryKey: Readonly<Ref<string | null | undefined>>
+}) {
+  const appFetch = useAppFetch()
+  const store = useMyBoatVesselStore()
+  const pending = shallowRef(false)
+  let activeRequestId = 0
+  let refreshTimer: number | null = null
+
+  function clearRefreshTimer() {
+    if (!refreshTimer) {
+      return
+    }
+
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+
+  async function refreshNearbyTraffic() {
+    if (!import.meta.client || !options.enabled.value) {
+      return
+    }
+
+    const endpoint = options.endpoint.value
+    const entryKey = options.entryKey.value
+    if (!endpoint || !entryKey) {
+      return
+    }
+
+    const requestId = ++activeRequestId
+    pending.value = true
+
+    try {
+      const response = await appFetch<TrafficNearbyResponse>(endpoint)
+      if (requestId !== activeRequestId) {
+        return
+      }
+
+      store.replaceAisContacts(options.namespace, entryKey, response.contacts || [])
+    } catch {
+      // Keep the live websocket state intact when snapshot refresh fails.
+    } finally {
+      if (requestId === activeRequestId) {
+        pending.value = false
+      }
+    }
+  }
+
+  function syncRefreshTimer(enabled: boolean) {
+    clearRefreshTimer()
+
+    if (!import.meta.client || !enabled) {
+      return
+    }
+
+    refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') {
+        return
+      }
+
+      void refreshNearbyTraffic()
+    }, TRAFFIC_NEARBY_REFRESH_MS)
+  }
+
+  watch(
+    [options.endpoint, options.enabled, options.entryKey],
+    ([endpoint, enabled, entryKey]) => {
+      activeRequestId += 1
+      syncRefreshTimer(Boolean(endpoint && entryKey && enabled))
+
+      if (!(endpoint && entryKey && enabled)) {
+        pending.value = false
+        return
+      }
+
+      void refreshNearbyTraffic()
+    },
+    { immediate: true },
+  )
+
+  onBeforeUnmount(() => {
+    activeRequestId += 1
+    pending.value = false
+    clearRefreshTimer()
+  })
+
+  return {
+    pending: readonly(pending),
+    refreshNearbyTraffic,
+  }
+}
+
 export function useAuthEnrichedTrafficContacts(
   vesselSlug: Readonly<Ref<string | null | undefined>>,
   contacts: Readonly<Ref<AisContactSummary[]>>,
@@ -106,6 +204,23 @@ export function useAuthEnrichedTrafficContacts(
   return useEnrichedTrafficContacts({
     endpoint,
     contacts,
+  })
+}
+
+export function useAuthNearbyTrafficHydrator(
+  vesselSlug: Readonly<Ref<string | null | undefined>>,
+  entryKey: Readonly<Ref<string | null | undefined>>,
+  enabled: Readonly<Ref<boolean>>,
+) {
+  const endpoint = computed(() =>
+    vesselSlug.value ? `/api/app/vessels/${vesselSlug.value}/traffic/nearby` : null,
+  )
+
+  return useNearbyTrafficHydrator({
+    endpoint,
+    enabled,
+    entryKey,
+    namespace: 'auth',
   })
 }
 
@@ -123,6 +238,26 @@ export function usePublicEnrichedTrafficContacts(
   return useEnrichedTrafficContacts({
     endpoint,
     contacts,
+  })
+}
+
+export function usePublicNearbyTrafficHydrator(
+  username: Readonly<Ref<string | null | undefined>>,
+  vesselSlug: Readonly<Ref<string | null | undefined>>,
+  entryKey: Readonly<Ref<string | null | undefined>>,
+  enabled: Readonly<Ref<boolean>>,
+) {
+  const endpoint = computed(() =>
+    username.value && vesselSlug.value
+      ? `/api/public/${username.value}/${vesselSlug.value}/traffic/nearby`
+      : null,
+  )
+
+  return useNearbyTrafficHydrator({
+    endpoint,
+    enabled,
+    entryKey,
+    namespace: 'public',
   })
 }
 

@@ -9,6 +9,13 @@ export interface TrafficContactDetailSummary extends AisContactSummary {
   liveState: TrafficContactLiveState
 }
 
+export interface TrafficNearbyResponse {
+  contacts: AisContactSummary[]
+  radiusNm: number
+  refreshedAt: string
+  source: 'broker' | 'signalk' | 'merged'
+}
+
 export interface VesselTrafficContactDetailResponse {
   vessel: VesselCardSummary
   contact: TrafficContactDetailSummary

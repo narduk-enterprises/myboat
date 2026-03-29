@@ -670,76 +670,103 @@ export function buildAisContactFromDelta(input: {
   for (const update of input.delta.updates) {
     for (const item of update.values) {
       const { path, value } = item
+      const resolvedValue =
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        'value' in value &&
+        Object.keys(value).length <= 8
+          ? (value as { value?: unknown }).value
+          : value
 
-      if (path === 'navigation.position' && value && typeof value === 'object') {
-        const position = value as { latitude?: unknown; longitude?: unknown }
+      if (path === 'navigation.position' && resolvedValue && typeof resolvedValue === 'object') {
+        const position = resolvedValue as { latitude?: unknown; longitude?: unknown }
         contact.lat = typeof position.latitude === 'number' ? position.latitude : contact.lat
         contact.lng = typeof position.longitude === 'number' ? position.longitude : contact.lng
         continue
       }
 
       if (path === 'navigation.position.latitude') {
-        contact.lat = typeof value === 'number' ? value : contact.lat
+        contact.lat = typeof resolvedValue === 'number' ? resolvedValue : contact.lat
         continue
       }
 
       if (path === 'navigation.position.longitude') {
-        contact.lng = typeof value === 'number' ? value : contact.lng
+        contact.lng = typeof resolvedValue === 'number' ? resolvedValue : contact.lng
         continue
       }
 
       if (path === 'navigation.courseOverGroundTrue') {
-        contact.cog = normalizeAngleDegrees(value)
+        contact.cog = normalizeAngleDegrees(resolvedValue)
         continue
       }
 
       if (path === 'navigation.speedOverGround') {
-        contact.sog = typeof value === 'number' ? value : contact.sog
+        contact.sog = typeof resolvedValue === 'number' ? resolvedValue : contact.sog
         continue
       }
 
       if (path === 'navigation.headingTrue' || path === 'navigation.headingMagnetic') {
-        contact.heading = normalizeAngleDegrees(value)
+        contact.heading = normalizeAngleDegrees(resolvedValue)
         continue
       }
 
-      if (path === 'name') {
-        contact.name = typeof value === 'string' ? value : contact.name
+      if (path === 'name' || path === 'design.name') {
+        contact.name = typeof resolvedValue === 'string' ? resolvedValue : contact.name
         continue
       }
 
-      if (path === 'design.aisShipType') {
-        contact.shipType = typeof value === 'number' ? value : contact.shipType
+      if (path === 'design.aisShipType' || path === 'design.aisShipType.id') {
+        contact.shipType = typeof resolvedValue === 'number' ? resolvedValue : contact.shipType
         continue
       }
 
-      if (path === 'navigation.destination.commonName') {
-        contact.destination = typeof value === 'string' ? value : contact.destination
+      if (path === 'navigation.destination.commonName' || path === 'navigation.destination') {
+        contact.destination =
+          typeof resolvedValue === 'string' ? resolvedValue : contact.destination
         continue
       }
 
-      if (path === 'communication.callsignVhf') {
-        contact.callSign = typeof value === 'string' ? value : contact.callSign
+      if (path === 'communication.callsignVhf' || path === 'communication.callsign') {
+        contact.callSign = typeof resolvedValue === 'string' ? resolvedValue : contact.callSign
         continue
       }
 
       if (path === 'design.length.overall') {
-        contact.length = typeof value === 'number' ? value : contact.length
+        contact.length = typeof resolvedValue === 'number' ? resolvedValue : contact.length
+        continue
+      }
+
+      if (path === 'design.length' && resolvedValue && typeof resolvedValue === 'object') {
+        const dimensions = resolvedValue as { overall?: unknown }
+        contact.length =
+          typeof dimensions.overall === 'number' ? dimensions.overall : contact.length
         continue
       }
 
       if (path === 'design.beam') {
-        contact.beam = typeof value === 'number' ? value : contact.beam
+        contact.beam = typeof resolvedValue === 'number' ? resolvedValue : contact.beam
         continue
       }
 
-      if (path === 'design.draft.current') {
-        contact.draft = typeof value === 'number' ? value : contact.draft
+      if (path === 'design.draft.current' || path === 'design.draft.maximum') {
+        contact.draft = typeof resolvedValue === 'number' ? resolvedValue : contact.draft
+        continue
+      }
+
+      if (path === 'design.draft' && resolvedValue && typeof resolvedValue === 'object') {
+        const draft = resolvedValue as { current?: unknown; maximum?: unknown }
+        contact.draft =
+          typeof draft.current === 'number'
+            ? draft.current
+            : typeof draft.maximum === 'number'
+              ? draft.maximum
+              : contact.draft
         continue
       }
 
       if (path === 'navigation.state') {
-        contact.navState = typeof value === 'string' ? value : contact.navState
+        contact.navState = typeof resolvedValue === 'string' ? resolvedValue : contact.navState
       }
     }
   }

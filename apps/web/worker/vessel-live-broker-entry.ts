@@ -17,6 +17,28 @@ export default {
       })
     }
 
+    const stateMatch = url.pathname.match(/^\/vessels\/([^/]+)\/state$/)
+    if (stateMatch) {
+      const [, vesselId] = stateMatch
+      const stub = env.VESSEL_LIVE_BROKER_SELF.getByName(vesselId)
+
+      return stub.fetch('https://vessel-live.internal/state', {
+        method: request.method,
+        headers: request.headers,
+      })
+    }
+
+    const contactsMatch = url.pathname.match(/^\/vessels\/([^/]+)\/contacts$/)
+    if (contactsMatch) {
+      const [, vesselId] = contactsMatch
+      const stub = env.VESSEL_LIVE_BROKER_SELF.getByName(vesselId)
+
+      return stub.fetch('https://vessel-live.internal/contacts', {
+        method: request.method,
+        headers: request.headers,
+      })
+    }
+
     const contactMatch = url.pathname.match(/^\/vessels\/([^/]+)\/contacts\/(.+)$/)
     if (contactMatch) {
       const [, vesselId, contactId] = contactMatch

@@ -755,6 +755,28 @@ export function useMyBoatVesselStore() {
     )
   }
 
+  function replaceAisContacts(
+    namespace: VesselStoreNamespace,
+    entryKey: string,
+    contacts: AisContactSummary[],
+  ) {
+    updateEntry(namespace, entryKey, (currentEntry) => {
+      const nextContacts = contacts.reduce<Record<string, AisContactSummary>>((accumulator, contact) => {
+        accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
+        return accumulator
+      }, {})
+
+      return {
+        ...currentEntry,
+        aisContacts: nextContacts,
+        live: {
+          ...currentEntry.live,
+          lastDeltaAt: contacts.length ? Date.now() : currentEntry.live.lastDeltaAt,
+        },
+      }
+    })
+  }
+
   function toAuthDetail(entry: VesselStoreEntry | null): VesselDetailResponse | null {
     if (!entry?.vessel || !entry.profile) {
       return null
@@ -1312,6 +1334,7 @@ export function useMyBoatVesselStore() {
     publicActiveEntry: readonly(publicActiveEntry),
     publicState: readonly(publicState),
     refreshPublicVesselDetail,
+    replaceAisContacts,
     serializeAisContacts,
     setLiveDemand,
     setActiveAuthVessel,

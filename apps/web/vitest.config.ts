@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   resolve: {
     alias: {
-      '~': __dirname,
+      '~': resolve(__dirname, 'app'),
       '~~': __dirname,
       '#server': resolve(__dirname, 'server'),
       '#layer': resolve(__dirname, '../../layers/narduk-nuxt-layer'),

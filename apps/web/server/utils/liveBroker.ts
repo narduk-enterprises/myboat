@@ -1,11 +1,18 @@
 import type { H3Event } from 'h3'
 import { getHeader, toWebRequest } from 'h3'
 import { useRuntimeConfig } from '#imports'
-import type { AisContactSummary } from '../../app/types/myboat'
-import type { VesselLivePublishMessage } from '../../shared/myboatLive'
+import type { AisContactSummary, VesselSnapshotSummary } from '../../app/types/myboat'
+import type { VesselLiveConnectionState, VesselLivePublishMessage } from '../../shared/myboatLive'
 
 type VesselLiveBrokerEnv = {
   VESSEL_LIVE_BROKER?: DurableObjectNamespace
+}
+
+export interface VesselLiveStateSnapshot {
+  snapshot: VesselSnapshotSummary | null
+  contacts: AisContactSummary[]
+  connectionState: VesselLiveConnectionState
+  lastObservedAt: string | null
 }
 
 function useVesselLiveBrokerNamespace(event: H3Event) {
@@ -131,4 +138,29 @@ export async function fetchVesselLiveContact(event: H3Event, vesselId: string, c
   })
 
   return response?.contact || null
+}
+
+export async function fetchVesselLiveContacts(event: H3Event, vesselId: string) {
+  const response = await fetchBrokerJson<{ contacts: AisContactSummary[] }>(event, vesselId, {
+    path: '/contacts',
+  })
+
+  return response?.contacts || []
+}
+
+export async function fetchVesselLiveState(event: H3Event, vesselId: string) {
+  const response = await fetchBrokerJson<VesselLiveStateSnapshot>(event, vesselId, {
+    path: '/state',
+  })
+
+  if (!response) {
+    return null
+  }
+
+  return {
+    snapshot: response.snapshot || null,
+    contacts: Array.isArray(response.contacts) ? response.contacts : [],
+    connectionState: response.connectionState,
+    lastObservedAt: response.lastObservedAt || null,
+  } satisfies VesselLiveStateSnapshot
 }

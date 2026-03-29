@@ -1,7 +1,30 @@
 import type { AisContactSummary } from '~/types/myboat'
 
+const METERS_PER_SECOND_TO_KNOTS = 1.94384
+
 function preferDefined<T>(next: T | null | undefined, previous: T | null | undefined) {
   return next ?? previous ?? null
+}
+
+export function speedMetersPerSecondToKnots(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  return value * METERS_PER_SECOND_TO_KNOTS
+}
+
+export function isTrafficMoving(
+  speedMetersPerSecond: number | null | undefined,
+  thresholdKnots = 0.6,
+) {
+  const speedKnots = speedMetersPerSecondToKnots(speedMetersPerSecond)
+  return speedKnots !== null && speedKnots >= thresholdKnots
+}
+
+export function formatTrafficSpeed(speedMetersPerSecond: number | null | undefined) {
+  const speedKnots = speedMetersPerSecondToKnots(speedMetersPerSecond)
+  return speedKnots === null ? 'Speed unavailable' : `${speedKnots.toFixed(1)} kts`
 }
 
 export function mergeTrafficContactSummary(
@@ -81,16 +104,16 @@ export function formatTrafficMovement(contact: {
   cog?: number | null
   heading?: number | null
 }) {
-  const speed = contact.sog
+  const speedKnots = speedMetersPerSecondToKnots(contact.sog)
   const course = contact.cog ?? contact.heading
 
-  if (speed === null || speed === undefined) {
+  if (speedKnots === null) {
     return 'Speed unavailable'
   }
 
   if (course === null || course === undefined) {
-    return `${speed.toFixed(1)} kts`
+    return `${speedKnots.toFixed(1)} kts`
   }
 
-  return `${speed.toFixed(1)} kts · ${Math.round(course)}°`
+  return `${speedKnots.toFixed(1)} kts · ${Math.round(course)}°`
 }

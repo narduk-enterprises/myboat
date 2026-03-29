@@ -276,7 +276,7 @@ export function extractObservedSelfIdentityPatchFromDelta(delta: IngestDelta) {
   return hasObservedIdentityPatchData(patch) ? patch : null
 }
 
-export function extractObservedSelfIdentityPatchFromSignalKModel(
+export function extractObservedIdentityPatchFromSignalKModel(
   model: unknown,
   fallbackSelfContext?: string | null,
 ) {
@@ -331,6 +331,13 @@ export function extractObservedSelfIdentityPatchFromSignalKModel(
     normalizeMmsi(readSignalKPathValue(vesselModel, 'mmsi'))
 
   return hasObservedIdentityPatchData(patch) ? patch : null
+}
+
+export function extractObservedSelfIdentityPatchFromSignalKModel(
+  model: unknown,
+  fallbackSelfContext?: string | null,
+) {
+  return extractObservedIdentityPatchFromSignalKModel(model, fallbackSelfContext)
 }
 
 function serializeObservedIdentityRow(row: IdentityRowShape | null | undefined) {

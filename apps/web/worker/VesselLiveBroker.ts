@@ -188,6 +188,15 @@ export class VesselLiveBroker extends DurableObject {
     })
   }
 
+  private buildStateResponse() {
+    return {
+      snapshot: this.stateRecord.snapshot,
+      contacts: Object.values(this.stateRecord.aisContacts),
+      connectionState: this.stateRecord.connectionState,
+      lastObservedAt: this.stateRecord.lastObservedAt,
+    }
+  }
+
   async fetch(request: Request) {
     const url = new URL(request.url)
 
@@ -209,6 +218,16 @@ export class VesselLiveBroker extends DurableObject {
           status: contact ? 200 : 404,
         },
       )
+    }
+
+    if (request.method === 'GET' && url.pathname === '/contacts') {
+      return Response.json({
+        contacts: Object.values(this.stateRecord.aisContacts),
+      })
+    }
+
+    if (request.method === 'GET' && url.pathname === '/state') {
+      return Response.json(this.buildStateResponse())
     }
 
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {

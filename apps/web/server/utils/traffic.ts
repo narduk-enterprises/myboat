@@ -6,8 +6,12 @@ import { useRuntimeConfig } from '#imports'
 import { getStoredAisHubResultsByMmsis } from '#server/utils/aishub'
 import { vesselInstallations } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { mergeAisContactSummary } from '../../shared/myboatLive'
+import { fetchVesselLiveState } from '#server/utils/liveBroker'
+import { extractObservedIdentityPatchFromSignalKModel } from '#server/utils/vesselIdentity'
 
 const SIGNALK_TRAFFIC_TIMEOUT_MS = 8_000
+export const TRAFFIC_NEARBY_RADIUS_NM = 24
 
 type TrafficMetadata = Pick<
   AisContactSummary,
@@ -71,6 +75,33 @@ function asString(value: unknown) {
 
 function asNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function normalizeAngleDegrees(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null
+  }
+
+  return Math.abs(value) > Math.PI * 2 ? value : (value * 180) / Math.PI
+}
+
+function extractSignalKPosition(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { lat: null, lng: null }
+  }
+
+  const position = value as { latitude?: unknown; longitude?: unknown }
+  return {
+    lat: asNumber(position.latitude),
+    lng: asNumber(position.longitude),
+  }
+}
+
+function trafficContactKeys(contact: Pick<AisContactSummary, 'id' | 'mmsi'>) {
+  return [
+    normalizeContactId(contact.id),
+    contact.mmsi ? `mmsi:${contact.mmsi.trim()}` : null,
+  ].filter((value): value is string => Boolean(value))
 }
 
 function normalizeSignalKBaseUrl(rawValue: string | null | undefined) {
@@ -223,13 +254,15 @@ async function resolveSignalKBaseUrlForVessel(event: H3Event, vesselId: string) 
   }
 
   const runtimeConfig = useRuntimeConfig(event)
-  return normalizeSignalKBaseUrl(runtimeConfig.signalKHttpUrl)
+  return normalizeSignalKBaseUrl(
+    typeof runtimeConfig.signalKHttpUrl === 'string' ? runtimeConfig.signalKHttpUrl : null,
+  )
 }
 
-async function fetchSignalKTrafficMetadata(event: H3Event, vesselId: string) {
+async function fetchSignalKTrafficCatalog(event: H3Event, vesselId: string) {
   const baseUrl = await resolveSignalKBaseUrlForVessel(event, vesselId)
   if (!baseUrl) {
-    return new Map<string, TrafficMetadata>()
+    return null
   }
 
   const controller = new AbortController()
@@ -244,51 +277,167 @@ async function fetchSignalKTrafficMetadata(event: H3Event, vesselId: string) {
     })
 
     if (!response.ok) {
-      return new Map<string, TrafficMetadata>()
+      return null
     }
 
-    const catalog = (await response.json()) as Record<string, unknown>
-    const metadataMap = new Map<string, TrafficMetadata>()
-
-    for (const [contextKey, rawValue] of Object.entries(catalog)) {
-      if (contextKey === 'self') {
-        continue
-      }
-
-      const identity = getSignalKContextIdentity(contextKey)
-      if (!identity) {
-        continue
-      }
-
-      const metadata: TrafficMetadata = {
-        name: asString(readSignalKPath(rawValue, 'name')),
-        mmsi: identity.mmsi || null,
-        shipType: asNumber(readSignalKPath(rawValue, 'design.aisShipType.id')),
-        destination: asString(readSignalKPath(rawValue, 'navigation.destination.commonName')),
-        callSign:
-          asString(readSignalKPath(rawValue, 'communication.callsignVhf')) ||
-          asString(readSignalKPath(rawValue, 'communication.callsign')),
-        length: asNumber(readSignalKPath(rawValue, 'design.length.overall')),
-        beam: asNumber(readSignalKPath(rawValue, 'design.beam')),
-        draft:
-          asNumber(readSignalKPath(rawValue, 'design.draft.current')) ||
-          asNumber(readSignalKPath(rawValue, 'design.draft.maximum')),
-        navState: asString(readSignalKPath(rawValue, 'navigation.state')),
-      }
-
-      metadataMap.set(identity.id, metadata)
-
-      if (identity.mmsi) {
-        metadataMap.set(`mmsi:${identity.mmsi}`, metadata)
-      }
-    }
-
-    return metadataMap
+    return (await response.json()) as Record<string, unknown>
   } catch {
-    return new Map<string, TrafficMetadata>()
+    return null
   } finally {
     clearTimeout(timeout)
   }
+}
+
+function buildTrafficContactFromSignalKVessel(
+  contextKey: string,
+  rawValue: unknown,
+  observedAtMs: number,
+) {
+  const identity = getSignalKContextIdentity(contextKey)
+  if (!identity) {
+    return null
+  }
+
+  const extractedIdentity = extractObservedIdentityPatchFromSignalKModel(rawValue, contextKey)
+  const positionValue = readSignalKPath(rawValue, 'navigation.position')
+  const position = extractSignalKPosition(positionValue)
+  const lat = position.lat ?? asNumber(readSignalKPath(rawValue, 'navigation.position.latitude'))
+  const lng = position.lng ?? asNumber(readSignalKPath(rawValue, 'navigation.position.longitude'))
+
+  return {
+    id: identity.id,
+    name:
+      extractedIdentity?.observedName ||
+      asString(readSignalKPath(rawValue, 'name')) ||
+      asString(readSignalKPath(rawValue, 'design.name')),
+    mmsi: extractedIdentity?.mmsi || identity.mmsi || null,
+    shipType:
+      extractedIdentity?.shipTypeCode ??
+      asNumber(readSignalKPath(rawValue, 'design.aisShipType.id')) ??
+      asNumber(readSignalKPath(rawValue, 'design.aisShipType')),
+    lat,
+    lng,
+    cog: normalizeAngleDegrees(readSignalKPath(rawValue, 'navigation.courseOverGroundTrue')),
+    sog: asNumber(readSignalKPath(rawValue, 'navigation.speedOverGround')),
+    heading:
+      normalizeAngleDegrees(readSignalKPath(rawValue, 'navigation.headingTrue')) ??
+      normalizeAngleDegrees(readSignalKPath(rawValue, 'navigation.headingMagnetic')),
+    destination:
+      asString(readSignalKPath(rawValue, 'navigation.destination.commonName')) ||
+      asString(readSignalKPath(rawValue, 'navigation.destination.name')) ||
+      asString(readSignalKPath(rawValue, 'navigation.destination')),
+    callSign:
+      extractedIdentity?.callSign ||
+      asString(readSignalKPath(rawValue, 'communication.callsignVhf')) ||
+      asString(readSignalKPath(rawValue, 'communication.callsign')),
+    length:
+      extractedIdentity?.lengthOverall ??
+      asNumber(readSignalKPath(rawValue, 'design.length.overall')),
+    beam: extractedIdentity?.beam ?? asNumber(readSignalKPath(rawValue, 'design.beam')),
+    draft:
+      extractedIdentity?.draft ??
+      asNumber(readSignalKPath(rawValue, 'design.draft.current')) ??
+      asNumber(readSignalKPath(rawValue, 'design.draft.maximum')),
+    navState: asString(readSignalKPath(rawValue, 'navigation.state')),
+    lastUpdateAt: observedAtMs,
+  } satisfies AisContactSummary
+}
+
+async function fetchSignalKTrafficMetadata(event: H3Event, vesselId: string) {
+  const catalog = await fetchSignalKTrafficCatalog(event, vesselId)
+  if (!catalog) {
+    return new Map<string, TrafficMetadata>()
+  }
+
+  const metadataMap = new Map<string, TrafficMetadata>()
+
+  for (const [contextKey, rawValue] of Object.entries(catalog)) {
+    if (contextKey === 'self') {
+      continue
+    }
+
+    const contact = buildTrafficContactFromSignalKVessel(contextKey, rawValue, Date.now())
+    if (!contact) {
+      continue
+    }
+
+    const metadata: TrafficMetadata = {
+      name: contact.name,
+      mmsi: contact.mmsi,
+      shipType: contact.shipType,
+      destination: contact.destination,
+      callSign: contact.callSign,
+      length: contact.length,
+      beam: contact.beam,
+      draft: contact.draft,
+      navState: contact.navState,
+    }
+
+    metadataMap.set(contact.id, metadata)
+
+    if (contact.mmsi) {
+      metadataMap.set(`mmsi:${contact.mmsi}`, metadata)
+    }
+  }
+
+  return metadataMap
+}
+
+async function fetchSignalKTrafficContacts(event: H3Event, vesselId: string) {
+  const catalog = await fetchSignalKTrafficCatalog(event, vesselId)
+  if (!catalog) {
+    return []
+  }
+
+  const observedAtMs = Date.now()
+
+  return Object.entries(catalog)
+    .filter(([contextKey]) => contextKey !== 'self')
+    .map(([contextKey, rawValue]) =>
+      buildTrafficContactFromSignalKVessel(contextKey, rawValue, observedAtMs),
+    )
+    .filter((contact): contact is AisContactSummary => Boolean(contact))
+}
+
+function mergeTrafficContactCollections(
+  primaryContacts: AisContactSummary[],
+  secondaryContacts: AisContactSummary[],
+) {
+  const mergedByKey = new Map<string, AisContactSummary>()
+  const ordered: AisContactSummary[] = []
+
+  for (const contact of primaryContacts) {
+    ordered.push(contact)
+    for (const key of trafficContactKeys(contact)) {
+      mergedByKey.set(key, contact)
+    }
+  }
+
+  for (const contact of secondaryContacts) {
+    const match = trafficContactKeys(contact)
+      .map((key) => mergedByKey.get(key) || null)
+      .find((value): value is AisContactSummary => Boolean(value))
+
+    if (!match) {
+      ordered.push(contact)
+      for (const key of trafficContactKeys(contact)) {
+        mergedByKey.set(key, contact)
+      }
+      continue
+    }
+
+    const nextContact = mergeAisContactSummary(contact, match)
+    for (const key of trafficContactKeys(nextContact)) {
+      mergedByKey.set(key, nextContact)
+    }
+
+    const orderedIndex = ordered.findIndex((candidate) => candidate.id === match.id)
+    if (orderedIndex >= 0) {
+      ordered[orderedIndex] = nextContact
+    }
+  }
+
+  return ordered
 }
 
 async function fetchAisHubTrafficMetadata(event: H3Event, contacts: AisContactSummary[]) {
@@ -335,6 +484,72 @@ export async function enrichTrafficContactsForVessel(
     const aisHub = contact.mmsi ? aisHubMetadata.get(`mmsi:${contact.mmsi}`) || null : null
     return mergeTrafficMetadata(contact, signalK, aisHub)
   })
+}
+
+export async function listNearbyTrafficContactsForVessel(
+  event: H3Event,
+  vesselId: string,
+  vesselSnapshot: VesselSnapshotSummary | null | undefined,
+) {
+  const brokerState = await fetchVesselLiveState(event, vesselId)
+  const focusSnapshot = brokerState?.snapshot || vesselSnapshot || null
+
+  if (
+    focusSnapshot?.positionLat === null ||
+    focusSnapshot?.positionLat === undefined ||
+    focusSnapshot.positionLng === null ||
+    focusSnapshot.positionLng === undefined
+  ) {
+    return {
+      contacts: [] as AisContactSummary[],
+      source: 'broker' as const,
+    }
+  }
+
+  const signalKContacts = await fetchSignalKTrafficContacts(event, vesselId)
+  const combinedContacts = mergeTrafficContactCollections(
+    brokerState?.contacts || [],
+    signalKContacts,
+  )
+  const aisHubMetadata = await fetchAisHubTrafficMetadata(event, combinedContacts)
+
+  const mergedContacts = combinedContacts
+    .map((contact) =>
+      mergeTrafficMetadata(
+        contact,
+        null,
+        contact.mmsi ? aisHubMetadata.get(`mmsi:${contact.mmsi}`) : null,
+      ),
+    )
+    .filter(
+      (contact) =>
+        contact.lat !== null &&
+        contact.lat !== undefined &&
+        contact.lng !== null &&
+        contact.lng !== undefined,
+    )
+    .map((contact) => ({
+      contact,
+      distanceNm: haversineNm(
+        focusSnapshot.positionLat!,
+        focusSnapshot.positionLng!,
+        contact.lat!,
+        contact.lng!,
+      ),
+    }))
+    .filter(({ distanceNm }) => distanceNm <= TRAFFIC_NEARBY_RADIUS_NM)
+    .sort((left, right) => left.distanceNm - right.distanceNm)
+    .map(({ contact }) => contact)
+
+  return {
+    contacts: mergedContacts,
+    source:
+      brokerState?.contacts?.length && signalKContacts.length
+        ? ('merged' as const)
+        : signalKContacts.length
+          ? ('signalk' as const)
+          : ('broker' as const),
+  }
 }
 
 export function toTrafficContactDetailSummary(
