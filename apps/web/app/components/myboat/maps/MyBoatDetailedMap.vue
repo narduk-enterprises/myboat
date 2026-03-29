@@ -10,6 +10,7 @@ import type {
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
 import { buildTrafficContactPath, formatTrafficSpeed } from '~/utils/traffic'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
+import { mergeFeatureCollections, type MyBoatMapToolsProfile } from './advanced-tools'
 import {
   buildAisVectorFeatureCollection,
   buildNearbyAisPins,
@@ -42,12 +43,14 @@ const props = withDefaults(
     hasSignalKSource?: boolean
     trafficEnabled?: boolean
     trafficDetailBasePath?: string | null
+    toolsProfile?: MyBoatMapToolsProfile
     heightClass?: string
     persistKey?: string | null
     showFocusPanel?: boolean
     showLayerToggles?: boolean
     showPinLabels?: boolean
     showStatsRail?: boolean
+    autoFitKey?: string | null
   }>(),
   {
     passages: () => [],
@@ -60,12 +63,14 @@ const props = withDefaults(
     hasSignalKSource: undefined,
     trafficEnabled: undefined,
     trafficDetailBasePath: null,
+    toolsProfile: 'viewer',
     heightClass: 'h-[24rem] sm:h-[30rem] lg:h-[38rem] xl:h-[44rem]',
     persistKey: null,
     showFocusPanel: true,
     showLayerToggles: true,
     showPinLabels: true,
     showStatsRail: true,
+    autoFitKey: null,
   },
 )
 
@@ -80,13 +85,33 @@ const showWaypoints = shallowRef(true)
 const showMedia = shallowRef(true)
 const localTrafficEnabled = shallowRef(true)
 const showTrafficVectors = shallowRef(true)
-const showPointsOfInterest = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const isCompactViewport = useCompactViewport()
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
+const {
+  capabilities: toolCapabilities,
+  canShowHeadingLine,
+  canShowRangeRings,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: true,
+  focusSnapshot,
+  profile: computed(() => props.toolsProfile),
+})
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const waypointPins = computed(() => buildWaypointPins(props.waypoints))
 const mediaPins = computed(() => buildMediaPins(props.media))
@@ -115,13 +140,13 @@ const mapItems = computed(() => [
 ])
 const baseGeojson = computed(() => buildPassageFeatureCollection(props.passages))
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
-const geojson = computed(() => ({
-  type: 'FeatureCollection' as const,
-  features: [
-    ...(showRoutes.value ? baseGeojson.value.features : []),
-    ...(showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : []),
-  ],
-}))
+const geojson = computed(() =>
+  mergeFeatureCollections(
+    showRoutes.value ? baseGeojson.value : null,
+    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value : null,
+    toolGeojson.value,
+  ),
+)
 const allPins = computed(() => [...mapItems.value, ...(showTraffic.value ? aisPins.value : [])])
 const hasMapData = computed(
   () =>
@@ -495,6 +520,18 @@ watch([showWaypoints, showMedia, showTraffic], () => {
   selectedId.value = null
 })
 
+watch(
+  () => props.autoFitKey,
+  async (value, previousValue) => {
+    if (!value || value === previousValue) {
+      return
+    }
+
+    await nextTick()
+    mapRef.value?.zoomToFit(0)
+  },
+)
+
 useMarineAisOverlay({
   map: mapInstance,
   pins: aisPins,
@@ -528,10 +565,12 @@ onBeforeUnmount(() => {
       :bounding-padding="0.22"
       :height-class="heightClass"
       :persist-key="persistKey"
+      :map-style="mapStyle"
       allow-fullscreen
       preserve-region
-      :shows-points-of-interest="showPointsOfInterest"
+      :shows-points-of-interest="true"
       :clustering-identifier="clusteringIdentifier"
+      @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
     >
       <template
@@ -582,15 +621,6 @@ onBeforeUnmount(() => {
               Center vessel
             </UButton>
             <UButton
-              :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
-              :color="showPointsOfInterest ? 'primary' : 'neutral'"
-              :variant="showPointsOfInterest ? 'soft' : 'outline'"
-              size="xs"
-              @click="showPointsOfInterest = !showPointsOfInterest"
-            >
-              {{ showPointsOfInterest ? 'Labels on' : 'Labels off' }}
-            </UButton>
-            <UButton
               v-if="savedRegion"
               icon="i-lucide-rotate-ccw"
               color="neutral"
@@ -609,6 +639,25 @@ onBeforeUnmount(() => {
             >
               {{ isFullscreen ? 'Exit full screen' : 'Full screen' }}
             </UButton>
+            <MyBoatMapAdvancedTools
+              :capabilities="toolCapabilities"
+              :can-reset-view="Boolean(savedRegion)"
+              :can-show-heading-line="canShowHeadingLine"
+              :can-show-range-rings="canShowRangeRings"
+              :has-active-indicator="hasActiveIndicator"
+              :map-style="mapStyle"
+              :measure-mode="measureMode"
+              :measure-result="measureResult"
+              :show-heading-line="showHeadingLine"
+              :show-label="true"
+              :show-range-rings="showRangeRings"
+              size="xs"
+              @reset-view="clearRememberedView"
+              @set-map-style="setMapStyle"
+              @toggle-heading-line="toggleHeadingLine"
+              @toggle-measure="toggleMeasureMode"
+              @toggle-range-rings="toggleRangeRings"
+            />
           </div>
         </div>
       </template>
@@ -667,27 +716,6 @@ onBeforeUnmount(() => {
           />
           <UButton
             class="pointer-events-auto"
-            :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
-            :color="showPointsOfInterest ? 'primary' : 'neutral'"
-            :variant="showPointsOfInterest ? 'soft' : 'outline'"
-            size="sm"
-            title="Toggle map context labels"
-            aria-label="Toggle map context labels"
-            @click="showPointsOfInterest = !showPointsOfInterest"
-          />
-          <UButton
-            v-if="savedRegion"
-            class="pointer-events-auto"
-            icon="i-lucide-rotate-ccw"
-            color="neutral"
-            variant="soft"
-            size="sm"
-            title="Clear remembered camera position"
-            aria-label="Clear remembered camera position"
-            @click="clearRememberedView"
-          />
-          <UButton
-            class="pointer-events-auto"
             :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
             color="neutral"
             variant="soft"
@@ -695,6 +723,24 @@ onBeforeUnmount(() => {
             title="Toggle fullscreen map"
             aria-label="Toggle fullscreen map"
             @click="toggleFullscreen"
+          />
+          <MyBoatMapAdvancedTools
+            :capabilities="toolCapabilities"
+            :can-reset-view="Boolean(savedRegion)"
+            :can-show-heading-line="canShowHeadingLine"
+            :can-show-range-rings="canShowRangeRings"
+            :has-active-indicator="hasActiveIndicator"
+            :map-style="mapStyle"
+            :measure-mode="measureMode"
+            :measure-result="measureResult"
+            :show-heading-line="showHeadingLine"
+            :show-range-rings="showRangeRings"
+            size="sm"
+            @reset-view="clearRememberedView"
+            @set-map-style="setMapStyle"
+            @toggle-heading-line="toggleHeadingLine"
+            @toggle-measure="toggleMeasureMode"
+            @toggle-range-rings="toggleRangeRings"
           />
         </div>
 
@@ -714,6 +760,7 @@ onBeforeUnmount(() => {
               Routes {{ baseGeojson.features.length ? `(${baseGeojson.features.length})` : '' }}
             </UButton>
             <UButton
+              v-if="waypointPins.length"
               class="pointer-events-auto"
               icon="i-lucide-map-pinned"
               :color="showWaypoints ? 'primary' : 'neutral'"
@@ -724,6 +771,7 @@ onBeforeUnmount(() => {
               Waypoints {{ waypointPins.length ? `(${waypointPins.length})` : '' }}
             </UButton>
             <UButton
+              v-if="mediaPins.length"
               class="pointer-events-auto"
               icon="i-lucide-camera"
               :color="showMedia ? 'primary' : 'neutral'"
@@ -786,6 +834,7 @@ onBeforeUnmount(() => {
               Routes {{ baseGeojson.features.length ? `(${baseGeojson.features.length})` : '' }}
             </UButton>
             <UButton
+              v-if="waypointPins.length"
               icon="i-lucide-map-pinned"
               :color="showWaypoints ? 'primary' : 'neutral'"
               :variant="showWaypoints ? 'soft' : 'outline'"
@@ -795,6 +844,7 @@ onBeforeUnmount(() => {
               Waypoints {{ waypointPins.length ? `(${waypointPins.length})` : '' }}
             </UButton>
             <UButton
+              v-if="mediaPins.length"
               icon="i-lucide-camera"
               :color="showMedia ? 'primary' : 'neutral'"
               :variant="showMedia ? 'soft' : 'outline'"

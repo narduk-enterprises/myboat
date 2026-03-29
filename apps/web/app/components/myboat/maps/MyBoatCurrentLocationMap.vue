@@ -2,6 +2,7 @@
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import type { AisContactSummary, VesselCardSummary } from '~/types/myboat'
+import { mergeFeatureCollections } from './advanced-tools'
 import {
   buildAisVectorFeatureCollection,
   buildNearbyAisPins,
@@ -49,6 +50,27 @@ const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
+const {
+  capabilities: toolCapabilities,
+  canShowHeadingLine,
+  canShowRangeRings,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: true,
+  focusSnapshot,
+  profile: 'navigation',
+})
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const showTraffic = computed({
   get: () => props.trafficEnabled ?? localTrafficEnabled.value,
@@ -79,17 +101,18 @@ const aisPins = computed(() =>
   }),
 )
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
-const geojson = computed(() => ({
-  type: 'FeatureCollection' as const,
-  features:
-    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : [],
-}))
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
 const selectedAisPin = computed(
   () => aisPins.value.find((pin) => pin.id === selectedId.value) || null,
 )
 const selectedAisDetailPath = computed(() =>
   buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
+)
+const geojson = computed(() =>
+  mergeFeatureCollections(
+    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value : null,
+    toolGeojson.value,
+  ),
 )
 
 function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: boolean) {
@@ -211,10 +234,68 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
       :zoom-span="{ lat: 0.018, lng: 0.022 }"
       :bounding-padding="0.22"
       :height-class="heightClass"
+      :map-style="mapStyle"
+      :shows-points-of-interest="true"
+      @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
     >
+      <template #header>
+        <div class="border-b border-default/70 px-4 py-3 lg:hidden">
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              icon="i-lucide-crosshair"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="centerOnVessel"
+            >
+              Center vessel
+            </UButton>
+            <UButton
+              :color="toggleTrafficColor"
+              :variant="toggleTrafficVariant"
+              icon="i-lucide-radar"
+              size="xs"
+              :disabled="!hasSignalKSource"
+              @click="showTraffic = !showTraffic"
+            >
+              {{ toggleTrafficLabel }}
+            </UButton>
+            <UButton
+              v-if="showTraffic"
+              :color="showTrafficVectors ? 'primary' : 'neutral'"
+              :variant="showTrafficVectors ? 'soft' : 'outline'"
+              icon="i-lucide-navigation-2"
+              size="xs"
+              @click="showTrafficVectors = !showTrafficVectors"
+            >
+              Vectors
+            </UButton>
+            <MyBoatMapAdvancedTools
+              :capabilities="toolCapabilities"
+              :can-show-heading-line="canShowHeadingLine"
+              :can-show-range-rings="canShowRangeRings"
+              :has-active-indicator="hasActiveIndicator"
+              :map-style="mapStyle"
+              :measure-mode="measureMode"
+              :measure-result="measureResult"
+              :show-heading-line="showHeadingLine"
+              :show-label="true"
+              :show-range-rings="showRangeRings"
+              size="xs"
+              @set-map-style="setMapStyle"
+              @toggle-heading-line="toggleHeadingLine"
+              @toggle-measure="toggleMeasureMode"
+              @toggle-range-rings="toggleRangeRings"
+            />
+          </div>
+        </div>
+      </template>
+
       <template #overlay>
-        <div class="absolute right-4 top-4 flex max-w-[calc(100%-2rem)] flex-col gap-2 sm:flex-row">
+        <div
+          class="absolute right-4 top-4 hidden max-w-[calc(100%-2rem)] flex-wrap justify-end gap-2 lg:flex"
+        >
           <UButton
             class="pointer-events-auto"
             color="neutral"
@@ -244,6 +325,22 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
           >
             Vectors
           </UButton>
+          <MyBoatMapAdvancedTools
+            :capabilities="toolCapabilities"
+            :can-show-heading-line="canShowHeadingLine"
+            :can-show-range-rings="canShowRangeRings"
+            :has-active-indicator="hasActiveIndicator"
+            :map-style="mapStyle"
+            :measure-mode="measureMode"
+            :measure-result="measureResult"
+            :show-heading-line="showHeadingLine"
+            :show-range-rings="showRangeRings"
+            size="sm"
+            @set-map-style="setMapStyle"
+            @toggle-heading-line="toggleHeadingLine"
+            @toggle-measure="toggleMeasureMode"
+            @toggle-range-rings="toggleRangeRings"
+          />
         </div>
       </template>
 

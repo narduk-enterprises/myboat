@@ -48,17 +48,21 @@ export interface PassageSummary {
   summary: string | null
   departureName: string | null
   arrivalName: string | null
+  startPlaceLabel?: string | null
+  endPlaceLabel?: string | null
   startedAt: string
   endedAt: string | null
   distanceNm: number | null
   maxWindKn: number | null
   trackGeojson: string | null
+  playbackAvailable?: boolean
 }
 
 export type MediaMatchStatus = 'attached' | 'review'
 
 export interface WaypointSummary {
   id: string
+  passageId?: string | null
   title: string
   note: string | null
   kind: string

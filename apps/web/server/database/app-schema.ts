@@ -1,5 +1,13 @@
 import { apiKeys, users } from '#layer/server/database/schema'
-import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 
 const isoTimestamp = () => new Date().toISOString()
 
@@ -195,13 +203,32 @@ export const passages = sqliteTable('passages', {
   summary: text('summary'),
   departureName: text('departure_name'),
   arrivalName: text('arrival_name'),
+  startPlaceLabel: text('start_place_label'),
+  endPlaceLabel: text('end_place_label'),
   startedAt: text('started_at').notNull(),
   endedAt: text('ended_at'),
   distanceNm: real('distance_nm'),
   maxWindKn: real('max_wind_kn'),
   trackGeojson: text('track_geojson'),
+  playbackJson: text('playback_json'),
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
 })
+
+export const passageAisVessels = sqliteTable(
+  'passage_ais_vessels',
+  {
+    passageId: text('passage_id')
+      .notNull()
+      .references(() => passages.id, { onDelete: 'cascade' }),
+    mmsi: text('mmsi').notNull(),
+    profileJson: text('profile_json').notNull(),
+    samplesJson: text('samples_json').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.passageId, table.mmsi] }),
+    passageIdx: index('passage_ais_vessels_passage_idx').on(table.passageId),
+  }),
+)
 
 export const waypoints = sqliteTable('waypoints', {
   id: text('id').primaryKey(),

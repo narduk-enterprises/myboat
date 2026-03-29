@@ -6,6 +6,7 @@ const props = defineProps<{
   detail: VesselDetailResponse
 }>()
 
+const detail = computed(() => props.detail)
 const isCompactViewport = useCompactViewport()
 const { updateMedia } = useUpdateVesselMedia(props.detail.vessel.slug)
 const pendingCoverIds = ref<string[]>([])

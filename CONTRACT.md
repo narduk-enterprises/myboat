@@ -11,10 +11,12 @@ Status: UNLOCKED
 - `/register`
 - `/dashboard`
 - `/dashboard/map`
+- `/dashboard/passages`
 - `/dashboard/fleet-friends`
 - `/dashboard/settings`
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
+- `/dashboard/vessels/[vesselSlug]/passages`
 - `/dashboard/installations/[installationId]`
 - `/dashboard/settings/profile`
 - `/dashboard/settings/security`
@@ -22,6 +24,7 @@ Status: UNLOCKED
 - `/dashboard/settings/sharing`
 - `/:username`
 - `/:username/:vesselSlug`
+- `/:username/:vesselSlug/passages`
 
 ### API routes
 
@@ -30,6 +33,7 @@ Status: UNLOCKED
 - `GET /api/app/vessels/[vesselSlug]`
 - `POST /api/app/vessels/[vesselSlug]/media/import`
 - `PATCH /api/app/vessels/[vesselSlug]/media/[mediaId]`
+- `GET /api/app/passages/[passageId]/playback`
 - `GET /api/app/vessels/[vesselSlug]/live`
 - `GET /api/app/installations/[installationId]`
 - `POST /api/app/installations/[installationId]/keys`
@@ -44,6 +48,7 @@ Status: UNLOCKED
 - `GET /api/public/[username]/[vesselSlug]/history`
 - `GET /api/public/[username]/[vesselSlug]/history/catalog`
 - `GET /api/public/[username]/[vesselSlug]/live`
+- `GET /api/public/[username]/[vesselSlug]/passages/[passageId]/playback`
 
 ## Page composition requirements
 
@@ -91,6 +96,17 @@ Status: UNLOCKED
 - compact diagnostics panel
 - deeper live metric board
 
+### `/dashboard/passages`
+
+- hero
+- vessel switcher when multiple vessels exist
+- dedicated passage workspace
+- searchable and sortable passage rail
+- passage-focused map panel
+- playback theater with scrubber and rate controls when a bundle exists
+- nearby AIS contact panel driven by compact stored traffic samples
+- shared media strip
+
 ### `/dashboard/fleet-friends`
 
 - route header
@@ -112,6 +128,17 @@ Status: UNLOCKED
 - owner-only review queue for ambiguous media imports
 - general vessel media strip for unattached items
 - install links card
+
+### `/dashboard/vessels/[vesselSlug]/passages`
+
+- hero
+- local vessel live/passages switcher
+- dedicated vessel passage workspace
+- searchable and sortable passage rail
+- passage-focused map panel
+- playback theater with scrubber and rate controls when a bundle exists
+- nearby AIS contact panel driven by compact stored traffic samples
+- shared media strip
 
 ### `/dashboard/installations/[installationId]`
 
@@ -144,6 +171,16 @@ Status: UNLOCKED
 - public map
 - public route and media context
 
+### `/:username/:vesselSlug/passages`
+
+- public vessel hero
+- dedicated public passage workspace
+- searchable and sortable public passage rail
+- passage-focused public map
+- read-only playback theater when a public bundle exists
+- public nearby-traffic panel sourced from compact stored AIS samples
+- public media strip
+
 ## Naming rules
 
 - use `vessel`, not `boat` or `install` interchangeably inside the same feature
@@ -164,6 +201,13 @@ Status: UNLOCKED
 - page data loading uses `useFetch()` or `useAsyncData()`
 - browsers read only MyBoat-owned APIs and MyBoat-owned live routes
 - D1 is the operational state store; InfluxDB is the historical telemetry store
+- v1 passage workspace reads only MyBoat-owned D1 passage summaries, stored
+  `track_geojson`, compact `playback_json`, and `passage_ais_vessels`
+- the seeded Tideye flagship playback import is allowed only as demo content
+  after it has been copied into MyBoat-owned D1 rows and served by MyBoat-owned
+  endpoints
+- future playback or AIS passage enrichments must stay MyBoat-owned compact
+  bundles in D1 and/or R2, generated server-side from Influx history
 - connection-derived vessel identity is app-owned operational state and must not
   require browser-side SignalK parsing
 - `POST /api/ingest/v1/delta` accepts collector-normalized batched deltas with
@@ -258,6 +302,8 @@ Status: UNLOCKED
 - do not bypass the app-owned schema with ad hoc JSON files for core product
   data
 - do not add raw SignalK or raw Influx browser proxies
+- do not make browsers call Tideye playback endpoints or Tideye-owned storage
+- do not add filesystem-backed playback fallbacks inside Worker-serving code
 - do not create new pages that compete with existing vessel/install/public
   profile terminology
 - do not reintroduce installation-first primary navigation for launch

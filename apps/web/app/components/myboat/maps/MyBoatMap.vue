@@ -4,11 +4,42 @@ import type {
   MyBoatMapHandle,
   MyBoatMapOverlayStyle,
 } from './map-support'
+import type { MyBoatMapStyle } from './advanced-tools'
+
+interface MyBoatMapKitGlobal {
+  Map?: {
+    MapTypes?: {
+      Hybrid?: unknown
+      MutedStandard?: unknown
+      Satellite?: unknown
+      Standard?: unknown
+    }
+  }
+  PointOfInterestFilter?: {
+    excludingAllCategories?: unknown
+  }
+}
+
+declare const mapkit: MyBoatMapKitGlobal
 
 interface MyBoatMapItem {
   id: string
   lat: number
   lng: number
+}
+
+interface MyBoatMapCircleOverlay {
+  lat: number
+  lng: number
+  radius: number
+  color: string
+  opacity?: number
+}
+
+interface MyBoatRuntimeMap {
+  mapType?: unknown
+  pointOfInterestFilter?: unknown
+  showsPointsOfInterest?: boolean
 }
 
 const props = withDefaults(
@@ -20,6 +51,7 @@ const props = withDefaults(
       isSelected: boolean,
     ) => { element: HTMLElement; cleanup?: () => void }
     overlayStyleFn?: (properties: Record<string, unknown>) => MyBoatMapOverlayStyle
+    circles?: MyBoatMapCircleOverlay[]
     fallbackCenter?: { lat: number; lng: number }
     annotationSize?: { width: number; height: number }
     zoomSpan?: { lat: number; lng: number }
@@ -28,6 +60,7 @@ const props = withDefaults(
     heightClass?: string
     persistKey?: string | null
     allowFullscreen?: boolean
+    mapStyle?: MyBoatMapStyle
     preserveRegion?: boolean
     suppressSelectionZoom?: boolean
     showsPointsOfInterest?: boolean
@@ -38,6 +71,7 @@ const props = withDefaults(
     geojson: null,
     createPinElement: undefined,
     overlayStyleFn: undefined,
+    circles: () => [],
     fallbackCenter: () => ({ lat: 29.3043, lng: -94.7977 }),
     annotationSize: () => ({ width: 100, height: 56 }),
     zoomSpan: () => ({ lat: 0.018, lng: 0.022 }),
@@ -46,6 +80,7 @@ const props = withDefaults(
     heightClass: 'h-[22rem] sm:h-[24rem]',
     persistKey: null,
     allowFullscreen: false,
+    mapStyle: undefined,
     preserveRegion: false,
     suppressSelectionZoom: false,
     showsPointsOfInterest: true,
@@ -58,6 +93,7 @@ const emit = defineEmits<{
   'region-change': [
     region: { latDelta: number; lngDelta: number; centerLat: number; centerLng: number },
   ]
+  'map-click': [coords: { lat: number; lng: number }]
 }>()
 
 const selectedId = defineModel<string | null>('selectedId', { default: null })
@@ -75,6 +111,60 @@ function fitToContent(zoomOutLevels = 0) {
   mapRef.value?.zoomToFit(zoomOutLevels)
 }
 
+function resolveEffectiveMapStyle() {
+  return props.mapStyle ?? (props.showsPointsOfInterest ? 'standard' : 'muted')
+}
+
+function applyMapStyle() {
+  if (!import.meta.client || typeof mapkit === 'undefined') {
+    return
+  }
+
+  const map = mapRef.value?.getMap() as MyBoatRuntimeMap | null
+  if (!map) {
+    return
+  }
+
+  const style = resolveEffectiveMapStyle()
+  const mapTypes = mapkit.Map?.MapTypes
+  const excludeAllPoi = mapkit.PointOfInterestFilter?.excludingAllCategories
+
+  if (!mapTypes) {
+    return
+  }
+
+  switch (style) {
+    case 'muted':
+      map.mapType = mapTypes.MutedStandard
+      map.showsPointsOfInterest = false
+      if (excludeAllPoi) {
+        map.pointOfInterestFilter = excludeAllPoi
+      }
+      break
+    case 'satellite':
+      map.mapType = mapTypes.Satellite
+      map.showsPointsOfInterest = false
+      if (excludeAllPoi) {
+        map.pointOfInterestFilter = excludeAllPoi
+      }
+      break
+    case 'hybrid':
+      map.mapType = mapTypes.Hybrid
+      map.showsPointsOfInterest = true
+      if (excludeAllPoi && map.pointOfInterestFilter === excludeAllPoi) {
+        map.pointOfInterestFilter = null
+      }
+      break
+    default:
+      map.mapType = mapTypes.Standard
+      map.showsPointsOfInterest = true
+      if (excludeAllPoi && map.pointOfInterestFilter === excludeAllPoi) {
+        map.pointOfInterestFilter = null
+      }
+      break
+  }
+}
+
 function clearRememberedView() {
   clearSavedRegion()
   fitToContent(0)
@@ -89,6 +179,7 @@ function handleMapReady() {
     )
   }
 
+  applyMapStyle()
   emit('map-ready')
 }
 
@@ -103,6 +194,10 @@ function handleRegionChange(region: {
   }
 
   emit('region-change', region)
+}
+
+function handleMapClick(coords: { lat: number; lng: number }) {
+  emit('map-click', coords)
 }
 
 function syncFullscreenState() {
@@ -152,6 +247,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
 
+watch(
+  () => [props.mapStyle, props.showsPointsOfInterest],
+  () => {
+    applyMapStyle()
+  },
+)
+
 defineExpose({
   getMap: () => mapRef.value?.getMap() ?? null,
   setRegion: (center: { lat: number; lng: number }, span?: { lat: number; lng: number }) => {
@@ -182,6 +284,7 @@ defineExpose({
             :geojson="geojson"
             :create-pin-element="createPinElement"
             :overlay-style-fn="overlayStyleFn"
+            :circles="circles"
             :fallback-center="fallbackCenter"
             :annotation-size="annotationSize"
             :zoom-span="zoomSpan"
@@ -192,6 +295,7 @@ defineExpose({
             :shows-points-of-interest="showsPointsOfInterest"
             :clustering-identifier="clusteringIdentifier"
             @map-ready="handleMapReady"
+            @map-click="handleMapClick"
             @region-change="handleRegionChange"
           />
         </ClientOnly>

@@ -1,4 +1,5 @@
 import type { PassageSummary } from '~/types/myboat'
+import { resolvePassageStopLabel, buildPassageDisplayTitle } from './passage-display'
 
 export function formatCoordinate(value: number | null | undefined, isLatitude: boolean) {
   if (value === null || value === undefined) {
@@ -76,9 +77,36 @@ export function buildTrackFeatureCollection(passages: PassageSummary[]) {
     .filter((passage) => Boolean(passage.trackGeojson))
     .map((passage, index) => {
       try {
-        const geometry = JSON.parse(passage.trackGeojson || '') as {
+        const parsed = JSON.parse(passage.trackGeojson || '') as {
           type: string
-          coordinates: unknown
+          coordinates?: unknown
+          geometry?: {
+            type: string
+            coordinates: unknown
+          }
+          features?: Array<{
+            type: 'Feature'
+            geometry?: {
+              type: string
+              coordinates: unknown
+            }
+          }>
+        } | null
+
+        const geometry =
+          parsed?.type === 'FeatureCollection'
+            ? parsed.features?.find((feature) => feature.geometry)?.geometry
+            : parsed?.type === 'Feature'
+              ? parsed.geometry
+              : parsed && 'coordinates' in parsed
+                ? {
+                    type: parsed.type,
+                    coordinates: parsed.coordinates,
+                  }
+                : null
+
+        if (!geometry?.type || geometry.coordinates === undefined) {
+          return null
         }
 
         return {
@@ -86,9 +114,9 @@ export function buildTrackFeatureCollection(passages: PassageSummary[]) {
           geometry,
           properties: {
             id: passage.id,
-            name: passage.title,
-            departure: passage.departureName,
-            arrival: passage.arrivalName,
+            name: buildPassageDisplayTitle(passage),
+            departure: resolvePassageStopLabel(passage, 'start'),
+            arrival: resolvePassageStopLabel(passage, 'end'),
             startedAt: passage.startedAt,
             endedAt: passage.endedAt,
             distanceNm: passage.distanceNm,

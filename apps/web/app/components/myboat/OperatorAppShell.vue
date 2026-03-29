@@ -16,8 +16,19 @@ const { colorModeIcon, cycleColorMode } = useColorModeToggle()
 const activeVesselSlug = computed(() =>
   typeof route.params.vesselSlug === 'string' ? route.params.vesselSlug : null,
 )
+const mobilePassagesLink = computed<MyBoatShellLink>(() => ({
+  label: 'Passages',
+  to: activeVesselSlug.value
+    ? `/dashboard/vessels/${activeVesselSlug.value}/passages`
+    : '/dashboard/passages',
+  icon: 'i-lucide-route',
+}))
 
 function isActive(link: MyBoatShellLink) {
+  if (link.label === 'Passages') {
+    return route.path === link.to || route.path.endsWith('/passages')
+  }
+
   if (link.match === 'prefix') {
     return route.path === link.to || route.path.startsWith(`${link.to}/`)
   }
@@ -37,6 +48,7 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
     : [
         { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Live Map', to: '/dashboard/map', icon: 'i-lucide-map' },
+        { label: 'Passages', to: '/dashboard/passages', icon: 'i-lucide-route' },
         { label: 'Buddy Boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         {
           label: 'Settings',
@@ -62,15 +74,7 @@ const mobileLinks = computed<MyBoatShellLink[]>(() =>
     : [
         { label: 'Board', to: '/dashboard', icon: 'i-lucide-layout-dashboard', match: 'prefix' },
         { label: 'Map', to: '/dashboard/map', icon: 'i-lucide-map' },
-        ...(activeVesselSlug.value
-          ? [
-              {
-                label: 'Passages',
-                to: `/dashboard/vessels/${activeVesselSlug.value}/passages`,
-                icon: 'i-lucide-route',
-              },
-            ]
-          : []),
+        mobilePassagesLink.value,
         { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         {
           label: 'Prefs',

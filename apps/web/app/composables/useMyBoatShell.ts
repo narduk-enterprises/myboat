@@ -36,6 +36,11 @@ export function useMyBoatShell() {
   const userMenuLinks = computed<MyBoatShellLink[]>(() => {
     const links: MyBoatShellLink[] = [
       {
+        label: 'Passages',
+        to: '/dashboard/passages',
+        icon: 'i-lucide-route',
+      },
+      {
         label: 'Settings',
         to: '/dashboard/settings',
         icon: 'i-lucide-sliders-horizontal',
@@ -67,6 +72,7 @@ export function useMyBoatShell() {
       links: [
         { label: 'Dashboard', to: '/dashboard' },
         { label: 'Live map', to: '/dashboard/map' },
+        { label: 'Passages', to: '/dashboard/passages' },
         { label: 'Buddy Boats', to: '/dashboard/fleet-friends' },
         { label: 'Settings', to: '/dashboard/settings' },
         {

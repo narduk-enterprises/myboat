@@ -5,6 +5,7 @@ import { apiKeys, users } from '#layer/server/database/schema'
 import type { AppSessionUser } from '#server/utils/app-auth'
 import {
   mediaItems,
+  passageAisVessels,
   passages,
   publicProfiles,
   vesselInstallationApiKeys,
@@ -33,6 +34,166 @@ const UI_AUDIT_MEDIA_HARBOR_ID = 'ui-audit-media-harbor'
 
 const ISO_NOW = '2026-03-27T05:20:00.000Z'
 const MEDIA_IMAGE_URL = '/images/hero-bg.webp'
+const UI_AUDIT_PASSAGE_ACTIVE_PLAYBACK_JSON = JSON.stringify({
+  v: 1,
+  trackWindow: '10m',
+  note: 'Compact Tideye-style demo bundle for captain passage playback testing.',
+  samples: [
+    {
+      t: '2026-03-26T13:05:00.000Z',
+      lat: 29.301,
+      lon: -94.807,
+      sog: 4.2,
+      cog: 128,
+      stw: 4.0,
+      windKts: 18,
+      windDir: 142,
+    },
+    {
+      t: '2026-03-26T13:45:00.000Z',
+      lat: 29.287,
+      lon: -94.785,
+      sog: 6.3,
+      cog: 132,
+      stw: 5.9,
+      windKts: 20,
+      windDir: 148,
+    },
+    {
+      t: '2026-03-26T14:25:00.000Z',
+      lat: 29.241,
+      lon: -94.744,
+      sog: 7.1,
+      cog: 136,
+      stw: 6.7,
+      windKts: 22,
+      windDir: 153,
+    },
+    {
+      t: '2026-03-26T15:05:00.000Z',
+      lat: 29.168,
+      lon: -94.701,
+      sog: 7.4,
+      cog: 138,
+      stw: 7.0,
+      windKts: 23,
+      windDir: 156,
+    },
+    {
+      t: '2026-03-26T15:45:00.000Z',
+      lat: 29.087,
+      lon: -94.654,
+      sog: 6.2,
+      cog: 140,
+      stw: 5.8,
+      windKts: 19,
+      windDir: 150,
+    },
+    {
+      t: '2026-03-26T16:25:00.000Z',
+      lat: 28.999,
+      lon: -94.612,
+      sog: 4.8,
+      cog: 144,
+      stw: 4.5,
+      windKts: 17,
+      windDir: 146,
+    },
+  ],
+  vessels: [],
+})
+const UI_AUDIT_PASSAGE_ARCHIVE_PLAYBACK_JSON = JSON.stringify({
+  v: 1,
+  trackWindow: '15m',
+  note: 'Archived passage bundle for the captain/public playback workspace tests.',
+  samples: [
+    {
+      t: '2026-03-18T11:40:00.000Z',
+      lat: 27.834,
+      lon: -97.037,
+      sog: 5.4,
+      cog: 58,
+      stw: 5.0,
+      windKts: 24,
+      windDir: 122,
+    },
+    {
+      t: '2026-03-18T15:10:00.000Z',
+      lat: 28.219,
+      lon: -96.741,
+      sog: 11.3,
+      cog: 62,
+      stw: 10.8,
+      windKts: 29,
+      windDir: 128,
+    },
+    {
+      t: '2026-03-18T18:40:00.000Z',
+      lat: 28.782,
+      lon: -95.805,
+      sog: 12.4,
+      cog: 65,
+      stw: 11.9,
+      windKts: 31,
+      windDir: 136,
+    },
+    {
+      t: '2026-03-18T22:10:00.000Z',
+      lat: 29.091,
+      lon: -95.264,
+      sog: 9.5,
+      cog: 68,
+      stw: 9.1,
+      windKts: 26,
+      windDir: 140,
+    },
+    {
+      t: '2026-03-19T01:40:00.000Z',
+      lat: 29.301,
+      lon: -94.794,
+      sog: 6.1,
+      cog: 72,
+      stw: 5.7,
+      windKts: 20,
+      windDir: 145,
+    },
+  ],
+  vessels: [],
+})
+const UI_AUDIT_ACTIVE_TRAFFIC_PROFILE = JSON.stringify({
+  v: 1,
+  contextUrn: 'vessels.urn:mrn:imo:mmsi:367712340',
+  mmsi: '367712340',
+  name: 'Sector escort',
+  shipTypeId: 30,
+  shipTypeName: 'Fishing vessel',
+  lengthM: 36,
+  beamM: 9,
+  draftM: 3.2,
+  destination: 'Freeport',
+})
+const UI_AUDIT_ACTIVE_TRAFFIC_SAMPLES = JSON.stringify([
+  { t: '2026-03-26T13:45:00.000Z', lat: 29.292, lon: -94.778, sog: 4.2, cog: 130, hdg: 128 },
+  { t: '2026-03-26T14:25:00.000Z', lat: 29.247, lon: -94.732, sog: 5.1, cog: 136, hdg: 134 },
+  { t: '2026-03-26T15:05:00.000Z', lat: 29.175, lon: -94.686, sog: 5.8, cog: 139, hdg: 137 },
+])
+const UI_AUDIT_ARCHIVE_TRAFFIC_PROFILE = JSON.stringify({
+  v: 1,
+  contextUrn: 'vessels.urn:mrn:imo:mmsi:338210991',
+  mmsi: '338210991',
+  name: 'Bluewater freighter',
+  shipTypeId: 70,
+  shipTypeName: 'Cargo',
+  lengthM: 185,
+  beamM: 28,
+  draftM: 10.8,
+  destination: 'Houston',
+})
+const UI_AUDIT_ARCHIVE_TRAFFIC_SAMPLES = JSON.stringify([
+  { t: '2026-03-18T15:10:00.000Z', lat: 28.248, lon: -96.692, sog: 13.4, cog: 61, hdg: 63 },
+  { t: '2026-03-18T18:40:00.000Z', lat: 28.809, lon: -95.754, sog: 14.1, cog: 64, hdg: 66 },
+  { t: '2026-03-18T22:10:00.000Z', lat: 29.121, lon: -95.219, sog: 13.2, cog: 67, hdg: 69 },
+])
 
 export type UiAuditSeedResult = {
   username: string
@@ -251,6 +412,8 @@ export async function seedUiAuditWorkspace(
         'A live coastal leg used to validate telemetry integrity, route history, and public-facing passage cards.',
       departureName: 'Galveston',
       arrivalName: 'Freeport',
+      startPlaceLabel: 'Galveston',
+      endPlaceLabel: 'Freeport',
       startedAt: '2026-03-26T13:05:00.000Z',
       endedAt: null,
       distanceNm: 42.3,
@@ -268,6 +431,7 @@ export async function seedUiAuditWorkspace(
         },
         properties: { name: 'Galveston to Freeport sea trial' },
       }),
+      playbackJson: UI_AUDIT_PASSAGE_ACTIVE_PLAYBACK_JSON,
       createdAt: now,
     },
     {
@@ -278,6 +442,8 @@ export async function seedUiAuditWorkspace(
         'An archived offshore return with enough structure to keep the timeline and public profile visually rich.',
       departureName: 'Port Aransas',
       arrivalName: 'Galveston',
+      startPlaceLabel: 'Port Aransas',
+      endPlaceLabel: 'Galveston',
       startedAt: '2026-03-18T11:40:00.000Z',
       endedAt: '2026-03-19T03:10:00.000Z',
       distanceNm: 186.7,
@@ -295,7 +461,29 @@ export async function seedUiAuditWorkspace(
         },
         properties: { name: 'Port Aransas return leg' },
       }),
+      playbackJson: UI_AUDIT_PASSAGE_ARCHIVE_PLAYBACK_JSON,
       createdAt: now,
+    },
+  ])
+
+  await db
+    .delete(passageAisVessels)
+    .where(eq(passageAisVessels.passageId, UI_AUDIT_PASSAGE_ACTIVE_ID))
+  await db
+    .delete(passageAisVessels)
+    .where(eq(passageAisVessels.passageId, UI_AUDIT_PASSAGE_ARCHIVE_ID))
+  await db.insert(passageAisVessels).values([
+    {
+      passageId: UI_AUDIT_PASSAGE_ACTIVE_ID,
+      mmsi: '367712340',
+      profileJson: UI_AUDIT_ACTIVE_TRAFFIC_PROFILE,
+      samplesJson: UI_AUDIT_ACTIVE_TRAFFIC_SAMPLES,
+    },
+    {
+      passageId: UI_AUDIT_PASSAGE_ARCHIVE_ID,
+      mmsi: '338210991',
+      profileJson: UI_AUDIT_ARCHIVE_TRAFFIC_PROFILE,
+      samplesJson: UI_AUDIT_ARCHIVE_TRAFFIC_SAMPLES,
     },
   ])
 

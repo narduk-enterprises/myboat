@@ -302,6 +302,7 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         :live-connection-state="liveState?.connectionState"
         :live-last-delta-at="liveState?.lastDeltaAt"
         :has-signal-k-source="liveState?.hasSignalKSource"
+        tools-profile="viewer"
         :traffic-detail-base-path="trafficDetailBasePath"
         v-model:traffic-enabled="trafficEnabled"
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
@@ -336,11 +337,21 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
                   present conditions with the boat&apos;s recent movement.
                 </p>
               </div>
-              <span
-                class="rounded-full border border-default/70 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted"
-              >
-                {{ detail.passages.length }} passages
-              </span>
+              <div class="flex flex-wrap items-center gap-3">
+                <span
+                  class="rounded-full border border-default/70 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted"
+                >
+                  {{ detail.passages.length }} passages
+                </span>
+                <UButton
+                  :to="`/${detail.profile.username}/${detail.vessel.slug}/passages`"
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-arrow-right"
+                >
+                  Open all passages
+                </UButton>
+              </div>
             </div>
           </template>
 

@@ -64,16 +64,24 @@ describe('apps/web local seed data', () => {
       const counts = db
         .prepare(
           `
-            SELECT
-              (SELECT COUNT(*) FROM vessels WHERE owner_user_id = ?) AS vesselCount,
-              (SELECT COUNT(*) FROM passages WHERE vessel_id IN (
-                SELECT id FROM vessels WHERE owner_user_id = ?
-              )) AS passageCount,
-              (SELECT COUNT(*) FROM media_items WHERE vessel_id IN (
-                SELECT id FROM vessels WHERE owner_user_id = ?
-              )) AS mediaCount,
-              (SELECT COUNT(*) FROM waypoints WHERE vessel_id IN (
-                SELECT id FROM vessels WHERE owner_user_id = ?
+	            SELECT
+	              (SELECT COUNT(*) FROM vessels WHERE owner_user_id = ?) AS vesselCount,
+	              (SELECT COUNT(*) FROM passages WHERE vessel_id IN (
+	                SELECT id FROM vessels WHERE owner_user_id = ?
+	              )) AS passageCount,
+	              (SELECT COUNT(*) FROM passages WHERE vessel_id IN (
+	                SELECT id FROM vessels WHERE owner_user_id = ?
+	              ) AND playback_json IS NOT NULL) AS playbackPassageCount,
+	              (SELECT COUNT(*) FROM passage_ais_vessels WHERE passage_id IN (
+	                SELECT id FROM passages WHERE vessel_id IN (
+	                  SELECT id FROM vessels WHERE owner_user_id = ?
+	                )
+	              )) AS playbackTrafficCount,
+	              (SELECT COUNT(*) FROM media_items WHERE vessel_id IN (
+	                SELECT id FROM vessels WHERE owner_user_id = ?
+	              )) AS mediaCount,
+	              (SELECT COUNT(*) FROM waypoints WHERE vessel_id IN (
+	                SELECT id FROM vessels WHERE owner_user_id = ?
               )) AS waypointCount
           `,
         )
@@ -82,9 +90,13 @@ describe('apps/web local seed data', () => {
           '00000000-0000-0000-0000-000000000002',
           '00000000-0000-0000-0000-000000000002',
           '00000000-0000-0000-0000-000000000002',
+          '00000000-0000-0000-0000-000000000002',
+          '00000000-0000-0000-0000-000000000002',
         ) as {
         vesselCount: number
         passageCount: number
+        playbackPassageCount: number
+        playbackTrafficCount: number
         mediaCount: number
         waypointCount: number
       }
@@ -97,6 +109,8 @@ describe('apps/web local seed data', () => {
       expect(counts).toEqual({
         vesselCount: 1,
         passageCount: 4,
+        playbackPassageCount: 4,
+        playbackTrafficCount: 12,
         mediaCount: 2,
         waypointCount: 4,
       })

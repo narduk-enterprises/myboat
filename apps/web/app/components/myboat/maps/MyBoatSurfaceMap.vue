@@ -10,6 +10,7 @@ import type {
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
 import { formatTrafficSpeed } from '~/utils/traffic'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
+import { mergeFeatureCollections, type MyBoatMapToolsProfile } from './advanced-tools'
 import {
   buildAisVectorFeatureCollection,
   buildNearbyAisPins,
@@ -40,6 +41,7 @@ const props = withDefaults(
     liveConnectionState?: 'idle' | 'connecting' | 'connected' | 'error'
     liveLastDeltaAt?: number | null
     hasSignalKSource?: boolean
+    toolsProfile?: MyBoatMapToolsProfile
     heightClass?: string
     persistKey?: string | null
     allowTraffic?: boolean
@@ -59,6 +61,7 @@ const props = withDefaults(
     liveConnectionState: 'idle',
     liveLastDeltaAt: null,
     hasSignalKSource: false,
+    toolsProfile: 'viewer',
     heightClass: 'h-[22rem] sm:h-[24rem] lg:h-[28rem]',
     persistKey: null,
     allowTraffic: false,
@@ -77,7 +80,6 @@ const showWaypoints = shallowRef(true)
 const showMedia = shallowRef(true)
 const showTraffic = shallowRef(props.defaultTrafficVisible)
 const showTrafficVectors = shallowRef(false)
-const showPointsOfInterest = shallowRef(true)
 const isCompactViewport = useCompactViewport()
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
@@ -85,6 +87,27 @@ const primaryVessel = computed(
   () => props.vessels.find((vessel) => vessel.isPrimary) || props.vessels[0] || null,
 )
 const focusSnapshot = computed(() => primaryVessel.value?.liveSnapshot ?? null)
+const {
+  capabilities: toolCapabilities,
+  canShowHeadingLine,
+  canShowRangeRings,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: true,
+  focusSnapshot,
+  profile: computed(() => props.toolsProfile),
+})
 const vesselPins = computed(() => buildVesselPins(props.vessels))
 const waypointPins = computed(() => buildWaypointPins(props.waypoints))
 const mediaPins = computed(() => buildMediaPins(props.media))
@@ -105,15 +128,15 @@ const mapItems = computed(() => [
 ])
 const baseGeojson = computed(() => buildPassageFeatureCollection(props.passages))
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
-const geojson = computed(() => ({
-  type: 'FeatureCollection' as const,
-  features: [
-    ...(showRoutes.value ? baseGeojson.value.features : []),
-    ...(props.allowTraffic && showTraffic.value && showTrafficVectors.value
-      ? trafficVectorGeojson.value.features
-      : []),
-  ],
-}))
+const geojson = computed(() =>
+  mergeFeatureCollections(
+    showRoutes.value ? baseGeojson.value : null,
+    props.allowTraffic && showTraffic.value && showTrafficVectors.value
+      ? trafficVectorGeojson.value
+      : null,
+    toolGeojson.value,
+  ),
+)
 const allPins = computed(() => [
   ...mapItems.value,
   ...(props.allowTraffic && showTraffic.value ? aisPins.value : []),
@@ -549,10 +572,12 @@ onBeforeUnmount(() => {
       :bounding-padding="0.22"
       :height-class="heightClass"
       :persist-key="persistKey"
+      :map-style="mapStyle"
       allow-fullscreen
       preserve-region
-      :shows-points-of-interest="showPointsOfInterest"
+      :shows-points-of-interest="true"
       :clustering-identifier="clusteringIdentifier"
+      @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
     >
       <template
@@ -597,15 +622,6 @@ onBeforeUnmount(() => {
               Center vessel
             </UButton>
             <UButton
-              :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
-              :color="showPointsOfInterest ? 'primary' : 'neutral'"
-              :variant="showPointsOfInterest ? 'soft' : 'outline'"
-              size="xs"
-              @click="showPointsOfInterest = !showPointsOfInterest"
-            >
-              {{ showPointsOfInterest ? 'Labels on' : 'Labels off' }}
-            </UButton>
-            <UButton
               v-if="savedRegion"
               icon="i-lucide-rotate-ccw"
               color="neutral"
@@ -624,6 +640,25 @@ onBeforeUnmount(() => {
             >
               {{ isFullscreen ? 'Exit full screen' : 'Full screen' }}
             </UButton>
+            <MyBoatMapAdvancedTools
+              :capabilities="toolCapabilities"
+              :can-reset-view="Boolean(savedRegion)"
+              :can-show-heading-line="canShowHeadingLine"
+              :can-show-range-rings="canShowRangeRings"
+              :has-active-indicator="hasActiveIndicator"
+              :map-style="mapStyle"
+              :measure-mode="measureMode"
+              :measure-result="measureResult"
+              :show-heading-line="showHeadingLine"
+              :show-label="true"
+              :show-range-rings="showRangeRings"
+              size="xs"
+              @reset-view="clearRememberedView"
+              @set-map-style="setMapStyle"
+              @toggle-heading-line="toggleHeadingLine"
+              @toggle-measure="toggleMeasureMode"
+              @toggle-range-rings="toggleRangeRings"
+            />
           </div>
         </div>
       </template>
@@ -674,28 +709,29 @@ onBeforeUnmount(() => {
           />
           <UButton
             class="pointer-events-auto"
-            :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
-            :color="showPointsOfInterest ? 'primary' : 'neutral'"
-            :variant="showPointsOfInterest ? 'soft' : 'outline'"
-            size="sm"
-            @click="showPointsOfInterest = !showPointsOfInterest"
-          />
-          <UButton
-            v-if="savedRegion"
-            class="pointer-events-auto"
-            icon="i-lucide-rotate-ccw"
-            color="neutral"
-            variant="soft"
-            size="sm"
-            @click="clearRememberedView"
-          />
-          <UButton
-            class="pointer-events-auto"
             :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
             color="neutral"
             variant="soft"
             size="sm"
             @click="toggleFullscreen"
+          />
+          <MyBoatMapAdvancedTools
+            :capabilities="toolCapabilities"
+            :can-reset-view="Boolean(savedRegion)"
+            :can-show-heading-line="canShowHeadingLine"
+            :can-show-range-rings="canShowRangeRings"
+            :has-active-indicator="hasActiveIndicator"
+            :map-style="mapStyle"
+            :measure-mode="measureMode"
+            :measure-result="measureResult"
+            :show-heading-line="showHeadingLine"
+            :show-range-rings="showRangeRings"
+            size="sm"
+            @reset-view="clearRememberedView"
+            @set-map-style="setMapStyle"
+            @toggle-heading-line="toggleHeadingLine"
+            @toggle-measure="toggleMeasureMode"
+            @toggle-range-rings="toggleRangeRings"
           />
         </div>
 
