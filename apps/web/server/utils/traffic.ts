@@ -292,7 +292,9 @@ async function fetchSignalKTrafficMetadata(event: H3Event, vesselId: string) {
 }
 
 async function fetchAisHubTrafficMetadata(event: H3Event, contacts: AisContactSummary[]) {
-  const mmsis = contacts.map((contact) => contact.mmsi).filter((mmsi): mmsi is string => Boolean(mmsi))
+  const mmsis = contacts
+    .map((contact) => contact.mmsi)
+    .filter((mmsi): mmsi is string => Boolean(mmsi))
   const stored = await getStoredAisHubResultsByMmsis(event, mmsis)
   const metadataMap = new Map<string, TrafficMetadata>()
 

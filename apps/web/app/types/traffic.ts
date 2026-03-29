@@ -1,8 +1,4 @@
-import type {
-  AisContactSummary,
-  PublicProfileSummary,
-  VesselCardSummary,
-} from './myboat'
+import type { AisContactSummary, PublicProfileSummary, VesselCardSummary } from './myboat'
 
 export type TrafficContactLiveState = 'live' | 'cached'
 

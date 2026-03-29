@@ -158,6 +158,34 @@ export const vesselLiveSnapshots = sqliteTable('vessel_live_snapshots', {
   updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
 })
 
+export const vesselInstallationSourceStates = sqliteTable(
+  'vessel_installation_source_states',
+  {
+    installationId: text('installation_id')
+      .primaryKey()
+      .references(() => vesselInstallations.id, { onDelete: 'cascade' }),
+    vesselId: text('vessel_id')
+      .notNull()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    publisherRole: text('publisher_role').notNull().default('primary'),
+    policyVersion: text('policy_version').notNull(),
+    sourceInventoryJson: text('source_inventory_json').notNull().default('[]'),
+    currentWinnersJson: text('current_winners_json').notNull().default('[]'),
+    duplicateHotspotsJson: text('duplicate_hotspots_json').notNull().default('[]'),
+    shadowPublisherSeen: integer('shadow_publisher_seen', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    lastInventoryObservedAt: text('last_inventory_observed_at'),
+    lastSelectionObservedAt: text('last_selection_observed_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+    updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    vesselIdx: index('vessel_installation_source_states_vessel_idx').on(table.vesselId),
+    roleIdx: index('vessel_installation_source_states_role_idx').on(table.publisherRole),
+  }),
+)
+
 export const passages = sqliteTable('passages', {
   id: text('id').primaryKey(),
   vesselId: text('vessel_id')

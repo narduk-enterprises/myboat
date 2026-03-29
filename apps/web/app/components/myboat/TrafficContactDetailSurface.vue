@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import type {
-  AisContactSummary,
-  PublicProfileSummary,
-  VesselCardSummary,
-} from '~/types/myboat'
+import type { AisContactSummary, PublicProfileSummary, VesselCardSummary } from '~/types/myboat'
 import type { TrafficContactDetailSummary } from '~/types/traffic'
 import { formatCoordinate, formatRelativeTime, formatTimestamp } from '~/utils/marine'
 import { formatTrafficContactDimensions, formatTrafficMovement } from '~/utils/traffic'
@@ -41,7 +37,9 @@ const contactSummary = computed<AisContactSummary[]>(() => [
 ])
 
 const vesselPath = computed(() =>
-  props.profile ? `/${props.profile.username}/${props.vessel.slug}` : `/dashboard/vessels/${props.vessel.slug}`,
+  props.profile
+    ? `/${props.profile.username}/${props.vessel.slug}`
+    : `/dashboard/vessels/${props.vessel.slug}`,
 )
 const detailMetrics = computed(() => [
   {
@@ -191,13 +189,17 @@ const detailMetrics = computed(() => [
             <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
               <p class="text-xs uppercase tracking-wide text-muted">Call sign / destination</p>
               <p class="mt-2 font-medium text-default">{{ contact.callSign || 'Unavailable' }}</p>
-              <p class="mt-1 text-xs text-muted">{{ contact.destination || 'Destination unavailable' }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{ contact.destination || 'Destination unavailable' }}
+              </p>
             </div>
 
             <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
               <p class="text-xs uppercase tracking-wide text-muted">Navigation state</p>
               <p class="mt-2 font-medium text-default">{{ contact.navState || 'Unavailable' }}</p>
-              <p class="mt-1 text-xs text-muted">{{ formatTimestamp(new Date(contact.lastUpdateAt).toISOString()) }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{ formatTimestamp(new Date(contact.lastUpdateAt).toISOString()) }}
+              </p>
             </div>
           </div>
         </UCard>

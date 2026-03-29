@@ -55,7 +55,11 @@ export default defineEventHandler(async (event): Promise<PublicTrafficContactDet
     }
   }
 
-  const cachedContact = await resolveCachedTrafficContactDetail(event, contactId, vesselCard.liveSnapshot)
+  const cachedContact = await resolveCachedTrafficContactDetail(
+    event,
+    contactId,
+    vesselCard.liveSnapshot,
+  )
   if (!cachedContact) {
     throw createError({ statusCode: 404, message: 'Traffic contact not found.' })
   }

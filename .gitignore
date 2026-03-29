@@ -62,3 +62,6 @@ __pycache__/
 
 # Local audit snapshots
 artifacts/
+
+# Local deploy bundle generated for the edge collector container.
+apps/edge-collector/dist/index.cjs

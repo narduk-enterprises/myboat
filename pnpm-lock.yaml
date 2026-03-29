@@ -50,6 +50,9 @@ importers:
 
   apps/edge-collector:
     dependencies:
+      '@myboat/telemetry-source-policy':
+        specifier: workspace:*
+        version: link:../../packages/telemetry-source-policy
       ws:
         specifier: ^8.20.0
         version: 8.20.0
@@ -69,6 +72,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@myboat/telemetry-source-policy':
+        specifier: workspace:*
+        version: link:../../packages/telemetry-source-policy
       '@narduk-enterprises/eslint-config':
         specifier: ^1.0.17
         version: 1.0.17(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)(vitest@4.1.1(@opentelemetry/api@1.9.0)(@types/node@22.19.15)(happy-dom@20.8.8)(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(vue-eslint-parser@10.4.0(eslint@9.39.4(jiti@2.6.1)))
@@ -282,6 +288,18 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.1(@opentelemetry/api@1.9.0)(@types/node@22.19.15)(happy-dom@20.8.8)(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/telemetry-source-policy:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.13
+        version: 22.19.15
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
 packages:
 

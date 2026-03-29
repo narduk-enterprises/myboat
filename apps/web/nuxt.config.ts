@@ -76,12 +76,31 @@ export default defineNuxtConfig({
     authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',
     authServiceRoleKey: process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || '',
     authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',
+    historyOwnerFreeMaxDays: Number(process.env.MYBOAT_HISTORY_OWNER_FREE_MAX_DAYS || 7),
+    historyOwnerPaidMaxDays: Number(process.env.MYBOAT_HISTORY_OWNER_PAID_MAX_DAYS || 90),
+    historyPaidUserIds: process.env.MYBOAT_HISTORY_PAID_USER_IDS || '',
+    historyPublicMaxDays: Number(process.env.MYBOAT_HISTORY_PUBLIC_MAX_DAYS || 30),
+    influxBucketCoreFree: process.env.INFLUX_BUCKET_CORE_FREE || process.env.INFLUX_BUCKET || '',
+    influxBucketCorePaid:
+      process.env.INFLUX_BUCKET_CORE_PAID ||
+      process.env.INFLUX_BUCKET_CORE_FREE ||
+      process.env.INFLUX_BUCKET ||
+      '',
+    influxBucketCoreRollup1h: process.env.INFLUX_BUCKET_CORE_ROLLUP_1H || '',
+    influxBucketDebug: process.env.INFLUX_BUCKET_DEBUG || process.env.INFLUX_BUCKET || '',
+    influxBucketDetailFree: process.env.INFLUX_BUCKET_DETAIL_FREE || '',
+    influxBucketDetailPaid:
+      process.env.INFLUX_BUCKET_DETAIL_PAID || process.env.INFLUX_BUCKET_DETAIL_FREE || '',
+    influxBucketDetailRollup1h: process.env.INFLUX_BUCKET_DETAIL_ROLLUP_1H || '',
+    influxQueryToken: process.env.INFLUX_QUERY_TOKEN || process.env.INFLUX_TOKEN || '',
+    influxQueryUrl: process.env.INFLUX_QUERY_URL || process.env.INFLUX_WRITE_URL || '',
     influxWriteUrl: process.env.INFLUX_WRITE_URL || '',
     influxOrg: process.env.INFLUX_ORG || '',
     influxBucket: process.env.INFLUX_BUCKET || '',
-    influxToken: process.env.INFLUX_TOKEN || '',
+    influxToken: process.env.INFLUX_WRITE_TOKEN || process.env.INFLUX_TOKEN || '',
     localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
     localBrokerOrigin: process.env.MYBOAT_LOCAL_BROKER_ORIGIN || '',
+    signalKHttpUrl: process.env.SIGNALK_HTTP_URL || '',
     turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
     posthogOwnerDistinctId: process.env.POSTHOG_OWNER_DISTINCT_ID || '',
     // Server-only (admin API routes)

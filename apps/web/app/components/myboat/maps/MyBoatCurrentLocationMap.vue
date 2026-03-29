@@ -81,10 +81,13 @@ const aisPins = computed(() =>
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
 const geojson = computed(() => ({
   type: 'FeatureCollection' as const,
-  features: showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : [],
+  features:
+    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : [],
 }))
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
-const selectedAisPin = computed(() => aisPins.value.find((pin) => pin.id === selectedId.value) || null)
+const selectedAisPin = computed(
+  () => aisPins.value.find((pin) => pin.id === selectedId.value) || null,
+)
 const selectedAisDetailPath = computed(() =>
   buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
 )
@@ -246,10 +249,7 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
 
       <template #footer>
         <div v-if="selectedAisPin" class="border-t border-default/70 px-4 py-3">
-          <TrafficContactFocusCard
-            :contact="selectedAisPin"
-            :detail-path="selectedAisDetailPath"
-          />
+          <TrafficContactFocusCard :contact="selectedAisPin" :detail-path="selectedAisDetailPath" />
         </div>
       </template>
     </MyBoatMap>

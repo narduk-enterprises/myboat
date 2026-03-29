@@ -34,7 +34,14 @@ export default defineEventHandler(async (event): Promise<VesselTrafficContactDet
     fetchVesselLiveContact(event, vessel.id, contactId),
   ])
 
-  const vesselCard = serializeVesselCards([vessel], snapshotRows, [], [], [], observedIdentityRows)[0]
+  const vesselCard = serializeVesselCards(
+    [vessel],
+    snapshotRows,
+    [],
+    [],
+    [],
+    observedIdentityRows,
+  )[0]
   if (!vesselCard) {
     throw createError({ statusCode: 404, message: 'Vessel not found.' })
   }
@@ -51,7 +58,11 @@ export default defineEventHandler(async (event): Promise<VesselTrafficContactDet
     }
   }
 
-  const cachedContact = await resolveCachedTrafficContactDetail(event, contactId, vesselCard.liveSnapshot)
+  const cachedContact = await resolveCachedTrafficContactDetail(
+    event,
+    contactId,
+    vesselCard.liveSnapshot,
+  )
   if (!cachedContact) {
     throw createError({ statusCode: 404, message: 'Traffic contact not found.' })
   }

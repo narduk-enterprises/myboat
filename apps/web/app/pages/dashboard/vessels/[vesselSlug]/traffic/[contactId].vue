@@ -12,8 +12,7 @@ const { data, pending, error } = await useAuthTrafficContactDetail(
 
 useSeo({
   title: data.value ? `${data.value.contact.title} · Traffic detail` : 'Traffic contact',
-  description:
-    'Selected AIS traffic contact with live range, movement, and relative map context.',
+  description: 'Selected AIS traffic contact with live range, movement, and relative map context.',
   robots: 'noindex, nofollow',
 })
 

@@ -39,6 +39,8 @@ management are deferred until the single-vessel operator console is stable.
 - `https://vps.nard.uk/auth/v1` remains the staging and rollback auth origin
 - MyBoat keeps first-party app sessions and vessel data in its own app storage
 - historical telemetry lands in InfluxDB on `narduk` / Linode
+- the cloud history tenant is exposed through `https://influx-public.tideye.com`
+  with MyBoat-scoped buckets and tokens
 - D1 remains the operational store for captain, vessel, installation, sharing,
   heartbeat, latest-snapshot state, and connection-derived vessel identity
 - owner and public live views consume MyBoat-managed live streams, not raw
@@ -51,6 +53,13 @@ management are deferred until the single-vessel operator console is stable.
   LAN hostname; that local deployment serves the same MyBoat-shaped APIs and
   live stream while reading directly from onboard telemetry to reduce boat-side
   bandwidth
+- `tideyebee` is the first official real-boat MyBoat install and should be
+  treated as production-adjacent for telemetry and SignalK changes
+- `myboat-edge-canary` on `narduk` is only a remote container proving rig; it is
+  not rollout evidence and must not be treated as the canonical install
+- as of 2026-03-29, the `myboat-edge-canary` collector on `narduk` is consuming
+  `signalk-public.tideye.com` and publishing curated history into the MyBoat
+  cloud-history buckets for the public vessel route `narduk/tideye`
 
 ## Target users
 
@@ -138,6 +147,8 @@ credentials, and internal telemetry views.
   websocket or raw InfluxDB endpoints
 - the browser contract is always a MyBoat API plus a MyBoat-native live stream,
   whether the app is running at `mybo.at` or on a local boat hostname
+- historical chart reads are served by MyBoat-owned history endpoints rather
+  than ad hoc browser queries into SignalK or InfluxDB
 
 ### 4. Live-source management
 
@@ -157,6 +168,35 @@ credentials, and internal telemetry views.
   the product contract
 - the collector may read local onboard telemetry, but once data enters MyBoat
   the product serves only MyBoat-native data shapes
+- the collector preserves SignalK source provenance on ingest and runs the same
+  canonical source-selection policy as the cloud ingest safety gate
+- selection happens after leaf expansion, so object-valued paths like
+  `navigation.position` and root payloads with `path=""` are expanded into
+  canonical leaf paths before ranking
+- canonical source selection is keyed by `(context, canonicalPath)` and must
+  prefer the explicit MyBoat precedence policy over SignalK's transient current
+  winner
+- sticky winners use freshness windows tuned by path family:
+  - fast nav, wind, current, and depth: 15 seconds
+  - electrical, tanks, propulsion, and steering: 60 seconds
+  - static identity, design, and AIS dimensions: 6 hours
+- duplicate losers belong only in short-lived debug telemetry, not in curated
+  live fanout or curated history
+- the collector also publishes normalized source inventory snapshots to
+  `POST /api/ingest/v1/sources`
+- owner diagnostics for the current primary install live at
+  `/api/app/vessels/[vesselSlug]/telemetry/sources`
+
+### 4a. Passage media import and review
+
+- the first real-media backfill path is a local macOS Apple Photos seed utility
+  that authenticates to MyBoat with a user API key
+- the seed utility reads only passage-derived scan windows, not the full photo
+  library by default
+- strong passage matches auto-attach and default to public visibility
+- ambiguous matches land in an owner-only review queue until confirmed
+- imported media dedupes per vessel by source fingerprint so reruns do not
+  create duplicate passage media records
 
 ### 5. Buddy boats
 
@@ -169,6 +209,32 @@ credentials, and internal telemetry views.
 - a single collector path normalizes incoming telemetry before fanout or storage
 - collector ingest is the canonical cloud entrypoint:
   `boat sensors / SignalK -> collector -> MyBoat ingest`
+- source provenance is kept end-to-end:
+  - update `$source`
+  - update `source`
+  - collector receive time separate from raw SignalK payload timestamps
+- MyBoat runs the same source-selection policy twice:
+  - first in the collector to reduce upstream load
+  - again in cloud ingest as a stateless safety gate
+- source policy rules currently cover both `vessels.self` and external AIS
+  contexts, including:
+  - `ydg-nmea-2000.*`
+  - `ydg-nmea-0183.*`
+  - `venus.com.victronenergy.*`
+  - plugin-owned domains such as Leopard switches and engine-hours runtime
+- precedence is explicit instead of inferred from SignalK's current winner:
+  - `electrical.switches.leopard.*` prefers
+    `signalk-leopard-empirbus-switches`
+  - `propulsion.*.runTime*` prefers `signalk-engine-hours.*`
+  - speed and wind averaging paths prefer `signalk-speed-wind-averaging`
+  - `notifications.server.*` prefers `signalk-server`
+  - Victron electrical domains prefer `venus.*`
+  - self navigation prefers `ydg-nmea-2000.74`, then other NMEA 2000, then
+    Victron GPS, then `ydg-nmea-0183.YD`, then `ydg-nmea-0183.AI`
+  - wind prefers `ydg-nmea-2000.105`
+  - current prefers `ydg-nmea-2000.4`
+  - AIS and external-vessel overlap prefers `ydg-nmea-2000.2`
+  - `defaults` is only a fallback for static design, identity, and offset paths
 - live viewer updates and historical ingest happen in parallel from the same
   normalized stream
 - D1 stores latest vessel state, install heartbeat, sharing flags, and other
@@ -176,11 +242,62 @@ credentials, and internal telemetry views.
 - D1 also stores the latest observed vessel identity and its provenance so
   dashboard and settings surfaces do not need to infer identity directly from
   raw live deltas
+- D1 now also stores per-install source inventory plus source-selection
+  diagnostics:
+  - latest normalized source inventory
+  - duplicate hotspots by path family
+  - current tracked canonical winners
+  - policy version and primary-install timestamps
+  - whether any shadow publisher has been observed
 - InfluxDB stores time-series history and rollups for all boats
+- MyBoat writes three history shapes:
+  - short-lived debug raw telemetry for troubleshooting and schema discovery
+  - curated `core` history for public-safe track and vessel metrics
+  - curated `detail` history for owner-only electrical, tank, propulsion, and
+    other systems metrics
+- only canonical winners are promoted into latest snapshot state, live fanout,
+  `core`, and `detail`; raw losers stay in `myboat_debug` only
+- raw `electrical.switches.bank.*` stays debug-only; the canonical operator
+  switch surface is `electrical.switches.leopard.*`
 - public and dashboard clients read telemetry through MyBoat APIs and managed
   live channels, not through raw SignalK or raw Influx browser access
 - local boat deployments can read directly from onboard telemetry, but they
   still expose the same MyBoat-shaped API contract to browsers
+
+### 6a. History API contract
+
+- owner history route: `/api/app/vessels/[vesselSlug]/history`
+- public history route: `/api/public/[username]/[vesselSlug]/history`
+- owner history catalog route: `/api/app/vessels/[vesselSlug]/history/catalog`
+- public history catalog route:
+  `/api/public/[username]/[vesselSlug]/history/catalog`
+- history requests must provide bounded `start`, `end`, and explicit `series`
+  ids; open-ended scans are out of contract
+- supported series ids come from a MyBoat-managed allowlist and family catalog,
+  not raw passthrough SignalK paths
+- query resolution is bounded to `auto | raw | 1m | 5m | 15m | 1h`
+- history reads must be aggregate-heavy:
+  - apply `aggregateWindow(...)` before any reshape step
+  - cap track points and per-series point counts
+  - prefer hourly rollups for older windows instead of re-reading raw history
+- public history is limited to public-safe `core` series only
+- owner history can include `core` and `detail` series, but the launch POC
+  defaults to free retention unless the owner is explicitly marked paid via
+  server config
+- launch retention posture:
+  - free owner raw history target: 7 days
+  - paid owner raw history target: 90 days
+  - public history target: aggregated and bounded, not unlimited raw replay
+- current bucket layout:
+  - `myboat_history_core_free`
+  - `myboat_history_core_paid`
+  - `myboat_history_detail_free`
+  - `myboat_history_detail_paid`
+- the debug bucket is the only place where per-point source provenance is
+  retained; curated history remains source-light
+  - `myboat_history_core_rollup_1h`
+  - `myboat_history_detail_rollup_1h`
+  - `myboat_debug`
 
 ### 7. Passages
 
@@ -192,6 +309,10 @@ credentials, and internal telemetry views.
 ### 8. Media and annotations
 
 - media items are geo-aware vessel memories tied to passages or places
+- media items can be attached to passages or remain general vessel media
+- media items have per-item public visibility instead of inheriting vessel
+  visibility blindly
+- review-queue media stays owner-only until a captain confirms it
 - waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or
   notes
 
@@ -331,7 +452,8 @@ Dashboard identity behavior:
 - OTP auth or a second auth stack
 - raw SignalK or raw Influx browser proxies
 - giant marketing-site expansion unrelated to the product
-- telemetry charts beyond the current live snapshot and passage framing
+- arbitrary raw timeseries browsing, open-ended query builders, and historical
+  AIS playback beyond the curated MyBoat history routes
 - multi-vessel launch navigation
 - multi-install launch navigation
 
@@ -350,8 +472,18 @@ Dashboard identity behavior:
 - `/api/ingest/v1/identity` exists and updates observed vessel identity state
 - `/api/ingest/v1/delta` can still carry collector-normalized self identity
   context alongside telemetry when it shows up in deltas
+- `/api/app/vessels/[vesselSlug]/history` exists for authenticated bounded
+  history reads
+- `/api/public/[username]/[vesselSlug]/history` exists for public bounded
+  history reads
+- paired history catalog routes exist so supported series are discoverable
+  without reading server code
+- the production public route `/api/public/narduk/tideye/history` has been
+  verified against live Influx-backed data written by the canary collector
 - owner and public vessel pages read live deltas through MyBoat-managed live
   routes, not raw SignalK browser sockets
+- owner and public history routes use MyBoat-owned allowlists and bounded
+  aggregate-heavy Influx queries, not raw browser access
 - dashboard identity surfaces do not depend on manual MMSI entry when the
   collector can discover it from the connection
 - no placeholder home/about/contact scaffold remains

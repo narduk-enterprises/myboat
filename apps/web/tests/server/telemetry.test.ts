@@ -4,6 +4,7 @@ import {
   buildInfluxLines,
   buildLivePublishMessage,
   buildSnapshotFromDelta,
+  selectTelemetryDelta,
 } from '../../server/utils/telemetry'
 
 describe('telemetry helpers', () => {
@@ -147,5 +148,62 @@ describe('telemetry helpers', () => {
     expect(lines).toHaveLength(2)
     expect(lines[0]).toContain('myboat_signalk')
     expect(lines[0]).toContain('vessel_id=vessel-1')
+  })
+
+  it('selects canonical winners and keeps loser provenance in debug deltas', () => {
+    const outcome = selectTelemetryDelta({
+      delta: {
+        context: 'vessels.self',
+        publisherRole: 'primary',
+        self: 'vessels.self',
+        updates: [
+          {
+            $source: 'ydg-nmea-0183.YD',
+            timestamp: '2026-03-29T12:00:00.000Z',
+            values: [{ path: 'navigation.speedOverGround', value: 6.0 }],
+          },
+          {
+            $source: 'ydg-nmea-2000.74',
+            timestamp: '2026-03-29T12:00:00.050Z',
+            values: [
+              { path: 'navigation.position', value: { latitude: 29.5, longitude: -95.1 } },
+              { path: 'navigation.speedOverGround', value: 6.2 },
+            ],
+          },
+        ],
+      },
+      receivedAt: '2026-03-29T12:00:00.100Z',
+    })
+
+    expect(outcome.selectedDeltas).toHaveLength(1)
+    expect(outcome.debugDeltas).toHaveLength(1)
+    expect(outcome.selectedDeltas[0]?.delta.updates[0]?.$source).toBe('ydg-nmea-2000.74')
+    expect(outcome.debugDeltas[0]?.delta.updates[0]?.dropReason).toBe('lower_priority_source')
+    expect(outcome.debugDeltas[0]?.delta.updates[0]?.$source).toBe('ydg-nmea-0183.YD')
+  })
+
+  it('adds source provenance tags to debug influx lines', () => {
+    const lines = buildInfluxLines({
+      delta: {
+        context: 'vessels.self',
+        publisherRole: 'shadow',
+        updates: [
+          {
+            $source: 'ydg-nmea-0183.YD',
+            dropReason: 'shadow_source_suppressed',
+            source: { label: '0183 YD' },
+            values: [{ path: 'navigation.speedOverGround', value: 6.1 }],
+          },
+        ],
+      },
+      installationId: 'install-1',
+      vesselId: 'vessel-1',
+      observedAt: '2026-03-28T12:05:00.000Z',
+    })
+
+    expect(lines[0]).toContain('publisher_role=shadow')
+    expect(lines[0]).toContain('source_id=ydg-nmea-0183.YD')
+    expect(lines[0]).toContain('drop_reason=shadow_source_suppressed')
+    expect(lines[0]).toContain('source_json=')
   })
 })

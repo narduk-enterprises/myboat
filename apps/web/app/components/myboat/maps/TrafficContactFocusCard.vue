@@ -49,8 +49,12 @@ const dimensionsLabel = computed(() => formatTrafficContactDimensions(props.cont
 
     <div class="mt-3 space-y-1 text-sm text-muted">
       <p>{{ contact.callSign ? `Call sign ${contact.callSign}` : 'Call sign unavailable' }}</p>
-      <p>{{ contact.destination ? `Destination ${contact.destination}` : 'Destination unavailable' }}</p>
-      <p>{{ contact.navState ? `Nav state ${contact.navState}` : 'Navigation state unavailable' }}</p>
+      <p>
+        {{ contact.destination ? `Destination ${contact.destination}` : 'Destination unavailable' }}
+      </p>
+      <p>
+        {{ contact.navState ? `Nav state ${contact.navState}` : 'Navigation state unavailable' }}
+      </p>
       <p>{{ dimensionsLabel }}</p>
       <p>Updated {{ lastUpdatedLabel }}</p>
     </div>

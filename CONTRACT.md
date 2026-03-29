@@ -1,6 +1,6 @@
-Status: UNLOCKED
-
 # MyBoat Product Contract
+
+Status: UNLOCKED
 
 ## Canonical route contract
 
@@ -28,13 +28,21 @@ Status: UNLOCKED
 - `GET /api/app/dashboard`
 - `POST /api/app/onboarding`
 - `GET /api/app/vessels/[vesselSlug]`
+- `POST /api/app/vessels/[vesselSlug]/media/import`
+- `PATCH /api/app/vessels/[vesselSlug]/media/[mediaId]`
 - `GET /api/app/vessels/[vesselSlug]/live`
 - `GET /api/app/installations/[installationId]`
 - `POST /api/app/installations/[installationId]/keys`
 - `POST /api/ingest/v1/delta`
 - `POST /api/ingest/v1/identity`
+- `POST /api/ingest/v1/sources`
+- `GET /api/app/vessels/[vesselSlug]/history`
+- `GET /api/app/vessels/[vesselSlug]/history/catalog`
+- `GET /api/app/vessels/[vesselSlug]/telemetry/sources`
 - `GET /api/public/[username]`
 - `GET /api/public/[username]/[vesselSlug]`
+- `GET /api/public/[username]/[vesselSlug]/history`
+- `GET /api/public/[username]/[vesselSlug]/history/catalog`
 - `GET /api/public/[username]/[vesselSlug]/live`
 
 ## Page composition requirements
@@ -100,8 +108,9 @@ Status: UNLOCKED
 - hero
 - map panel
 - live metric grid
-- passage timeline
-- media strip
+- passage timeline with attached media galleries
+- owner-only review queue for ambiguous media imports
+- general vessel media strip for unattached items
 - install links card
 
 ### `/dashboard/installations/[installationId]`
@@ -157,10 +166,20 @@ Status: UNLOCKED
 - D1 is the operational state store; InfluxDB is the historical telemetry store
 - connection-derived vessel identity is app-owned operational state and must not
   require browser-side SignalK parsing
-- `POST /api/ingest/v1/delta` may accept collector-normalized batched deltas and
-  upstream self-context metadata
+- `POST /api/ingest/v1/delta` accepts collector-normalized batched deltas with
+  `context`, `self`, `publisherRole`, update `$source`, update `source`, and
+  collector `receivedAt`
 - `POST /api/ingest/v1/identity` accepts collector-derived observed self
   identity from SignalK bootstrap / refresh reads
+- `POST /api/ingest/v1/sources` accepts normalized SignalK source inventory for
+  the authenticated installation
+- collector and cloud ingest both run the same canonical source-selection
+  policy; the collector is the load-reduction point and cloud ingest is the
+  safety gate
+- owner and public history reads go through the MyBoat history routes and
+  series catalog routes instead of raw browser Flux
+- owner source diagnostics go through
+  `GET /api/app/vessels/[vesselSlug]/telemetry/sources`
 - local boat deployments may read onboard telemetry directly, but they must
   expose the same MyBoat-shaped browser contract as `mybo.at`
 
@@ -187,6 +206,19 @@ Status: UNLOCKED
 - Browsers do not derive MMSI or vessel identity directly from raw SignalK.
 - Live AIS updates are partial by nature; broker/store handling must preserve
   last known non-null values when sparse upserts arrive.
+- Only canonical source winners may update the live snapshot, live broker,
+  curated `core` history, or curated `detail` history.
+- Duplicate losers are retained only in short-lived debug telemetry and source
+  diagnostics.
+- Owner source diagnostics return `latestSourceInventory`,
+  `duplicateHotspots`, `currentWinners`, `policyVersion`,
+  `primaryInstallation`, and `shadowPublisherSeen`.
+- Shadow publishers must never replace a fresh primary winner in canonical
+  output.
+- media items can attach to passages or remain general vessel media.
+- media items support per-item public visibility.
+- public vessel reads return only media where `share_public = true`.
+- review-queue media remains owner-only until a captain confirms it.
 
 ## Theme rules
 

@@ -46,9 +46,19 @@ async function fetchBrokerJson<T>(
   },
 ) {
   const localBrokerOrigin = getLocalBrokerOrigin(event)
-  const request =
-    localBrokerOrigin
-      ? await fetch(new URL(`/vessels/${vesselId}${input.path}`, localBrokerOrigin), {
+  const request = localBrokerOrigin
+    ? await fetch(new URL(`/vessels/${vesselId}${input.path}`, localBrokerOrigin), {
+        method: input.method || 'GET',
+        headers: input.body
+          ? {
+              'content-type': 'application/json',
+            }
+          : undefined,
+        body: input.body,
+      })
+    : await getVesselLiveBrokerStub(event, vesselId).fetch(
+        `https://vessel-live.internal${input.path}`,
+        {
           method: input.method || 'GET',
           headers: input.body
             ? {
@@ -56,19 +66,8 @@ async function fetchBrokerJson<T>(
               }
             : undefined,
           body: input.body,
-        })
-      : await getVesselLiveBrokerStub(event, vesselId).fetch(
-          `https://vessel-live.internal${input.path}`,
-          {
-            method: input.method || 'GET',
-            headers: input.body
-              ? {
-                  'content-type': 'application/json',
-                }
-              : undefined,
-            body: input.body,
-          },
-        )
+        },
+      )
 
   if (!request.ok) {
     return null
@@ -126,11 +125,7 @@ export async function publishVesselLiveMessage(
   }
 }
 
-export async function fetchVesselLiveContact(
-  event: H3Event,
-  vesselId: string,
-  contactId: string,
-) {
+export async function fetchVesselLiveContact(event: H3Event, vesselId: string, contactId: string) {
   const response = await fetchBrokerJson<{ contact: AisContactSummary | null }>(event, vesselId, {
     path: `/contacts/${encodeURIComponent(contactId)}`,
   })

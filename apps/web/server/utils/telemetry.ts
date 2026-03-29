@@ -1,5 +1,14 @@
 import type { AisContactSummary, VesselSnapshotSummary } from '../../app/types/myboat'
 import type { VesselLivePublishMessage } from '../../shared/myboatLive'
+import {
+  type DuplicateDropReason,
+  type PublisherRole,
+  type SignalKUpdateSource,
+  buildStickyWinnerMap,
+  classifySignalKSourceFamily,
+  createTelemetrySourceCandidates,
+  selectTelemetryCandidates,
+} from '@myboat/telemetry-source-policy'
 
 export const TELEMETRY_SELF_CONTEXTS = new Set(['vessels.self', 'self', ''])
 
@@ -45,14 +54,35 @@ export type IngestDeltaValue = {
 }
 
 export type IngestDeltaUpdate = {
+  $source?: string
+  dropReason?: DuplicateDropReason | 'sticky_winner_fresh'
+  receivedAt?: string
+  source?: SignalKUpdateSource | null
   timestamp?: string
   values: IngestDeltaValue[]
 }
 
 export type IngestDelta = {
   context?: string
+  publisherRole?: PublisherRole
   self?: string
   updates: IngestDeltaUpdate[]
+}
+
+export type IngestSelectionOutcome = {
+  debugDeltas: MaterializedIngestDelta[]
+  results: ReturnType<typeof selectTelemetryCandidates>
+  selectedDeltas: MaterializedIngestDelta[]
+}
+
+export type MaterializedIngestDelta = {
+  delta: IngestDelta
+  receivedAt: string
+}
+
+type CandidateWithDropReason = {
+  candidate: ReturnType<typeof createTelemetrySourceCandidates>[number]
+  dropReason: DuplicateDropReason | 'sticky_winner_fresh'
 }
 
 type SnapshotDraft = Omit<
@@ -153,6 +183,283 @@ function applyDeltaValues(snapshot: SnapshotDraft, values: IngestDeltaValue[]) {
 
 function normalizeContext(context: string | undefined) {
   return context?.trim() || ''
+}
+
+function normalizePublisherRole(publisherRole: PublisherRole | string | undefined) {
+  return publisherRole === 'shadow' ? 'shadow' : 'primary'
+}
+
+function groupSourceCandidatesByDelta(
+  candidates: ReturnType<typeof createTelemetrySourceCandidates>,
+  input: {
+    publisherRole: PublisherRole
+    selfByContext?: Map<string, string>
+  },
+) {
+  return Array.from(
+    candidates.reduce<
+      Map<
+        string,
+        {
+          context: string
+          publisherRole: PublisherRole
+          receivedAt: string
+          self?: string
+          updates: IngestDeltaUpdate[]
+        }
+      >
+    >((groups, candidate) => {
+      const groupKey = `${candidate.context}\u0000${candidate.receivedAt}`
+      const existing = groups.get(groupKey)
+
+      if (!existing) {
+        groups.set(groupKey, {
+          context: candidate.context,
+          publisherRole: input.publisherRole,
+          receivedAt: candidate.receivedAt,
+          ...(input.selfByContext?.get(candidate.context)
+            ? { self: input.selfByContext.get(candidate.context) }
+            : {}),
+          updates: [
+            {
+              ...(candidate.observedAt ? { timestamp: candidate.observedAt } : {}),
+              receivedAt: candidate.receivedAt,
+              $source: candidate.sourceId,
+              ...(candidate.source ? { source: candidate.source } : {}),
+              values: [
+                {
+                  path: candidate.canonicalPath,
+                  value: candidate.value,
+                },
+              ],
+            },
+          ],
+        })
+        return groups
+      }
+
+      const updateKey = `${candidate.observedAt || ''}\u0000${candidate.sourceId}\u0000${JSON.stringify(candidate.source || null)}`
+      const existingUpdate =
+        existing.updates.find((update) => {
+          const currentKey = `${update.timestamp || ''}\u0000${update.$source || ''}\u0000${JSON.stringify(update.source || null)}`
+          return currentKey === updateKey
+        }) || null
+
+      if (existingUpdate) {
+        existingUpdate.values.push({
+          path: candidate.canonicalPath,
+          value: candidate.value,
+        })
+        return groups
+      }
+
+      existing.updates.push({
+        ...(candidate.observedAt ? { timestamp: candidate.observedAt } : {}),
+        receivedAt: candidate.receivedAt,
+        $source: candidate.sourceId,
+        ...(candidate.source ? { source: candidate.source } : {}),
+        values: [
+          {
+            path: candidate.canonicalPath,
+            value: candidate.value,
+          },
+        ],
+      })
+      return groups
+    }, new Map()),
+  ).map(([, delta]) => ({
+    delta: {
+      context: delta.context,
+      publisherRole: delta.publisherRole,
+      ...(delta.self ? { self: delta.self } : {}),
+      updates: delta.updates,
+    },
+    receivedAt: delta.receivedAt,
+  }))
+}
+
+function groupDebugCandidatesByDelta(
+  candidates: CandidateWithDropReason[],
+  input: {
+    publisherRole: PublisherRole
+    selfByContext?: Map<string, string>
+  },
+) {
+  return Array.from(
+    candidates.reduce<
+      Map<
+        string,
+        {
+          context: string
+          publisherRole: PublisherRole
+          receivedAt: string
+          self?: string
+          updates: IngestDeltaUpdate[]
+        }
+      >
+    >((groups, item) => {
+      const groupKey = `${item.candidate.context}\u0000${item.candidate.receivedAt}`
+      const existing = groups.get(groupKey)
+      const updateKey = `${item.candidate.observedAt || ''}\u0000${item.candidate.sourceId}\u0000${item.dropReason}`
+
+      if (!existing) {
+        groups.set(groupKey, {
+          context: item.candidate.context,
+          publisherRole: input.publisherRole,
+          receivedAt: item.candidate.receivedAt,
+          ...(input.selfByContext?.get(item.candidate.context)
+            ? { self: input.selfByContext.get(item.candidate.context) }
+            : {}),
+          updates: [
+            {
+              ...(item.candidate.observedAt ? { timestamp: item.candidate.observedAt } : {}),
+              receivedAt: item.candidate.receivedAt,
+              $source: item.candidate.sourceId,
+              ...(item.candidate.source ? { source: item.candidate.source } : {}),
+              dropReason: item.dropReason,
+              values: [
+                {
+                  path: item.candidate.canonicalPath,
+                  value: item.candidate.value,
+                },
+              ],
+            },
+          ],
+        })
+        return groups
+      }
+
+      const existingUpdate =
+        existing.updates.find((update) => {
+          const currentKey = `${update.timestamp || ''}\u0000${update.$source || ''}\u0000${update.dropReason || ''}`
+          return currentKey === updateKey
+        }) || null
+
+      if (existingUpdate) {
+        existingUpdate.values.push({
+          path: item.candidate.canonicalPath,
+          value: item.candidate.value,
+        })
+        return groups
+      }
+
+      existing.updates.push({
+        ...(item.candidate.observedAt ? { timestamp: item.candidate.observedAt } : {}),
+        receivedAt: item.candidate.receivedAt,
+        $source: item.candidate.sourceId,
+        ...(item.candidate.source ? { source: item.candidate.source } : {}),
+        dropReason: item.dropReason,
+        values: [
+          {
+            path: item.candidate.canonicalPath,
+            value: item.candidate.value,
+          },
+        ],
+      })
+      return groups
+    }, new Map()),
+  ).map(([, delta]) => ({
+    delta: {
+      context: delta.context,
+      publisherRole: delta.publisherRole,
+      ...(delta.self ? { self: delta.self } : {}),
+      updates: delta.updates,
+    },
+    receivedAt: delta.receivedAt,
+  }))
+}
+
+export function createTelemetryCandidatesFromDelta(input: {
+  delta: IngestDelta
+  receivedAt: string
+}) {
+  const publisherRole = normalizePublisherRole(input.delta.publisherRole)
+
+  return input.delta.updates.flatMap((update) =>
+    update.values.flatMap((item) =>
+      createTelemetrySourceCandidates({
+        context: input.delta.context || 'vessels.self',
+        timestamp: update.timestamp,
+        originalPath: item.path,
+        publisherRole,
+        receivedAt: update.receivedAt || input.receivedAt,
+        source: update.source || null,
+        sourceId: update.$source || 'unknown',
+        value: item.value,
+      }),
+    ),
+  )
+}
+
+export function selectTelemetryDelta(input: {
+  delta: IngestDelta
+  receivedAt: string
+  stickyWinners?: Parameters<typeof selectTelemetryCandidates>[0]['stickyWinners']
+}) {
+  const publisherRole = normalizePublisherRole(input.delta.publisherRole)
+  const candidates = createTelemetryCandidatesFromDelta({
+    delta: input.delta,
+    receivedAt: input.receivedAt,
+  })
+  const results = selectTelemetryCandidates({
+    candidates,
+    now: input.receivedAt,
+    stickyWinners: input.stickyWinners,
+  })
+  const selectedCandidates = results.flatMap((result) => (result.kept ? [result.kept] : []))
+  const rejectedCandidates = results.flatMap((result) =>
+    result.rejected.map((rejected) => ({
+      candidate: rejected.candidate,
+      dropReason: rejected.reason as DuplicateDropReason | 'sticky_winner_fresh',
+    })),
+  )
+
+  return {
+    debugDeltas: groupDebugCandidatesByDelta(rejectedCandidates, {
+      publisherRole,
+      selfByContext:
+        input.delta.self && input.delta.self.trim()
+          ? new Map([[normalizeContext(input.delta.context) || 'vessels.self', input.delta.self]])
+          : new Map(),
+    }),
+    results,
+    selectedDeltas: groupSourceCandidatesByDelta(selectedCandidates, {
+      publisherRole,
+      selfByContext:
+        input.delta.self && input.delta.self.trim()
+          ? new Map([[normalizeContext(input.delta.context) || 'vessels.self', input.delta.self]])
+          : new Map(),
+    }),
+    stickyWinners: buildStickyWinnerMap(results),
+  } satisfies IngestSelectionOutcome & {
+    stickyWinners: ReturnType<typeof buildStickyWinnerMap>
+  }
+}
+
+export function materializeTelemetrySelections(input: {
+  publisherRole?: PublisherRole | string
+  results: ReturnType<typeof selectTelemetryCandidates>
+  selfByContext?: Map<string, string>
+}) {
+  const publisherRole = normalizePublisherRole(input.publisherRole)
+  const selectedCandidates = input.results.flatMap((result) => (result.kept ? [result.kept] : []))
+  const rejectedCandidates = input.results.flatMap((result) =>
+    result.rejected.map((rejected) => ({
+      candidate: rejected.candidate,
+      dropReason: rejected.reason as DuplicateDropReason | 'sticky_winner_fresh',
+    })),
+  )
+
+  return {
+    debugDeltas: groupDebugCandidatesByDelta(rejectedCandidates, {
+      publisherRole,
+      selfByContext: input.selfByContext,
+    }),
+    selectedDeltas: groupSourceCandidatesByDelta(selectedCandidates, {
+      publisherRole,
+      selfByContext: input.selfByContext,
+    }),
+  }
 }
 
 function isSelfContext(context: string | undefined, selfContext?: string | undefined) {
@@ -388,10 +695,13 @@ export function buildInfluxLines(input: {
 
   const contextTag = escapeTagValue(normalizeContext(input.delta.context) || 'self')
   const lines: string[] = []
+  const publisherRole = normalizePublisherRole(input.delta.publisherRole)
 
   for (const update of input.delta.updates) {
     for (const item of update.values) {
       const pathTag = escapeTagValue(item.path)
+      const sourceId = update.$source?.trim() || ''
+      const sourceFamily = sourceId ? classifySignalKSourceFamily(sourceId) : 'unknown'
       let fields: Record<string, boolean | number | string>
       if (typeof item.value === 'number') {
         fields = { numeric_value: item.value }
@@ -403,6 +713,10 @@ export function buildInfluxLines(input: {
         fields = { json_value: JSON.stringify(item.value ?? null) }
       }
 
+      if (update.source) {
+        fields.source_json = JSON.stringify(update.source)
+      }
+
       lines.push(
         encodeInfluxLine({
           measurement: 'myboat_signalk',
@@ -411,6 +725,10 @@ export function buildInfluxLines(input: {
             installation_id: input.installationId,
             context: contextTag,
             path: pathTag,
+            publisher_role: publisherRole,
+            ...(sourceId ? { source_id: sourceId } : {}),
+            ...(sourceId ? { source_family: sourceFamily } : {}),
+            ...(update.dropReason ? { drop_reason: update.dropReason } : {}),
           },
           fields,
           timestampMs,
