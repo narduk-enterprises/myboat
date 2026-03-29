@@ -90,6 +90,30 @@ type SnapshotDraft = Omit<
   'observedAt' | 'source' | 'statusNote' | 'updatedAt' | 'vesselId'
 >
 
+const SNAPSHOT_METRIC_KEYS = [
+  'positionLat',
+  'positionLng',
+  'headingMagnetic',
+  'speedOverGround',
+  'speedThroughWater',
+  'windSpeedApparent',
+  'windAngleApparent',
+  'depthBelowTransducer',
+  'waterTemperatureKelvin',
+  'batteryVoltage',
+  'engineRpm',
+] as const
+
+type SnapshotMetricKey = (typeof SNAPSHOT_METRIC_KEYS)[number]
+
+export type SnapshotPatch = Partial<SnapshotDraft> & {
+  observedAt: string
+  source: string
+  statusNote: string | null
+  updatedAt?: string | null
+  vesselId: string
+}
+
 function baseSnapshot(): SnapshotDraft {
   return {
     positionLat: null,
@@ -114,14 +138,18 @@ function normalizeAngleDegrees(value: unknown) {
   return Math.abs(value) > Math.PI * 2 ? value : (value * 180) / Math.PI
 }
 
-function applyDeltaValues(snapshot: SnapshotDraft, values: IngestDeltaValue[]) {
+function applyDeltaValues(snapshot: Partial<SnapshotDraft>, values: IngestDeltaValue[]) {
   for (const item of values) {
     const { path, value } = item
 
     if (path === 'navigation.position' && value && typeof value === 'object') {
       const position = value as { latitude?: unknown; longitude?: unknown }
-      snapshot.positionLat = typeof position.latitude === 'number' ? position.latitude : null
-      snapshot.positionLng = typeof position.longitude === 'number' ? position.longitude : null
+      if ('latitude' in position) {
+        snapshot.positionLat = typeof position.latitude === 'number' ? position.latitude : null
+      }
+      if ('longitude' in position) {
+        snapshot.positionLng = typeof position.longitude === 'number' ? position.longitude : null
+      }
       continue
     }
 
@@ -521,19 +549,90 @@ export function buildSnapshotFromDelta(input: {
   source: string
   vesselId: string
 }) {
+  return materializeSnapshot(
+    buildSnapshotPatchFromDelta({
+      delta: input.delta,
+      observedAt: input.observedAt,
+      source: input.source,
+      vesselId: input.vesselId,
+    }),
+  )
+}
+
+function hasSnapshotMetric(patch: Partial<SnapshotDraft>, key: SnapshotMetricKey) {
+  return Object.prototype.hasOwnProperty.call(patch, key)
+}
+
+function materializeSnapshot(patch: SnapshotPatch): VesselSnapshotSummary {
   const snapshot = baseSnapshot()
 
+  for (const key of SNAPSHOT_METRIC_KEYS) {
+    if (hasSnapshotMetric(patch, key)) {
+      snapshot[key] = patch[key] ?? null
+    }
+  }
+
+  return {
+    vesselId: patch.vesselId,
+    source: patch.source,
+    observedAt: patch.observedAt,
+    ...snapshot,
+    statusNote: patch.statusNote,
+    updatedAt: patch.updatedAt ?? null,
+  } satisfies VesselSnapshotSummary
+}
+
+export function mergeSnapshotPatch(
+  previous: VesselSnapshotSummary | null,
+  patch: SnapshotPatch,
+): VesselSnapshotSummary {
+  const merged: VesselSnapshotSummary = {
+    vesselId: patch.vesselId || previous?.vesselId,
+    source: patch.source ?? previous?.source ?? null,
+    observedAt: patch.observedAt,
+    positionLat: previous?.positionLat ?? null,
+    positionLng: previous?.positionLng ?? null,
+    headingMagnetic: previous?.headingMagnetic ?? null,
+    speedOverGround: previous?.speedOverGround ?? null,
+    speedThroughWater: previous?.speedThroughWater ?? null,
+    windSpeedApparent: previous?.windSpeedApparent ?? null,
+    windAngleApparent: previous?.windAngleApparent ?? null,
+    depthBelowTransducer: previous?.depthBelowTransducer ?? null,
+    waterTemperatureKelvin: previous?.waterTemperatureKelvin ?? null,
+    batteryVoltage: previous?.batteryVoltage ?? null,
+    engineRpm: previous?.engineRpm ?? null,
+    statusNote: patch.statusNote ?? previous?.statusNote ?? null,
+    updatedAt: patch.updatedAt ?? previous?.updatedAt ?? null,
+  }
+
+  for (const key of SNAPSHOT_METRIC_KEYS) {
+    if (hasSnapshotMetric(patch, key)) {
+      merged[key] = patch[key] ?? null
+    }
+  }
+
+  return merged
+}
+
+export function buildSnapshotPatchFromDelta(input: {
+  delta: IngestDelta
+  observedAt: string
+  source: string
+  vesselId: string
+}) {
+  const snapshotPatch: Partial<SnapshotDraft> = {}
+
   for (const update of input.delta.updates) {
-    applyDeltaValues(snapshot, update.values)
+    applyDeltaValues(snapshotPatch, update.values)
   }
 
   return {
     vesselId: input.vesselId,
     source: input.source,
     observedAt: input.observedAt,
-    ...snapshot,
+    ...snapshotPatch,
     statusNote: null,
-  } satisfies VesselSnapshotSummary
+  } satisfies SnapshotPatch
 }
 
 export function buildAisContactFromDelta(input: {

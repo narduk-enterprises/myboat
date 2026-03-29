@@ -2,7 +2,7 @@ import { selectTelemetryCandidates } from '@myboat/telemetry-source-policy'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { apiKeys } from '#layer/server/database/schema'
-import type { VesselHistoryAccessTier } from '~/types/myboat'
+import type { VesselHistoryAccessTier, VesselSnapshotSummary } from '~/types/myboat'
 import { useLogger } from '#layer/server/utils/logger'
 import { defineWebhookMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
@@ -18,10 +18,12 @@ import { getInfluxConfig, writeInfluxTargets } from '#server/utils/influx'
 import { publishVesselLiveMessage } from '#server/utils/liveBroker'
 import {
   type IngestDelta,
+  buildSnapshotPatchFromDelta,
   buildInfluxLines,
   buildLivePublishMessage,
   createTelemetryCandidatesFromDelta,
   materializeTelemetrySelections,
+  mergeSnapshotPatch,
   resolveObservedAt,
 } from '#server/utils/telemetry'
 import { recordTelemetrySelectionState } from '#server/utils/telemetrySources'
@@ -111,6 +113,33 @@ function getObservedAtMs(observedAt: string) {
   return Number.isFinite(observedAtMs) ? observedAtMs : Number.NEGATIVE_INFINITY
 }
 
+function toSnapshotSummary(
+  row: typeof vesselLiveSnapshots.$inferSelect | null | undefined,
+): VesselSnapshotSummary | null {
+  if (!row) {
+    return null
+  }
+
+  return {
+    vesselId: row.vesselId,
+    source: row.source,
+    observedAt: row.observedAt ?? null,
+    positionLat: row.positionLat ?? null,
+    positionLng: row.positionLng ?? null,
+    headingMagnetic: row.headingMagnetic ?? null,
+    speedOverGround: row.speedOverGround ?? null,
+    speedThroughWater: row.speedThroughWater ?? null,
+    windSpeedApparent: row.windSpeedApparent ?? null,
+    windAngleApparent: row.windAngleApparent ?? null,
+    depthBelowTransducer: row.depthBelowTransducer ?? null,
+    waterTemperatureKelvin: row.waterTemperatureKelvin ?? null,
+    batteryVoltage: row.batteryVoltage ?? null,
+    engineRpm: row.engineRpm ?? null,
+    statusNote: row.statusNote ?? null,
+    updatedAt: row.updatedAt,
+  }
+}
+
 export default defineWebhookMutation(
   {
     rateLimit: RATE_LIMIT_POLICIES.authApiKeys,
@@ -120,6 +149,16 @@ export default defineWebhookMutation(
     const logger = useLogger(event).child('TelemetryIngest')
     const db = useAppDatabase(event)
     const installationBinding = await requireIngestInstallationBinding(event)
+    const existingSnapshotRow = installationBinding.isPrimary
+      ? (
+          await db
+            .select()
+            .from(vesselLiveSnapshots)
+            .where(eq(vesselLiveSnapshots.vesselId, installationBinding.vesselId))
+            .limit(1)
+        )[0] || null
+      : null
+    const existingSnapshot = toSnapshotSummary(existingSnapshotRow)
 
     const ingestItems = normalizeIngestItems(body)
     const now = new Date().toISOString()
@@ -167,7 +206,11 @@ export default defineWebhookMutation(
     const processedItems = [
       ...curatedItems.map((item) => ({ kind: 'curated' as const, item })),
       ...debugItems.map((item) => ({ kind: 'debug' as const, item })),
-    ]
+    ].sort((left, right) => {
+      const leftObservedAt = resolveObservedAt(left.item.receivedAt, left.item.delta)
+      const rightObservedAt = resolveObservedAt(right.item.receivedAt, right.item.delta)
+      return getObservedAtMs(leftObservedAt) - getObservedAtMs(rightObservedAt)
+    })
     const aggregatedAisContacts = new Map<
       string,
       NonNullable<VesselLivePublishMessage['aisContacts']>[number]
@@ -182,9 +225,9 @@ export default defineWebhookMutation(
     let latestIdentityObservedAtMs = Number.NEGATIVE_INFINITY
     let latestObservedAt: string | null = null
     let latestObservedAtMs = Number.NEGATIVE_INFINITY
-    let latestSnapshot: VesselLivePublishMessage['snapshot']
+    let latestSnapshot: VesselLivePublishMessage['snapshot'] = existingSnapshot
+    let latestSnapshotChanged = false
     let latestSnapshotObservedAt: string | null = null
-    let latestSnapshotObservedAtMs = Number.NEGATIVE_INFINITY
 
     for (const entry of processedItems) {
       const item = entry.item
@@ -230,10 +273,17 @@ export default defineWebhookMutation(
         connectionState: 'live',
       })
 
-      if (livePayload.snapshot && observedAtMs >= latestSnapshotObservedAtMs) {
-        latestSnapshotObservedAtMs = observedAtMs
+      if (livePayload.snapshot) {
+        const snapshotPatch = buildSnapshotPatchFromDelta({
+          delta: item.delta,
+          observedAt,
+          vesselId: installationBinding.vesselId,
+          source: installationBinding.installationType,
+        })
+
         latestSnapshotObservedAt = observedAt
-        latestSnapshot = livePayload.snapshot
+        latestSnapshot = mergeSnapshotPatch(latestSnapshot || null, snapshotPatch)
+        latestSnapshotChanged = true
       }
 
       for (const contact of livePayload.aisContacts || []) {
@@ -257,7 +307,7 @@ export default defineWebhookMutation(
       lastObservedAt: latestObservedAt,
     }
 
-    if (latestSnapshot !== undefined) {
+    if (latestSnapshotChanged && latestSnapshot) {
       livePayload.snapshot = latestSnapshot
     }
 
@@ -265,7 +315,12 @@ export default defineWebhookMutation(
       livePayload.aisContacts = Array.from(aggregatedAisContacts.values())
     }
 
-    if (installationBinding.isPrimary && latestSnapshot && latestSnapshotObservedAt) {
+    if (
+      installationBinding.isPrimary &&
+      latestSnapshotChanged &&
+      latestSnapshot &&
+      latestSnapshotObservedAt
+    ) {
       await db
         .insert(vesselLiveSnapshots)
         .values({

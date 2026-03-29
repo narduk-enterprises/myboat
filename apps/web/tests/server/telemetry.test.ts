@@ -3,7 +3,9 @@ import {
   buildAisContactFromDelta,
   buildInfluxLines,
   buildLivePublishMessage,
+  buildSnapshotPatchFromDelta,
   buildSnapshotFromDelta,
+  mergeSnapshotPatch,
   selectTelemetryDelta,
 } from '../../server/utils/telemetry'
 
@@ -121,6 +123,49 @@ describe('telemetry helpers', () => {
         positionLng: -95.1864,
         speedOverGround: 6.4,
       },
+    })
+  })
+
+  it('merges sparse self snapshot patches over the prior fix', () => {
+    const previousSnapshot = {
+      vesselId: 'vessel-1',
+      source: 'collector_ingest',
+      observedAt: '2026-03-28T12:01:00.000Z',
+      positionLat: 29.5458,
+      positionLng: -95.1864,
+      headingMagnetic: null,
+      speedOverGround: 6.4,
+      speedThroughWater: null,
+      windSpeedApparent: null,
+      windAngleApparent: null,
+      depthBelowTransducer: null,
+      waterTemperatureKelvin: null,
+      batteryVoltage: null,
+      engineRpm: null,
+      statusNote: null,
+      updatedAt: null,
+    }
+    const snapshotPatch = buildSnapshotPatchFromDelta({
+      delta: {
+        context: 'vessels.self',
+        updates: [
+          {
+            values: [{ path: 'navigation.headingMagnetic', value: Math.PI / 2 }],
+          },
+        ],
+      },
+      observedAt: '2026-03-28T12:02:00.000Z',
+      source: 'collector_ingest',
+      vesselId: 'vessel-1',
+    })
+
+    expect(mergeSnapshotPatch(previousSnapshot, snapshotPatch)).toMatchObject({
+      vesselId: 'vessel-1',
+      observedAt: '2026-03-28T12:02:00.000Z',
+      positionLat: 29.5458,
+      positionLng: -95.1864,
+      headingMagnetic: 90,
+      speedOverGround: 6.4,
     })
   })
 
