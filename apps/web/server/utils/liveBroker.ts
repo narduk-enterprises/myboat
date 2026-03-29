@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { getHeader, getRequestURL, toWebRequest } from 'h3'
+import { getHeader, toWebRequest } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import type { VesselLivePublishMessage } from '../../shared/myboatLive'
 
@@ -46,13 +46,12 @@ export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
   }
 
   const localBrokerOrigin = getLocalBrokerOrigin(event)
-  const url = new URL('/connect', getRequestURL(event))
   if (localBrokerOrigin) {
     const target = new URL(`/vessels/${vesselId}/connect`, localBrokerOrigin)
     return fetch(toProxyRequest(event, target))
   }
 
-  return getVesselLiveBrokerStub(event, vesselId).fetch(toProxyRequest(event, url))
+  return getVesselLiveBrokerStub(event, vesselId).fetch(toProxyRequest(event))
 }
 
 export async function publishVesselLiveMessage(
