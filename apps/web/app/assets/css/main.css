@@ -238,6 +238,7 @@ body {
 .marine-auth-shell {
   position: relative;
   overflow: hidden;
+  min-height: 0;
   border: 1px solid rgb(186 230 253 / 0.56);
   border-radius: 2rem;
   background:
@@ -252,7 +253,7 @@ body {
 
 .marine-auth-aside {
   position: relative;
-  min-height: 100%;
+  min-height: 0;
   background:
     radial-gradient(circle at top left, rgb(56 189 248 / 0.24), transparent 28%),
     radial-gradient(circle at 82% 18%, rgb(125 211 252 / 0.14), transparent 24%),
@@ -312,6 +313,7 @@ body {
 
 .marine-auth-panel {
   position: relative;
+  min-height: 0;
   background:
     radial-gradient(circle at top right, rgb(125 211 252 / 0.14), transparent 20%),
     linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(240 249 255 / 0.86)),
@@ -362,6 +364,20 @@ body {
   box-shadow: 0 42px 120px -76px rgb(2 6 23 / 0.78);
 }
 
+@media (min-width: 1024px) {
+  .marine-auth-card > [data-slot='header'] {
+    padding: 1.25rem 1.5rem 1rem;
+  }
+
+  .marine-auth-card > [data-slot='body'] {
+    padding: 1rem 1.5rem;
+  }
+
+  .marine-auth-card > [data-slot='footer'] {
+    padding: 1rem 1.5rem 1.25rem;
+  }
+}
+
 .marine-auth-chip {
   display: inline-flex;
   align-items: center;
@@ -388,7 +404,7 @@ body {
   border: 1px solid rgb(186 230 253 / 0.46);
   border-radius: 1.35rem;
   background: linear-gradient(145deg, rgb(255 255 255 / 0.9), rgb(240 249 255 / 0.82));
-  padding: 1rem;
+  padding: 0.875rem;
   box-shadow: 0 20px 54px -42px rgb(8 47 73 / 0.28);
   backdrop-filter: blur(16px);
 }
@@ -506,6 +522,19 @@ body {
   background:
     radial-gradient(circle at top left, rgb(56 189 248 / 0.16), transparent 22%),
     radial-gradient(circle at bottom right, rgb(14 165 233 / 0.16), transparent 20%);
+}
+
+@media (min-width: 1024px) and (max-height: 1280px) {
+  .marine-auth-chip,
+  .marine-kicker {
+    padding-block: 0.3rem;
+    padding-inline: 0.7rem;
+    letter-spacing: 0.14em;
+  }
+
+  .marine-auth-story::after {
+    inset: 0.75rem;
+  }
 }
 
 ::selection {
