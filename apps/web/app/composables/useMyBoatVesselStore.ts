@@ -142,6 +142,22 @@ function buildLiveUrlsForEntry(entry: VesselStoreEntry | null) {
     return []
   }
 
+  const runtimeConfig = useRuntimeConfig()
+  const localBrokerOrigin =
+    typeof runtimeConfig.public.localBrokerOrigin === 'string'
+      ? runtimeConfig.public.localBrokerOrigin.trim()
+      : ''
+  const vesselId =
+    entry.installations[0]?.vesselId ||
+    entry.vessel?.id ||
+    entry.liveSnapshot?.vesselId ||
+    entry.storedSnapshot?.vesselId ||
+    null
+
+  if (localBrokerOrigin && vesselId) {
+    return [createMyBoatLiveWebSocketUrl(`/vessels/${vesselId}/connect`, localBrokerOrigin)]
+  }
+
   if (entry.namespace === 'auth' && entry.vessel?.slug) {
     return [createMyBoatLiveWebSocketUrl(`/api/app/vessels/${entry.vessel.slug}/live`)]
   }

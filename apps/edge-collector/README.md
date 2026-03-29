@@ -77,6 +77,23 @@ docker run --rm \
   myboat-edge-collector
 ```
 
+## Root helper
+
+From the repo root you can launch the same Tideye-forwarding Docker path with:
+
+```bash
+MYBOAT_INGEST_KEY=nk_replace_me pnpm run dev:collector:tideye
+```
+
+Defaults:
+
+- SignalK source: `wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all`
+- Ingest URL: `http://host.docker.internal:3000/api/ingest/v1/delta`
+- Published collector websocket: `ws://localhost:4011/myboat/v1/stream`
+
+If your local app is not on port `3000`, set `MYBOAT_DEV_PORT` or override
+`MYBOAT_INGEST_URL` directly.
+
 Published MyBoat websocket:
 
 - `ws://localhost:4011/myboat/v1/stream`

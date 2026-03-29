@@ -1,11 +1,19 @@
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
+import { existsSync } from 'node:fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const localNuxtPort = Number(process.env.NUXT_PORT || 3000)
 const localSiteUrl = `http://localhost:${Number.isFinite(localNuxtPort) ? localNuxtPort : 3000}`
 const canonicalSiteUrl = process.env.SITE_URL || 'https://mybo.at'
 const publicAppUrl = process.env.SITE_URL || localSiteUrl
+const localCloudflareDevConfigPath = process.env.NUXT_CLOUDFLARE_DEV_CONFIG_PATH
+  ? resolve(__dirname, process.env.NUXT_CLOUDFLARE_DEV_CONFIG_PATH)
+  : resolve(__dirname, 'wrangler.dev.json')
+const cloudflareDevConfigPath = existsSync(localCloudflareDevConfigPath)
+  ? localCloudflareDevConfigPath
+  : resolve(__dirname, 'wrangler.json')
+const cloudflareDevPersistDir = resolve(__dirname, '.wrangler/state/v3')
 
 const configuredAuthBackend = process.env.AUTH_BACKEND
 const authBackend =
@@ -43,7 +51,8 @@ export default defineNuxtConfig({
       websocket: true,
     },
     cloudflareDev: {
-      configPath: resolve(__dirname, 'wrangler.json'),
+      configPath: cloudflareDevConfigPath,
+      persistDir: cloudflareDevPersistDir,
       ...(process.env.NUXT_WRANGLER_ENVIRONMENT
         ? { environment: process.env.NUXT_WRANGLER_ENVIRONMENT }
         : {}),
@@ -72,6 +81,7 @@ export default defineNuxtConfig({
     influxBucket: process.env.INFLUX_BUCKET || '',
     influxToken: process.env.INFLUX_TOKEN || '',
     localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
+    localBrokerOrigin: process.env.MYBOAT_LOCAL_BROKER_ORIGIN || '',
     turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
     posthogOwnerDistinctId: process.env.POSTHOG_OWNER_DISTINCT_ID || '',
     // Server-only (admin API routes)
@@ -101,6 +111,7 @@ export default defineNuxtConfig({
       gaMeasurementId: process.env.GA_MEASUREMENT_ID || '',
       cspConnectSrc: process.env.CSP_CONNECT_SRC || '',
       localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
+      localBrokerOrigin: process.env.MYBOAT_LOCAL_BROKER_ORIGIN || '',
       // IndexNow
       indexNowKey: process.env.INDEXNOW_KEY || '',
     },

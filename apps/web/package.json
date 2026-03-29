@@ -6,8 +6,11 @@
   "scripts": {
     "build": "nuxt build",
     "db:ready": "pnpm run db:migrate && pnpm run db:seed",
-    "predev": "pnpm run db:ready",
-    "dev": "(doppler run -- nuxt dev || nuxt dev)",
+    "predev": "pnpm run db:ready && pnpm run dev:bindings",
+    "dev": "pnpm exec concurrently -k -n broker,web -c blue,green \"pnpm run dev:broker\" \"pnpm run dev:nuxt\"",
+    "dev:bindings": "pnpm exec tsx ../../tools/verify-web-cloudflare-dev.ts",
+    "dev:broker": "wrangler dev --config worker/vessel-live-broker.wrangler.json --ip 127.0.0.1 --port 8791 --local-protocol http --persist-to .wrangler/state",
+    "dev:nuxt": "sh -c 'pnpm exec wait-on http-get://127.0.0.1:8791/healthz && export MYBOAT_LOCAL_BROKER_ORIGIN=http://127.0.0.1:8791 && (doppler run -- nuxt dev --host 0.0.0.0 --port ${NUXT_PORT:-3000} || nuxt dev --host 0.0.0.0 --port ${NUXT_PORT:-3000})'",
     "quality": "echo 'Turbo dependsOn handles lint + typecheck + format:check'",
     "db:migrate": "bash ../../tools/db-migrate.sh myboat-db --local --dir node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle --dir drizzle",
     "db:seed": "wrangler d1 execute myboat-db --local --file=node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle/seed.sql && wrangler d1 execute myboat-db --local --file=drizzle/seed.sql",

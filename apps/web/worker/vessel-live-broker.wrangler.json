@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "myboat-vessel-live-broker",
+  "main": "vessel-live-broker-entry.ts",
+  "compatibility_date": "2026-03-03",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VESSEL_LIVE_BROKER_SELF",
+        "class_name": "VesselLiveBroker"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["VesselLiveBroker"]
+    }
+  ]
+}

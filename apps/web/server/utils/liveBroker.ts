@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { getHeader, getMethod, getRequestHeaders, getRequestURL } from 'h3'
+import { useRuntimeConfig } from '#imports'
 import type { VesselLivePublishMessage } from '../../shared/myboatLive'
 
 type VesselLiveBrokerEnv = {
@@ -24,8 +25,12 @@ function getVesselLiveBrokerStub(event: H3Event, vesselId: string) {
   return useVesselLiveBrokerNamespace(event).getByName(vesselId)
 }
 
-function toProxyRequest(event: H3Event, path: string) {
-  const url = new URL(path, getRequestURL(event))
+function getLocalBrokerOrigin(event: H3Event) {
+  const configured = useRuntimeConfig(event).localBrokerOrigin
+  return typeof configured === 'string' && configured.trim() ? configured.trim() : ''
+}
+
+function toProxyRequestInit(event: H3Event) {
   const headers = new Headers()
 
   for (const [name, value] of Object.entries(getRequestHeaders(event))) {
@@ -34,10 +39,10 @@ function toProxyRequest(event: H3Event, path: string) {
     }
   }
 
-  return new Request(url.toString(), {
+  return {
     method: getMethod(event),
     headers,
-  })
+  } satisfies RequestInit
 }
 
 export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
@@ -50,7 +55,14 @@ export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
     })
   }
 
-  return getVesselLiveBrokerStub(event, vesselId).fetch(toProxyRequest(event, '/connect'))
+  const localBrokerOrigin = getLocalBrokerOrigin(event)
+  const url = new URL('/connect', getRequestURL(event))
+  if (localBrokerOrigin) {
+    const target = new URL(`/vessels/${vesselId}/connect`, localBrokerOrigin)
+    return fetch(target, toProxyRequestInit(event))
+  }
+
+  return getVesselLiveBrokerStub(event, vesselId).fetch(url.toString(), toProxyRequestInit(event))
 }
 
 export async function publishVesselLiveMessage(
@@ -58,15 +70,25 @@ export async function publishVesselLiveMessage(
   vesselId: string,
   payload: VesselLivePublishMessage,
 ) {
-  const response = await getVesselLiveBrokerStub(event, vesselId).fetch(
-    new Request('https://vessel-live.internal/publish', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    }),
-  )
+  const localBrokerOrigin = getLocalBrokerOrigin(event)
+  const response = localBrokerOrigin
+    ? await fetch(new URL(`/vessels/${vesselId}/publish`, localBrokerOrigin), {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+    : await getVesselLiveBrokerStub(event, vesselId).fetch(
+        'https://vessel-live.internal/publish',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        },
+      )
 
   if (!response.ok) {
     throw createError({
