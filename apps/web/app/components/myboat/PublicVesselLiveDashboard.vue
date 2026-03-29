@@ -41,6 +41,12 @@ const { contacts: aisContacts } = usePublicEnrichedTrafficContacts(
   vesselSlug,
   rawAisContacts,
 )
+usePublicNearbyTrafficHydrator(
+  username,
+  vesselSlug,
+  computed(() => entry.value?.key),
+  trafficEnabled,
+)
 const liveState = computed(() => entry.value?.live ?? null)
 
 const primaryInstallation = computed<PublicInstallationSummary | null>(

@@ -18,6 +18,11 @@ const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
   computed(() => props.detail.vessel.slug),
   rawAisContacts,
 )
+useAuthNearbyTrafficHydrator(
+  computed(() => props.detail.vessel.slug),
+  computed(() => entry.value?.key),
+  trafficEnabled,
+)
 useMyBoatLiveDemand({
   namespace: 'auth',
   consumerId: 'dashboard-vessel-live',

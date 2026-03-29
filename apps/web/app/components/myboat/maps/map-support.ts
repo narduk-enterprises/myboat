@@ -7,6 +7,7 @@ import type {
   WaypointSummary,
 } from '~/types/myboat'
 import { buildTrackFeatureCollection } from '~/utils/marine'
+import { isTrafficMoving, speedMetersPerSecondToKnots } from '~/utils/traffic'
 
 export interface MyBoatMapHandle {
   setRegion: (center: { lat: number; lng: number }, span?: { lat: number; lng: number }) => void
@@ -136,9 +137,9 @@ export function buildWaypointPins(waypoints: WaypointSummary[]) {
 export function buildNearbyAisPins(options: {
   contacts: AisContactSummary[]
   focusSnapshot: VesselSnapshotSummary | null
-  primaryVesselName?: string | null
+  primaryVessel?: Pick<VesselCardSummary, 'name' | 'observedIdentity'> | null
 }) {
-  const { contacts, focusSnapshot, primaryVesselName = null } = options
+  const { contacts, focusSnapshot, primaryVessel = null } = options
 
   if (
     focusSnapshot?.positionLat === null ||
@@ -149,7 +150,9 @@ export function buildNearbyAisPins(options: {
     return []
   }
 
-  const focusName = primaryVesselName?.trim().toLowerCase() || null
+  const focusName = primaryVessel?.name?.trim().toLowerCase() || null
+  const focusMmsi = primaryVessel?.observedIdentity?.mmsi?.trim() || null
+  const focusCallSign = primaryVessel?.observedIdentity?.callSign?.trim().toLowerCase() || null
 
   return contacts
     .filter(
@@ -173,16 +176,20 @@ export function buildNearbyAisPins(options: {
         return false
       }
 
-      if (!focusName || !contact.name) {
-        return true
-      }
+      const matchesName =
+        Boolean(focusName && contact.name && contact.name.trim().toLowerCase() === focusName) &&
+        distanceNm <= AIS_DUPLICATE_RADIUS_NM
+      const matchesMmsi = Boolean(focusMmsi && contact.mmsi && contact.mmsi.trim() === focusMmsi)
+      const matchesCallSign =
+        Boolean(
+          focusCallSign &&
+            contact.callSign &&
+            contact.callSign.trim().toLowerCase() === focusCallSign,
+        ) && distanceNm <= AIS_DUPLICATE_RADIUS_NM
 
-      return !(
-        distanceNm <= AIS_DUPLICATE_RADIUS_NM && contact.name.trim().toLowerCase() === focusName
-      )
+      return !(matchesName || matchesMmsi || matchesCallSign)
     })
     .sort((left, right) => left.distanceNm - right.distanceNm)
-    .slice(0, 32)
     .map(({ contact, distanceNm }) => ({
       id: `ais:${contact.id}`,
       lat: contact.lat!,
@@ -245,9 +252,9 @@ function projectPoint(lat: number, lng: number, bearingDeg: number, distanceNm: 
 
 export function buildAisVectorFeatureCollection(pins: MyBoatAisPin[]) {
   const features = pins
-    .filter((pin) => pin.sog !== null && pin.sog !== undefined && pin.sog > 0.4)
+    .filter((pin) => isTrafficMoving(pin.sog))
     .map((pin) => {
-      const speedOverGround = pin.sog
+      const speedOverGround = speedMetersPerSecondToKnots(pin.sog)
       const course = pin.cog ?? pin.heading
       if (
         course === null ||
@@ -446,17 +453,17 @@ export function getAisCategory(shipType: number | null, sog: number | null) {
     }
   }
 
-  return (sog ?? 0) > 0.5
+  return isTrafficMoving(sog)
     ? {
-        label: 'Traffic',
-        color: 'rgb(249 115 22)',
-        fill: 'rgb(255 237 213)',
+        label: 'Transit',
+        color: 'rgb(99 102 241)',
+        fill: 'rgb(224 231 255)',
         shape: 'utility' as const,
       }
     : {
-        label: 'At rest',
-        color: 'rgb(148 163 184)',
-        fill: 'rgb(241 245 249)',
+        label: 'Holding',
+        color: 'rgb(100 116 139)',
+        fill: 'rgb(226 232 240)',
         shape: 'generic' as const,
       }
 }
@@ -677,32 +684,50 @@ export function createAisPinElement(
 ) {
   const category = getAisCategory(item.shipType, item.sog)
   const movementHeading = Math.round(item.heading ?? item.cog ?? 0)
-  const isMoving = (item.sog ?? 0) > 0.5
+  const isMoving = isTrafficMoving(item.sog)
   const freshness = aisFreshnessTone(item.lastUpdateAt)
+  const speedKnots = speedMetersPerSecondToKnots(item.sog)
+  const ageMinutes = (Date.now() - item.lastUpdateAt) / 60_000
+  const markerOpacity = ageMinutes > 10 ? 0.68 : ageMinutes > 4 ? 0.84 : 1
 
   const element = document.createElement('div')
   element.style.cssText = [
     'position:relative',
     'display:flex',
-    'height:28px',
-    'width:28px',
+    'min-width:0',
+    'flex-direction:column',
     'align-items:center',
-    'justify-content:center',
+    'gap:4px',
     'pointer-events:none',
   ].join(';')
 
-  const halo = document.createElement('div')
-  halo.style.cssText = [
-    'position:absolute',
-    'inset:-2px',
-    'border-radius:999px',
-    `background:${withAlpha(category.fill, isSelected ? 0.92 : 0.72)}`,
-    `border:1px solid ${withAlpha(freshness, 0.6)}`,
-    `box-shadow:${isSelected ? `0 10px 22px ${withAlpha(category.color, 0.24)}` : `0 7px 18px ${withAlpha(category.color, 0.12)}`}`,
-    `transform:${isSelected ? 'scale(1.05)' : 'scale(1)'}`,
-    'transition:transform 180ms ease, box-shadow 180ms ease',
+  const frame = document.createElement('div')
+  frame.style.cssText = [
+    'position:relative',
+    'display:flex',
+    'height:34px',
+    'width:34px',
+    'align-items:center',
+    'justify-content:center',
+    `opacity:${markerOpacity}`,
+    `transform:${isSelected ? 'translateY(-1px) scale(1.08)' : 'translateY(0) scale(1)'}`,
+    `filter:drop-shadow(0 10px 18px ${withAlpha(category.color, isSelected ? 0.34 : 0.18)})`,
+    'transition:transform 180ms ease, filter 180ms ease, opacity 180ms ease',
   ].join(';')
-  element.appendChild(halo)
+
+  if (isSelected) {
+    const selectionPlate = document.createElement('div')
+    selectionPlate.style.cssText = [
+      'position:absolute',
+      'inset:2px',
+      'border-radius:12px',
+      `background:${withAlpha(category.fill, 0.34)}`,
+      `border:1px solid ${withAlpha(freshness, 0.74)}`,
+      `box-shadow:0 6px 16px ${withAlpha(category.color, 0.18)}`,
+      'transform:rotate(8deg)',
+    ].join(';')
+    frame.appendChild(selectionPlate)
+  }
 
   const ship = document.createElement('div')
   ship.style.cssText = [
@@ -710,14 +735,39 @@ export function createAisPinElement(
     'z-index:1',
     `transform:rotate(${movementHeading}deg) scale(${isSelected ? 1.08 : 1})`,
     'transition:transform 180ms ease',
-    'filter:drop-shadow(0 1px 3px rgb(15 23 42 / 0.24))',
+    `filter:drop-shadow(0 2px 6px ${withAlpha(freshness, 0.24)})`,
   ].join(';')
   ship.innerHTML = buildAisShipSvg(category.shape, {
     color: category.color,
-    deck: withAlpha('rgb(15 23 42)', isSelected ? 0.92 : 0.76),
-    accent: withAlpha('rgb(255 255 255)', isMoving ? 0.94 : 0.82),
+    deck: withAlpha('rgb(15 23 42)', isSelected ? 0.94 : 0.82),
+    accent: withAlpha('rgb(255 255 255)', isSelected ? 0.98 : 0.88),
+    wake: withAlpha(freshness, isSelected ? 0.88 : 0.72),
+    water: withAlpha(category.fill, isSelected ? 0.74 : 0.48),
+    moving: isMoving,
+    selected: isSelected,
   })
-  element.appendChild(ship)
+  frame.appendChild(ship)
+
+  if (isMoving && speedKnots !== null) {
+    const speedFlag = document.createElement('div')
+    speedFlag.style.cssText = [
+      'position:absolute',
+      'right:-1px',
+      'top:-1px',
+      'border-radius:999px',
+      `background:${withAlpha(category.color, 0.96)}`,
+      'padding:1px 5px',
+      'font-size:8px',
+      'font-weight:800',
+      'letter-spacing:0.03em',
+      'color:rgb(248 250 252)',
+      'box-shadow:0 6px 14px rgb(15 23 42 / 0.18)',
+    ].join(';')
+    speedFlag.textContent = `${speedKnots.toFixed(0)} kt`
+    frame.appendChild(speedFlag)
+  }
+
+  element.appendChild(frame)
 
   const shouldShowLabel =
     (options.showLabel !== false && isSelected) ||
@@ -740,9 +790,9 @@ export function createAisPinElement(
       'white-space:nowrap',
       'border-radius:999px',
       'border:1px solid rgb(255 255 255 / 0.72)',
-      `background:${isSelected ? 'rgb(15 23 42 / 0.94)' : 'rgb(255 255 255 / 0.9)'}`,
+      `background:${isSelected ? 'rgb(15 23 42 / 0.94)' : 'rgb(255 255 255 / 0.92)'}`,
       `color:${isSelected ? 'rgb(248 250 252)' : 'rgb(15 23 42)'}`,
-      'padding:2px 7px',
+      'padding:3px 8px',
       'font-size:9px',
       'font-weight:700',
       'letter-spacing:0.01em',
@@ -769,7 +819,7 @@ export function createAisPinFingerprint(
     (isSelected ||
       (!options.isCompactViewport && (options.pinCount ?? 0) <= 5 && item.distanceNm <= 4))
       ? 'label'
-      : 'dot'
+      : 'ship'
 
   return [
     item.title,
@@ -784,83 +834,120 @@ export function createAisPinFingerprint(
 
 function buildAisShipSvg(
   shape: ReturnType<typeof getAisCategory>['shape'],
-  palette: { color: string; deck: string; accent: string },
+  palette: {
+    color: string
+    deck: string
+    accent: string
+    wake: string
+    water: string
+    moving: boolean
+    selected: boolean
+  },
 ) {
-  const common = `fill="${palette.color}" stroke="${palette.accent}" stroke-width="1.05" stroke-linejoin="round"`
+  const common = `fill="${palette.color}" stroke="${palette.accent}" stroke-width="${palette.selected ? '1.3' : '1.08'}" stroke-linejoin="round"`
+  const wake = palette.moving
+    ? `
+        <path d="M13 31 Q20 36 27 31" stroke="${palette.wake}" stroke-width="1.6" stroke-linecap="round" fill="none" />
+        <path d="M15 28 Q20 31 25 28" stroke="${palette.wake}" stroke-width="1.15" stroke-linecap="round" fill="none" />
+      `
+    : ''
+  const water = `<ellipse cx="20" cy="32.5" rx="${palette.selected ? '11.5' : '10'}" ry="3.4" fill="${palette.water}" />`
 
   switch (shape) {
     case 'sail':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M16 4 L16 23 L9 23 Z" ${common} />
-          <path d="M15 6 L22.5 20.5 H15 Z" ${common} />
-          <path d="M10 23 L22 23 Q20 27 16 27 Q12 27 10 23 Z" fill="${palette.deck}" stroke="${palette.accent}" stroke-width="0.95" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M20 5 V25" stroke="${palette.accent}" stroke-width="1.35" stroke-linecap="round" />
+          <path d="M20 8 L12 24 H20 Z" ${common} />
+          <path d="M20 9 L28 22 H20 Z" ${common} />
+          <path d="M13 26 H27 Q25 31 20 33 Q15 31 13 26 Z" fill="${palette.deck}" stroke="${palette.accent}" stroke-width="1" />
         </svg>
       `
     case 'cargo':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M9 10 H21 L24 18 V24 Q24 27 16 28 Q8 27 8 23 V14 Z" ${common} />
-          <path d="M12 12 H20 V16 H12 Z" fill="${palette.deck}" opacity="0.82" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M12 11 H26 L30 19 V26 Q30 32 20 34 Q10 32 10 24 V15 Z" ${common} />
+          <path d="M14 14 H26 V18 H14 Z" fill="${palette.deck}" opacity="0.84" />
+          <path d="M15 21 H25" stroke="${palette.accent}" stroke-width="1" stroke-linecap="round" />
         </svg>
       `
     case 'tanker':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10 9 H22 L24 15 V23 Q24 28 16 28 Q8 28 8 23 V13 Z" ${common} />
-          <path d="M13 11 H19 V17 H13 Z" fill="${palette.deck}" opacity="0.82" />
-          <path d="M11 21 H21" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M12 10 H28 L30 17 V26 Q30 33 20 34 Q10 33 10 25 V15 Z" ${common} />
+          <path d="M15 13 H25 V18 H15 Z" fill="${palette.deck}" opacity="0.82" />
+          <path d="M13 24 H27" stroke="${palette.accent}" stroke-width="1.1" stroke-linecap="round" />
         </svg>
       `
     case 'ferry':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M9 11 H23 L24 19 Q24 27 16 28 Q8 27 8 19 Z" ${common} />
-          <path d="M12 13 H20 V17 H12 Z" fill="${palette.deck}" opacity="0.82" />
-          <path d="M11 21 H21" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M11 12 H29 L30 21 Q30 32 20 34 Q10 32 10 21 Z" ${common} />
+          <path d="M14 15 H26 V20 H14 Z" fill="${palette.deck}" opacity="0.82" />
+          <path d="M14 24 H26" stroke="${palette.accent}" stroke-width="1" stroke-linecap="round" />
         </svg>
       `
     case 'trawler':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10 10 H20 L23 17 V24 Q23 28 16 28 Q9 28 9 24 V14 Z" ${common} />
-          <path d="M16 6 V15" stroke="${palette.accent}" stroke-width="1.1" stroke-linecap="round" />
-          <path d="M13 12 H19" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M12 11 H24 L29 19 V27 Q29 33 20 34 Q11 33 11 25 V16 Z" ${common} />
+          <path d="M20 7 V18" stroke="${palette.accent}" stroke-width="1.2" stroke-linecap="round" />
+          <path d="M15 14 H24" stroke="${palette.accent}" stroke-width="1" stroke-linecap="round" />
         </svg>
       `
     case 'tow':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10 10 H21 L23 16 V23 Q23 28 16 28 Q9 28 9 23 V14 Z" ${common} />
-          <path d="M16 6 V14" stroke="${palette.accent}" stroke-width="1.05" stroke-linecap="round" />
-          <path d="M16 6 L21 10" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M12 11 H25 L29 18 V26 Q29 33 20 34 Q11 33 11 24 V16 Z" ${common} />
+          <path d="M20 7 V16" stroke="${palette.accent}" stroke-width="1.1" stroke-linecap="round" />
+          <path d="M20 7 L26 12" stroke="${palette.accent}" stroke-width="1" stroke-linecap="round" />
         </svg>
       `
     case 'yacht':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M11 12 L21 11 L23 18 Q23 27 16 28 Q9 27 9 20 Z" ${common} />
-          <path d="M13 13 H19 V16 H13 Z" fill="${palette.deck}" opacity="0.84" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M13 14 L25 12 L29 20 Q29 32 20 34 Q11 32 11 22 Z" ${common} />
+          <path d="M16 15 H23 V19 H16 Z" fill="${palette.deck}" opacity="0.86" />
         </svg>
       `
     case 'naval':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M16 5 L22 13 L21 24 Q21 27 16 28 Q11 27 11 24 L10 13 Z" ${common} />
-          <path d="M14 11 H18 V15 H14 Z" fill="${palette.deck}" opacity="0.82" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M20 6 L27 15 L25 27 Q25 33 20 34 Q15 33 15 27 L13 15 Z" ${common} />
+          <path d="M17 13 H23 V18 H17 Z" fill="${palette.deck}" opacity="0.82" />
         </svg>
       `
     case 'utility':
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M10 9 H22 L24 17 V23 Q24 28 16 28 Q8 28 8 23 V13 Z" ${common} />
-          <path d="M13 12 H19 V17 H13 Z" fill="${palette.deck}" opacity="0.82" />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M12 10 H28 L30 18 V26 Q30 33 20 34 Q10 33 10 24 V15 Z" ${common} />
+          <path d="M15 14 H25 V19 H15 Z" fill="${palette.deck}" opacity="0.82" />
         </svg>
       `
     default:
       return `
-        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M16 5 L22 21 Q22 28 16 28 Q10 28 10 21 Z" ${common} />
+        <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          ${water}
+          ${wake}
+          <path d="M20 6 L27 24 Q27 33 20 34 Q13 33 13 24 Z" ${common} />
         </svg>
       `
   }

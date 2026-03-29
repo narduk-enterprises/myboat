@@ -7,7 +7,7 @@ import type {
   WaypointSummary,
 } from '~/types/myboat'
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
-import { buildTrafficContactPath } from '~/utils/traffic'
+import { buildTrafficContactPath, formatTrafficSpeed } from '~/utils/traffic'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import {
   buildAisVectorFeatureCollection,
@@ -94,7 +94,7 @@ const aisPins = computed(() =>
   buildNearbyAisPins({
     contacts: props.aisContacts || [],
     focusSnapshot: focusSnapshot.value,
-    primaryVesselName: primaryVessel.value?.name || null,
+    primaryVessel: primaryVessel.value,
   }),
 )
 const connectionState = computed(() => props.liveConnectionState || 'idle')
@@ -275,7 +275,7 @@ const stats = computed(() => {
         value:
           selectedAisPin.value.sog === null || selectedAisPin.value.sog === undefined
             ? '--'
-            : `${selectedAisPin.value.sog.toFixed(1)} kts`,
+            : formatTrafficSpeed(selectedAisPin.value.sog),
       },
       {
         label: 'Heading',
@@ -299,7 +299,7 @@ const stats = computed(() => {
           focusSnapshot.value.speedOverGround === null ||
           focusSnapshot.value.speedOverGround === undefined
             ? '--'
-            : `${focusSnapshot.value.speedOverGround.toFixed(1)} kts`,
+            : formatTrafficSpeed(focusSnapshot.value.speedOverGround),
       },
       {
         label: 'Heading',

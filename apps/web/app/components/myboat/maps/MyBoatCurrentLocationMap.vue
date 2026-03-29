@@ -75,7 +75,7 @@ const aisPins = computed(() =>
   buildNearbyAisPins({
     contacts: props.aisContacts || [],
     focusSnapshot: focusSnapshot.value,
-    primaryVesselName: primaryVessel.value?.name || null,
+    primaryVessel: primaryVessel.value,
   }),
 )
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))

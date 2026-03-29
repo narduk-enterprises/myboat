@@ -84,6 +84,48 @@ describe('telemetry helpers', () => {
     })
   })
 
+  it('extracts richer AIS identity fields from wrapped Signal K values', () => {
+    const observedAt = '2026-03-28T12:01:30.000Z'
+    const contact = buildAisContactFromDelta({
+      observedAt,
+      delta: {
+        context: 'vessels.urn:mrn:imo:mmsi:366998877',
+        updates: [
+          {
+            values: [
+              { path: 'design.name', value: { value: 'SEA NOTE' } },
+              { path: 'communication.callsign', value: { value: 'WDE1234' } },
+              { path: 'design.aisShipType.id', value: { value: 37 } },
+              { path: 'navigation.courseOverGroundTrue', value: { value: Math.PI / 2 } },
+              { path: 'navigation.headingTrue', value: { value: Math.PI } },
+              { path: 'navigation.speedOverGround', value: { value: 4.1 } },
+              {
+                path: 'design.length',
+                value: { value: { overall: 13.4 } },
+              },
+              {
+                path: 'design.draft',
+                value: { value: { current: 1.6 } },
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    expect(contact).toMatchObject({
+      id: 'mmsi:366998877',
+      name: 'SEA NOTE',
+      callSign: 'WDE1234',
+      shipType: 37,
+      cog: 90,
+      heading: 180,
+      sog: 4.1,
+      length: 13.4,
+      draft: 1.6,
+    })
+  })
+
   it('treats the upstream self context as a vessel snapshot instead of AIS', () => {
     const observedAt = '2026-03-28T12:02:00.000Z'
     const delta = {

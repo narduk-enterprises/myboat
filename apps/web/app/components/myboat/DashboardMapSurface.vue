@@ -17,6 +17,11 @@ const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
   computed(() => detail.value?.vessel.slug),
   rawAisContacts,
 )
+useAuthNearbyTrafficHydrator(
+  computed(() => detail.value?.vessel.slug),
+  computed(() => entry.value?.key),
+  trafficEnabled,
+)
 
 function toRoundedText(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
