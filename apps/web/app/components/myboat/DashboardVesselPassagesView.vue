@@ -7,12 +7,40 @@ const props = defineProps<{
 }>()
 
 const isCompactViewport = useCompactViewport()
+const { updateMedia } = useUpdateVesselMedia(props.detail.vessel.slug)
+const pendingCoverIds = ref<string[]>([])
 const latestPassage = computed(
   () => props.detail.passages[0] || props.detail.vessel.latestPassage || null,
 )
 const totalDistanceNm = computed(() =>
   props.detail.passages.reduce((sum, passage) => sum + (passage.distanceNm || 0), 0),
 )
+const attachedPassageMedia = computed(() =>
+  props.detail.media.filter((item) => item.matchStatus === 'attached' && Boolean(item.passageId)),
+)
+const mapMedia = computed(() =>
+  attachedPassageMedia.value.filter((item) => item.lat !== null && item.lng !== null),
+)
+const reviewMedia = computed(() =>
+  props.detail.media.filter((item) => item.matchStatus === 'review'),
+)
+const generalMedia = computed(() =>
+  props.detail.media.filter((item) => item.matchStatus === 'attached' && !item.passageId),
+)
+
+async function handleSetCover(mediaId: string) {
+  pendingCoverIds.value = [...pendingCoverIds.value, mediaId]
+
+  try {
+    await updateMedia(mediaId, {
+      isCover: true,
+      matchStatus: 'attached',
+    })
+    await refreshNuxtData(`myboat-vessel-${props.detail.vessel.slug}`)
+  } finally {
+    pendingCoverIds.value = pendingCoverIds.value.filter((candidate) => candidate !== mediaId)
+  }
+}
 </script>
 
 <template>
@@ -26,6 +54,7 @@ const totalDistanceNm = computed(() =>
           :vessels="[detail.vessel]"
           :passages="detail.passages"
           :waypoints="detail.waypoints"
+          :media="mapMedia"
           height-class="h-[16rem] sm:h-[24rem] lg:h-[32rem]"
           :show-pin-labels="false"
         />
@@ -92,8 +121,21 @@ const totalDistanceNm = computed(() =>
       </UCard>
     </div>
 
-    <PassageTimeline :passages="detail.passages" />
+    <PassageTimeline
+      :passages="detail.passages"
+      :media="attachedPassageMedia"
+      editable
+      :pending-media-ids="pendingCoverIds"
+      @set-cover="handleSetCover"
+    />
 
-    <MediaStrip v-if="detail.media.length" :media="detail.media" />
+    <PassageMediaReviewQueue
+      v-if="reviewMedia.length"
+      :media="reviewMedia"
+      :passages="detail.passages"
+      :vessel-slug="detail.vessel.slug"
+    />
+
+    <MediaStrip v-if="generalMedia.length" :media="generalMedia" />
   </div>
 </template>

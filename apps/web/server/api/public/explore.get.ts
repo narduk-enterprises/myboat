@@ -2,8 +2,8 @@ import {
   getDiscoverableCaptainProfiles,
   getPublicExploreRows,
   getPublicFreshnessState,
-  getMediaForVesselIds,
   getPassagesForVesselIds,
+  getPublicMediaForVesselIds,
   getSnapshotsForVesselIds,
   getWaypointsForVesselIds,
   serializeVesselCards,
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   const [snapshotRows, passageRows, mediaRows, waypointRows] = await Promise.all([
     getSnapshotsForVesselIds(event, vesselIds),
     getPassagesForVesselIds(event, vesselIds),
-    getMediaForVesselIds(event, vesselIds),
+    getPublicMediaForVesselIds(event, vesselIds),
     getWaypointsForVesselIds(event, vesselIds),
   ])
 

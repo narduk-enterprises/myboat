@@ -35,6 +35,15 @@ const primaryInstallation = computed<InstallationSummary | null>(
 const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => detail.value?.vessel.liveSnapshot ?? null,
 )
+const mapMedia = computed(() =>
+  (detail.value?.media ?? []).filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      item.lat !== null &&
+      item.lng !== null,
+  ),
+)
 useMyBoatLiveDemand({
   namespace: 'auth',
   consumerId: 'dashboard-map',
@@ -106,6 +115,7 @@ const metricCards = computed(() => [
             :vessel="detail?.vessel || null"
             :passages="[]"
             :waypoints="detail?.waypoints || []"
+            :media="mapMedia"
             :installations="detail?.installations || []"
             :ais-contacts="enrichedAisContacts"
             :live-connection-state="entry?.live.connectionState"

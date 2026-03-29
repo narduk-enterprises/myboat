@@ -2,11 +2,12 @@ import {
   getCaptainProfileByUsername,
   getPublicFreshnessState,
   getPublicInstallationsForVesselIds,
-  getMediaForVesselIds,
+  getPublicMediaForVesselIds,
   getPassagesForVesselIds,
   getPublicVesselByUsernameAndSlug,
   getSnapshotsForVesselIds,
   getWaypointsForVesselIds,
+  serializeMediaItemSummary,
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
   const [snapshotRows, passageRows, mediaRows, waypointRows, installations] = await Promise.all([
     getSnapshotsForVesselIds(event, vesselIds),
     getPassagesForVesselIds(event, vesselIds),
-    getMediaForVesselIds(event, vesselIds),
+    getPublicMediaForVesselIds(event, vesselIds),
     getWaypointsForVesselIds(event, vesselIds),
     getPublicInstallationsForVesselIds(event, vesselIds),
   ])
@@ -54,15 +55,7 @@ export default defineEventHandler(async (event) => {
     vessel,
     installations,
     passages: passageRows,
-    media: mediaRows.map((item) => ({
-      id: item.id,
-      title: item.title,
-      caption: item.caption,
-      imageUrl: item.imageUrl,
-      lat: item.lat,
-      lng: item.lng,
-      capturedAt: item.capturedAt,
-    })),
+    media: mediaRows.map(serializeMediaItemSummary),
     waypoints: waypointRows,
     freshnessState: getPublicFreshnessState(vessel.liveSnapshot?.observedAt || null),
   }

@@ -1,6 +1,7 @@
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type {
   AisContactSummary,
+  MediaItemSummary,
   PassageSummary,
   VesselCardSummary,
   VesselSnapshotSummary,
@@ -66,6 +67,19 @@ export interface MyBoatWaypointPin {
   visitedAt: string | null
 }
 
+export interface MyBoatMediaPin {
+  id: string
+  lat: number
+  lng: number
+  pinKind: 'media'
+  title: string
+  caption: string | null
+  imageUrl: string
+  capturedAt: string | null
+  sharePublic: boolean
+  isCover: boolean
+}
+
 export interface MyBoatAisPin {
   id: string
   lat: number
@@ -88,7 +102,7 @@ export interface MyBoatAisPin {
   lastUpdateAt: number
 }
 
-export type MyBoatSurfacePin = MyBoatVesselPin | MyBoatWaypointPin
+export type MyBoatSurfacePin = MyBoatVesselPin | MyBoatWaypointPin | MyBoatMediaPin
 export type MyBoatPin = MyBoatSurfacePin | MyBoatAisPin
 
 export const AIS_NEARBY_RADIUS_NM = 24
@@ -131,6 +145,30 @@ export function buildWaypointPins(waypoints: WaypointSummary[]) {
     kind: waypoint.kind,
     visitedAt: waypoint.visitedAt,
   }))
+}
+
+export function buildMediaPins(media: MediaItemSummary[]) {
+  return media
+    .filter(
+      (item) =>
+        item.matchStatus === 'attached' &&
+        item.lat !== null &&
+        item.lat !== undefined &&
+        item.lng !== null &&
+        item.lng !== undefined,
+    )
+    .map((item) => ({
+      id: item.id,
+      lat: item.lat!,
+      lng: item.lng!,
+      pinKind: 'media' as const,
+      title: item.title,
+      caption: item.caption,
+      imageUrl: item.imageUrl,
+      capturedAt: item.capturedAt,
+      sharePublic: item.sharePublic,
+      isCover: item.isCover,
+    }))
 }
 
 export function buildNearbyAisPins(options: {
@@ -306,10 +344,7 @@ export function routeOverlayStyle(properties: Record<string, unknown>): MyBoatMa
       typeof properties.shipType === 'number' && Number.isFinite(properties.shipType)
         ? properties.shipType
         : null
-    const category = getAisCategory(
-      shipType,
-      1,
-    )
+    const category = getAisCategory(shipType, 1)
     const isDangerous = Boolean(properties.danger)
 
     return {
@@ -662,6 +697,119 @@ export function createWaypointPinElement(
   element.appendChild(label)
 
   return { element }
+}
+
+interface MediaPinRenderOptions {
+  isCompactViewport?: boolean
+  showLabel?: boolean
+}
+
+export function createMediaPinElement(
+  item: MyBoatMediaPin,
+  isSelected: boolean,
+  options: MediaPinRenderOptions = {},
+) {
+  const shell = document.createElement('div')
+  shell.style.cssText =
+    'display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;pointer-events:none;'
+
+  const marker = document.createElement('div')
+  marker.style.cssText = [
+    'position:relative',
+    'display:flex',
+    'height:42px',
+    'width:42px',
+    'overflow:hidden',
+    'align-items:center',
+    'justify-content:center',
+    'border-radius:16px',
+    'border:1px solid rgb(255 255 255 / 0.82)',
+    'background:linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(30 41 59 / 0.9))',
+    `box-shadow:${isSelected ? '0 14px 28px rgb(14 116 144 / 0.26)' : '0 10px 24px rgb(15 23 42 / 0.2)'}`,
+    `transform:${isSelected ? 'scale(1.08)' : 'scale(1)'}`,
+    'transition:transform 180ms ease, box-shadow 180ms ease',
+  ].join(';')
+
+  const image = document.createElement('img')
+  image.src = item.imageUrl
+  image.alt = item.title
+  image.loading = 'lazy'
+  image.decoding = 'async'
+  image.style.cssText = 'height:100%;width:100%;object-fit:cover;'
+
+  const fallback = document.createElement('div')
+  fallback.style.cssText = [
+    'position:absolute',
+    'inset:0',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'font-size:16px',
+    'font-weight:700',
+    'color:rgb(248 250 252)',
+    'background:linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(8 47 73 / 0.92))',
+    'opacity:0',
+    'transition:opacity 140ms ease',
+  ].join(';')
+  fallback.textContent = 'P'
+
+  image.onerror = () => {
+    fallback.style.opacity = '1'
+  }
+
+  marker.appendChild(image)
+  marker.appendChild(fallback)
+
+  const badge = document.createElement('div')
+  badge.style.cssText = [
+    'position:absolute',
+    'right:3px',
+    'bottom:3px',
+    'display:flex',
+    'height:16px',
+    'min-width:16px',
+    'align-items:center',
+    'justify-content:center',
+    'border-radius:999px',
+    'border:1px solid rgb(255 255 255 / 0.84)',
+    'background:rgb(15 23 42 / 0.82)',
+    'padding:0 4px',
+    'font-size:9px',
+    'font-weight:800',
+    'color:rgb(248 250 252)',
+    'backdrop-filter:blur(8px)',
+  ].join(';')
+  badge.textContent = item.isCover ? 'C' : 'P'
+  marker.appendChild(badge)
+
+  shell.appendChild(marker)
+
+  const shouldShowLabel =
+    options.showLabel === false ? false : !options.isCompactViewport || isSelected
+
+  if (shouldShowLabel) {
+    const label = document.createElement('div')
+    label.style.cssText = [
+      'max-width:156px',
+      'overflow:hidden',
+      'text-overflow:ellipsis',
+      'white-space:nowrap',
+      'border-radius:999px',
+      'border:1px solid rgb(255 255 255 / 0.74)',
+      `background:${isSelected ? 'rgb(8 47 73 / 0.94)' : 'rgb(255 255 255 / 0.92)'}`,
+      `color:${isSelected ? 'rgb(240 249 255)' : 'rgb(15 23 42)'}`,
+      'padding:4px 10px',
+      'font-size:11px',
+      'font-weight:700',
+      'letter-spacing:0.01em',
+      'box-shadow:0 10px 24px rgb(15 23 42 / 0.14)',
+      'backdrop-filter:blur(12px)',
+    ].join(';')
+    label.textContent = item.isCover ? `Cover · ${item.title}` : item.title
+    shell.appendChild(label)
+  }
+
+  return { element: shell }
 }
 
 interface AisPinRenderOptions {

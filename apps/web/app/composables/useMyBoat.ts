@@ -14,6 +14,8 @@ import type {
   PublicProfileResponse,
   PublicVesselDetailResponse,
   VesselDetailResponse,
+  VesselMediaImportResponse,
+  VesselMediaUpdatePayload,
 } from '~/types/myboat'
 
 export function useDashboardOverview(key = 'myboat-dashboard') {
@@ -100,6 +102,73 @@ export function useInstallationDetail(installationId: string) {
   return useFetch<InstallationDetailResponse>(`/api/app/installations/${installationId}`, {
     key: `myboat-installation-${installationId}`,
   })
+}
+
+export function useUpdateVesselMedia(vesselSlug: string) {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function updateMedia(mediaId: string, payload: VesselMediaUpdatePayload) {
+    pending.value = true
+
+    try {
+      return await appFetch<{ ok: true }>('/api/app/vessels/' + vesselSlug + '/media/' + mediaId, {
+        method: 'PATCH',
+        body: payload,
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    pending: readonly(pending),
+    updateMedia,
+  }
+}
+
+export function useImportVesselMedia(vesselSlug: string) {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function importMedia(payload: {
+    items: Array<{
+      passageId?: string | null
+      title: string
+      caption?: string | null
+      imageUrl: string
+      sharePublic?: boolean
+      sourceKind?: 'manual' | 'apple_photos_seed'
+      sourceAssetId?: string | null
+      sourceFingerprint?: string | null
+      matchStatus?: 'attached' | 'review'
+      matchScore?: number | null
+      matchReason?: string | null
+      isCover?: boolean
+      lat?: number | null
+      lng?: number | null
+      capturedAt?: string | null
+    }>
+  }) {
+    pending.value = true
+
+    try {
+      return await appFetch<VesselMediaImportResponse>(
+        '/api/app/vessels/' + vesselSlug + '/media/import',
+        {
+          method: 'POST',
+          body: payload,
+        },
+      )
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    importMedia,
+    pending: readonly(pending),
+  }
 }
 
 export function useSaveOnboarding() {

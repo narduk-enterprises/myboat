@@ -13,7 +13,9 @@ const store = useMyBoatVesselStore()
 const trafficEnabled = ref(true)
 const entry = computed(() => store.getAuthEntryBySlug(props.detail.vessel.slug))
 const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
-const trafficDetailBasePath = computed(() => `/dashboard/vessels/${props.detail.vessel.slug}/traffic`)
+const trafficDetailBasePath = computed(
+  () => `/dashboard/vessels/${props.detail.vessel.slug}/traffic`,
+)
 const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
   computed(() => props.detail.vessel.slug),
   rawAisContacts,
@@ -34,6 +36,18 @@ const primaryInstallation = computed<InstallationSummary | null>(
     null,
 )
 const recentPassages = computed(() => props.detail.passages.slice(0, 3))
+const recentPassageIds = computed(() => new Set(recentPassages.value.map((passage) => passage.id)))
+const recentPassageMedia = computed(() =>
+  props.detail.media.filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      recentPassageIds.value.has(item.passageId!),
+  ),
+)
+const generalMedia = computed(() =>
+  props.detail.media.filter((item) => item.matchStatus === 'attached' && !item.passageId),
+)
 const publicPath = computed(() => `/${props.detail.profile.username}/${props.detail.vessel.slug}`)
 const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => entry.value?.mergedSnapshot || props.detail.vessel.liveSnapshot || null,
@@ -131,7 +145,7 @@ const liveFeedStatus = computed(() => {
             </div>
           </template>
 
-          <PassageTimeline :passages="recentPassages" />
+          <PassageTimeline :passages="recentPassages" :media="recentPassageMedia" />
         </UCard>
       </div>
 
@@ -298,6 +312,6 @@ const liveFeedStatus = computed(() => {
       </div>
     </div>
 
-    <MediaStrip v-if="detail.media.length" :media="detail.media" />
+    <MediaStrip v-if="generalMedia.length" :media="generalMedia" />
   </div>
 </template>

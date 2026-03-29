@@ -1,10 +1,10 @@
 import {
   getCaptainProfileByUsername,
   getFollowedVesselsForUser,
-  getMediaForVesselIds,
   getPassagesForVesselIds,
   getPublicFreshnessState,
   getPublicInstallationsForVesselIds,
+  getPublicMediaForVesselIds,
   getPublicVessels,
   getSnapshotsForVesselIds,
   getWaypointsForVesselIds,
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   const [snapshotRows, passageRows, mediaRows, waypointRows, installations] = await Promise.all([
     getSnapshotsForVesselIds(event, vesselIds),
     getPassagesForVesselIds(event, vesselIds),
-    getMediaForVesselIds(event, vesselIds),
+    getPublicMediaForVesselIds(event, vesselIds),
     getWaypointsForVesselIds(event, vesselIds),
     getPublicInstallationsForVesselIds(event, vesselIds),
   ])

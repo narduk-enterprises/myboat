@@ -190,20 +190,37 @@ export const waypoints = sqliteTable('waypoints', {
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
 })
 
-export const mediaItems = sqliteTable('media_items', {
-  id: text('id').primaryKey(),
-  vesselId: text('vessel_id')
-    .notNull()
-    .references(() => vessels.id, { onDelete: 'cascade' }),
-  passageId: text('passage_id').references(() => passages.id, { onDelete: 'set null' }),
-  title: text('title').notNull(),
-  caption: text('caption'),
-  imageUrl: text('image_url').notNull(),
-  lat: real('lat'),
-  lng: real('lng'),
-  capturedAt: text('captured_at'),
-  createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
-})
+export const mediaItems = sqliteTable(
+  'media_items',
+  {
+    id: text('id').primaryKey(),
+    vesselId: text('vessel_id')
+      .notNull()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    passageId: text('passage_id').references(() => passages.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    caption: text('caption'),
+    imageUrl: text('image_url').notNull(),
+    sharePublic: integer('share_public', { mode: 'boolean' }).notNull().default(false),
+    sourceKind: text('source_kind').notNull().default('manual'),
+    sourceAssetId: text('source_asset_id'),
+    sourceFingerprint: text('source_fingerprint'),
+    matchStatus: text('match_status').notNull().default('attached'),
+    matchScore: real('match_score'),
+    matchReason: text('match_reason'),
+    isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
+    lat: real('lat'),
+    lng: real('lng'),
+    capturedAt: text('captured_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    vesselFingerprintIdx: uniqueIndex('media_items_vessel_fingerprint_idx').on(
+      table.vesselId,
+      table.sourceFingerprint,
+    ),
+  }),
+)
 
 export const followedVessels = sqliteTable(
   'followed_vessels',

@@ -8,6 +8,7 @@ import {
   getSnapshotsForVesselIds,
   getVesselBySlug,
   getWaypointsForVesselIds,
+  serializeMediaItemSummary,
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
@@ -58,15 +59,7 @@ export default defineEventHandler(async (event) => {
     vessel: vesselCards[0]!,
     installations: installations.filter((installation) => installation.vesselId === vessel.id),
     passages: passageRows,
-    media: mediaRows.map((item) => ({
-      id: item.id,
-      title: item.title,
-      caption: item.caption,
-      imageUrl: item.imageUrl,
-      lat: item.lat,
-      lng: item.lng,
-      capturedAt: item.capturedAt,
-    })),
+    media: mediaRows.map(serializeMediaItemSummary),
     waypoints: waypointRows,
   }
 })

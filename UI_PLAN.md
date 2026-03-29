@@ -282,8 +282,9 @@ Status: UNLOCKED
   - vessel hero
   - live map
   - live metric grid
-  - passage timeline
-  - media strip
+  - media-rich passage timeline
+  - owner-only review queue for ambiguous media matches
+  - general vessel media strip for unattached items
   - linked installations card
 - Primary CTA:
   - open installation

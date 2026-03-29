@@ -31,6 +31,8 @@ logs
 
 # Build artifacts
 *.bak
+**/.build/
+**/.swiftpm/
 
 # Test artifacts
 coverage/
