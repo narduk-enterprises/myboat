@@ -21,7 +21,7 @@ export function useFollowedVesselsState() {
   const items = shallowRef<FollowedVesselSummary[]>([])
 
   function mergeItems(nextItems: FollowedVesselSummary[]) {
-    return [ ...nextItems, ...items.value ].filter(
+    return [...nextItems, ...items.value].filter(
       (item, index, collection) =>
         collection.findIndex(
           (candidate) => candidate.id === item.id || candidate.mmsi === item.mmsi,

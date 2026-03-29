@@ -77,12 +77,11 @@ function getErrorMessage(error: unknown) {
 
 function parseImportPayload(rawPayload: string): FollowedVesselImportItem[] {
   const parsed = JSON.parse(rawPayload) as unknown
-  const candidateItems =
-    Array.isArray(parsed)
-      ? parsed
-      : parsed && typeof parsed === 'object' && 'items' in parsed
-        ? (parsed as { items: unknown }).items
-        : null
+  const candidateItems = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object' && 'items' in parsed
+      ? (parsed as { items: unknown }).items
+      : null
 
   if (!candidateItems) {
     throw new Error('Use a JSON array or an object with an items array.')
@@ -125,8 +124,8 @@ async function onSubmit() {
       <div>
         <h3 class="font-display text-xl text-default">Import buddy boats</h3>
         <p class="mt-1 text-sm text-muted">
-          Paste a JSON list of `{ mmsi, name }` entries. The importer enriches boats from the
-          local AIS cache when that data already exists.
+          Paste a JSON list of `{ mmsi, name }` entries. The importer enriches boats from the local
+          AIS cache when that data already exists.
         </p>
       </div>
     </template>

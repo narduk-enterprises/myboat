@@ -45,11 +45,7 @@ export default defineUserMutation(
       sourceStations: body.sourceStations,
     }
 
-    await rememberAisHubResults(
-      event,
-      [result],
-      now,
-    )
+    await rememberAisHubResults(event, [result], now)
 
     const followedVessel = await upsertFollowedVesselForUser(event, user.id, result, now)
 

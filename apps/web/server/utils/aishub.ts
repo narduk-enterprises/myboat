@@ -206,9 +206,7 @@ export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: strin
     .where(inArray(aishubVessels.mmsi, uniqueMmsis))
     .all()
 
-  return new Map(
-    rows.map((row) => [row.mmsi, serializeStoredResult(row, row.mmsi)]),
-  )
+  return new Map(rows.map((row) => [row.mmsi, serializeStoredResult(row, row.mmsi)]))
 }
 
 async function searchStoredAisHubVessels(event: H3Event, rawQuery: string) {
