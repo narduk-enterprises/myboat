@@ -69,6 +69,10 @@ Status: UNLOCKED
   - heading
   - depth
 - no per-user dashboard-panel configurability yet
+- dashboard MMSI and other source-derived identifiers must come from observed
+  connection identity when available
+- `Pending` or equivalent placeholder copy is valid only before the collector
+  has observed source identity for the vessel
 
 ### `/dashboard/map`
 
@@ -103,12 +107,14 @@ Status: UNLOCKED
 
 - hero
 - installation credential panel
+- observed identity panel
 
 ### `/dashboard/settings`
 
 - hero
 - captain profile section
-- vessel profile section
+- captain-managed vessel profile section
+- observed connection identity section
 - collector setup section
 - sharing section
 - security section
@@ -148,8 +154,36 @@ Status: UNLOCKED
 - page data loading uses `useFetch()` or `useAsyncData()`
 - browsers read only MyBoat-owned APIs and MyBoat-owned live routes
 - D1 is the operational state store; InfluxDB is the historical telemetry store
+- connection-derived vessel identity is app-owned operational state and must not
+  require browser-side SignalK parsing
+- `POST /api/ingest/v1/delta` may accept collector-normalized batched deltas and
+  upstream self-context metadata
 - local boat deployments may read onboard telemetry directly, but they must
   expose the same MyBoat-shaped browser contract as `mybo.at`
+
+## Identity and telemetry data rules
+
+- Captain-managed vessel profile and observed connection identity are distinct
+  data categories.
+- Captain-managed vessel profile is for:
+  - public display name
+  - summary
+  - home port
+  - sharing posture
+  - captain-confirmed overrides
+- Observed connection identity is for:
+  - MMSI
+  - observed vessel name
+  - callsign
+  - dimensions / beam / draft / length
+  - ship type and source context metadata
+  - last-observed timestamps and provenance
+- Dashboard, vessel, and installation reads should expose observed identity
+  separately from manual profile fields or provide equivalent resolved fields
+  with source provenance.
+- Browsers do not derive MMSI or vessel identity directly from raw SignalK.
+- Live AIS updates are partial by nature; broker/store handling must preserve
+  last known non-null values when sparse upserts arrive.
 
 ## Theme rules
 

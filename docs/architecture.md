@@ -1,9 +1,9 @@
 # MyBoat Architecture
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
-This document captures the real MyBoat deployment topology after the move to
-the shared Narduk auth authority, plus the telemetry architecture the app now
+This document captures the real MyBoat deployment topology after the move to the
+shared Narduk auth authority, plus the telemetry architecture the app now
 targets across cloud and local boat deployments.
 
 ## Topology
@@ -17,13 +17,13 @@ flowchart TB
   subgraph Users["Users"]
     Owner["Owner / captain browser"]
     Public["Public visitor browser"]
-    Boat["Boat sensors / SignalK<br/>local collector container"]
+    Boat["Boat sensors / SignalK<br/>local collector container<br/>self context + identity discovery"]
     Local["Boat-local browser<br/>myboat.local"]
   end
 
   subgraph Cloudflare["Cloudflare edge"]
     DNS["DNS + TLS for <br/>mybo.at"]
-    Web["Nuxt app on Cloudflare Workers<br/>https://mybo.at<br/>routes + APIs<br/>/api/ingest/v1/delta<br/>/api/signalk/relay"]
+    Web["Nuxt app on Cloudflare Workers<br/>https://mybo.at<br/>routes + APIs<br/>/api/ingest/v1/delta<br/>/api/app/.../live<br/>/api/public/.../live"]
     D1["D1<br/>myboat-db<br/>vessels, installs,<br/>sharing + snapshot cache"]
     KV["Cloudflare KV<br/>binding: KV"]
     Live["Per-vessel MyBoat live broker<br/>owner + public live updates"]
@@ -51,9 +51,9 @@ flowchart TB
   AuthProd --> Caddy --> Auth --> AuthPg
   AuthStage --> Caddy
 
-  Boat -->|"POST normalized deltas<br/>/api/ingest/v1/delta"| Web
+  Boat -->|"POST normalized deltas + observed self identity<br/>/api/ingest/v1/delta"| Web
   Boat -->|"direct local telemetry"| LocalApp
-  Web -->|"latest snapshot, install heartbeat,<br/>sharing state"| D1
+  Web -->|"latest snapshot, install heartbeat,<br/>sharing state, observed identity"| D1
   Web -->|"write time-series history"| Influx
   Web -->|"publish normalized live events"| Live
   LocalApp -->|"same MyBoat API + live contract<br/>LAN only"| Local
@@ -93,29 +93,79 @@ flowchart TB
   - sharing controls
   - ingest keys
   - installation heartbeat
-  - latest vessel snapshot and other app-facing derived state
+  - latest vessel snapshot
+  - observed vessel identity and provenance
+  - other app-facing derived state
 - InfluxDB is the historical telemetry store for all boats.
 - The live broker is the browser-facing live source for owner and public views.
 - Browsers do not connect to raw SignalK or raw InfluxDB endpoints.
+
+## Identity Responsibilities
+
+- The collector is responsible for speaking SignalK and discovering upstream
+  self identity when available.
+- Discovery may come from:
+  - SignalK websocket hello / self context
+  - SignalK paths carried in deltas
+  - future SignalK self / metadata endpoint reads when needed
+- MyBoat persists the latest observed vessel identity so UI surfaces do not need
+  to infer MMSI or source metadata directly from raw live deltas.
+- Captain-managed vessel profile remains separate from observed identity:
+  - captain-managed fields: public name, summary, home port, sharing, overrides
+  - observed fields: MMSI, observed name, callsign, dimensions, ship type,
+    source context, last observed
+- Dashboard and installation views should prefer observed identity for
+  source-derived facts like MMSI.
 
 ## Browser Data Flow
 
 Remote browser flow:
 
-1. Boat collector reads local telemetry.
-2. Collector posts normalized deltas to `POST /api/ingest/v1/delta`.
-3. MyBoat updates D1 with latest vessel snapshot and installation heartbeat.
-4. MyBoat writes telemetry history to InfluxDB.
-5. MyBoat publishes normalized live events to a per-vessel live broker.
-6. Browser loads initial state from MyBoat REST APIs.
-7. Browser subscribes to a MyBoat live route for incremental updates.
+1. Boat collector reads local telemetry and learns the upstream self context.
+2. Collector normalizes telemetry and observed self identity into MyBoat ingest
+   payloads.
+3. Collector posts those payloads to `POST /api/ingest/v1/delta`.
+4. MyBoat updates D1 with latest vessel snapshot, install heartbeat, and
+   observed vessel identity.
+5. MyBoat writes telemetry history to InfluxDB.
+6. MyBoat publishes normalized live events to a per-vessel live broker.
+7. Browser loads initial state from MyBoat REST APIs.
+8. Browser subscribes to a MyBoat live route for incremental updates.
 
 Local boat flow:
 
-1. The boat runs a local MyBoat deployment on `myboat.local` or a similar LAN hostname.
+1. The boat runs a local MyBoat deployment on `myboat.local` or a similar LAN
+   hostname.
 2. That local deployment reads onboard telemetry directly.
-3. Boat-local browsers read only MyBoat-shaped APIs and live updates from the local deployment.
+3. Boat-local browsers read only MyBoat-shaped APIs and live updates from the
+   local deployment.
 4. The browser contract stays the same; only the serving origin changes.
+
+## Source Of Truth Split
+
+- D1
+  - captain accounts, vessels, installations
+  - captain-managed vessel profile
+  - observed vessel identity
+  - installation heartbeat and latest vessel snapshot
+  - sharing posture and app-facing derived state
+- InfluxDB
+  - append-oriented telemetry history
+  - historical chart reads and rollups
+- Live broker
+  - low-latency fanout for the latest snapshot and AIS contacts
+  - ephemeral state used for browser live views
+
+## UI Implications
+
+- `/dashboard` MMSI should come from observed vessel identity, not manual
+  onboarding-only data.
+- Onboarding and settings should minimize manual entry for fields the connection
+  can reliably supply.
+- Installation detail should show what the collector has actually observed from
+  the source, with timestamps and provenance.
+- Sparse AIS deltas are normal; live handling should preserve last known
+  non-null contact fields instead of resetting them to `null`.
 
 ## Service Placement
 

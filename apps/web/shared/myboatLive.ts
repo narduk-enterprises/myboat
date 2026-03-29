@@ -104,6 +104,38 @@ export function mergeLiveDemands(demands: LiveDemand[]) {
   }, DEFAULT_LIVE_DEMAND)
 }
 
+function preferDefined<T>(next: T | null | undefined, previous: T | null | undefined) {
+  return next ?? previous ?? null
+}
+
+export function mergeAisContactSummary(
+  previous: AisContactSummary | null | undefined,
+  next: AisContactSummary,
+): AisContactSummary {
+  if (!previous) {
+    return next
+  }
+
+  return {
+    id: next.id,
+    name: preferDefined(next.name, previous.name),
+    mmsi: preferDefined(next.mmsi, previous.mmsi),
+    shipType: preferDefined(next.shipType, previous.shipType),
+    lat: preferDefined(next.lat, previous.lat),
+    lng: preferDefined(next.lng, previous.lng),
+    cog: preferDefined(next.cog, previous.cog),
+    sog: preferDefined(next.sog, previous.sog),
+    heading: preferDefined(next.heading, previous.heading),
+    destination: preferDefined(next.destination, previous.destination),
+    callSign: preferDefined(next.callSign, previous.callSign),
+    length: preferDefined(next.length, previous.length),
+    beam: preferDefined(next.beam, previous.beam),
+    draft: preferDefined(next.draft, previous.draft),
+    navState: preferDefined(next.navState, previous.navState),
+    lastUpdateAt: Math.max(previous.lastUpdateAt, next.lastUpdateAt),
+  }
+}
+
 export function createMyBoatLiveWebSocketUrl(path: string, baseOrigin?: string) {
   const origin = baseOrigin || (import.meta.client ? globalThis.location?.origin : null) || 'http://localhost:3000'
   const url = new URL(path, origin)

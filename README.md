@@ -7,6 +7,13 @@ real vessel-platform work has been normalized into the Narduk Nuxt workspace so
 the product can evolve on one coherent foundation instead of a split cloud/edge
 scaffold.
 
+MyBoat is now the only system that boats and browsers talk to. Boat-side
+collectors ingest telemetry into MyBoat, MyBoat normalizes and stores canonical
+vessel state in D1 plus historical telemetry in InfluxDB, and browsers consume
+only MyBoat APIs and MyBoat-managed live streams. Boats can also run a
+boat-local deployment on `myboat.local` or a similar LAN hostname while keeping
+the same browser-facing contract.
+
 ## What Lives Here
 
 - `apps/web/`: the shipped Nuxt 4 product
@@ -23,15 +30,31 @@ scaffold.
 - `/dashboard/vessels/[vesselSlug]`: live + historical vessel detail
 - `/dashboard/installations/[installationId]`: install and ingest-key management
 - `/:username`: public captain profile
-- `/api/ingest/v1/delta`: SignalK-style ingest endpoint for installation keys
+- `/api/ingest/v1/delta`: collector ingest endpoint for normalized telemetry,
+  observed vessel identity, and installation keys
 
 ## Local Development
 
 ```bash
 pnpm install
-pnpm --filter web run db:migrate
 doppler setup --project myboat --config dev
-pnpm --filter web run dev
+pnpm run db:migrate
+pnpm dev
+```
+
+`pnpm dev` boots the full local stack:
+
+- local D1 migrate + seed
+- Cloudflare dev-binding verification
+- the vessel live broker worker and Durable Object on `127.0.0.1:8791`
+- the Nuxt app on `http://127.0.0.1:${NUXT_PORT:-3000}`
+
+To simulate live boat traffic from the public Tideye SignalK stream through the
+collector container:
+
+```bash
+doppler setup --project myboat --config dev
+MYBOAT_INGEST_KEY=nk_replace_me pnpm run dev:collector:tideye
 ```
 
 Useful commands:
@@ -73,10 +96,12 @@ pnpm run test:e2e:web
 
 ## Docs
 
-- [SPEC.md](/Users/narduk/Downloads/myboat-main/SPEC.md)
-- [UI_PLAN.md](/Users/narduk/Downloads/myboat-main/UI_PLAN.md)
-- [CONTRACT.md](/Users/narduk/Downloads/myboat-main/CONTRACT.md)
-- [Architecture](/Users/narduk/new-code/template-apps/myboat/docs/architecture.md)
+- [SPEC.md](./SPEC.md)
+- [UI_PLAN.md](./UI_PLAN.md)
+- [CONTRACT.md](./CONTRACT.md)
+- [Architecture](./docs/architecture.md)
+- [Operations Guide](./docs/agents/operations.md)
+- [Collector README](./apps/edge-collector/README.md)
 
 ## Template Maintenance
 

@@ -40,11 +40,13 @@ management are deferred until the single-vessel operator console is stable.
 - MyBoat keeps first-party app sessions and vessel data in its own app storage
 - historical telemetry lands in InfluxDB on `narduk` / Linode
 - D1 remains the operational store for captain, vessel, installation, sharing,
-  heartbeat, and latest-snapshot state
+  heartbeat, latest-snapshot state, and connection-derived vessel identity
 - owner and public live views consume MyBoat-managed live streams, not raw
   browser connections to SignalK or InfluxDB
 - remote browsers load initial state from MyBoat APIs, then subscribe to
   MyBoat-native live updates for incremental changes
+- the collector is responsible for speaking SignalK, discovering upstream vessel
+  self identity, and delivering normalized MyBoat ingest payloads
 - boats can also run a local MyBoat deployment on `myboat.local` or a similar
   LAN hostname; that local deployment serves the same MyBoat-shaped APIs and
   live stream while reading directly from onboard telemetry to reduce boat-side
@@ -80,8 +82,8 @@ any live or historical context already marked public.
 - `/dashboard/fleet-friends`
 - `/dashboard/settings`
 
-Contextual and legacy private routes remain valid in this pass, but they are
-not primary navigation:
+Contextual and legacy private routes remain valid in this pass, but they are not
+primary navigation:
 
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
@@ -105,8 +107,23 @@ credentials, and internal telemetry views.
 ### 2. Vessel identity
 
 - launch supports one primary vessel per captain
-- vessel metadata includes name, type, home port, summary, and public-sharing
-  flag
+- vessel identity is split into:
+  - captain-managed profile fields:
+    - public display name
+    - vessel type label
+    - home port
+    - summary
+    - public-sharing flag
+  - observed connection-derived identity:
+    - MMSI
+    - observed vessel name
+    - callsign
+    - dimensions / beam / draft / length
+    - ship type and other stable source metadata when available
+- dashboard and install views should prefer observed identity for source-derived
+  facts like MMSI instead of requiring manual entry
+- manual entry is still valid for presentation, summary, and captain-confirmed
+  overrides
 - future multi-vessel management is explicitly deferred
 
 ### 3. Live vessel state
@@ -132,10 +149,12 @@ credentials, and internal telemetry views.
   launch
 - installation selection and setup live inside vessel/settings workflows rather
   than acting as a first-class route family in the primary IA
-- installs use a MyBoat collector delivered as a Docker image or similar
-  onboard package
-- MyBoat does not store or expose user-managed SignalK websocket URLs as part
-  of the product contract
+- installs use a MyBoat collector delivered as a Docker image or similar onboard
+  package
+- the collector should discover and forward upstream self identity context and
+  connection-derived vessel metadata when SignalK makes it available
+- MyBoat does not store or expose user-managed SignalK websocket URLs as part of
+  the product contract
 - the collector may read local onboard telemetry, but once data enters MyBoat
   the product serves only MyBoat-native data shapes
 
@@ -147,14 +166,16 @@ credentials, and internal telemetry views.
 
 ### 6. Telemetry transport and storage
 
-- a single collector path normalizes incoming telemetry before fanout or
-  storage
+- a single collector path normalizes incoming telemetry before fanout or storage
 - collector ingest is the canonical cloud entrypoint:
   `boat sensors / SignalK -> collector -> MyBoat ingest`
 - live viewer updates and historical ingest happen in parallel from the same
   normalized stream
 - D1 stores latest vessel state, install heartbeat, sharing flags, and other
   app-facing derived state
+- D1 also stores the latest observed vessel identity and its provenance so
+  dashboard and settings surfaces do not need to infer identity directly from
+  raw live deltas
 - InfluxDB stores time-series history and rollups for all boats
 - public and dashboard clients read telemetry through MyBoat APIs and managed
   live channels, not through raw SignalK or raw Influx browser access
@@ -173,6 +194,17 @@ credentials, and internal telemetry views.
 - media items are geo-aware vessel memories tied to passages or places
 - waypoints represent anchorages, landfalls, fuel stops, reefs, marinas, or
   notes
+
+### 9. Observed identity and overrides
+
+- MyBoat should derive as much stable vessel identity as possible from the live
+  connection instead of requiring operators to type it into the UI
+- onboarding and settings should minimize manual entry for fields SignalK can
+  reliably provide
+- connection-derived identity should be presented as "observed from source" with
+  last-observed timestamps
+- captain-managed overrides remain the public presentation and correction layer
+  when onboard identity is absent, wrong, or intentionally redacted
 
 ## Page inventory
 
@@ -206,7 +238,7 @@ authenticated IA:
 1. Register or sign in.
 2. Complete onboarding.
 3. Lock the public handle.
-4. Define the vessel.
+4. Define the captain-managed vessel profile.
 5. Define the first install.
 6. Land on `/dashboard`.
 
@@ -217,7 +249,8 @@ authenticated IA:
 3. Copy the collector command template.
 4. Point the collector at `/api/ingest/v1/delta` and its local onboard telemetry
    source.
-5. Confirm live snapshot and last-seen updates on dashboard and vessel pages.
+5. Confirm live snapshot, observed vessel identity, and last-seen updates on
+   dashboard and vessel pages.
 6. Allow the same normalized telemetry stream to feed both:
    - low-latency live viewing
    - historical storage in InfluxDB
@@ -235,7 +268,7 @@ authenticated IA:
 1. Land on `/dashboard`.
 2. Read the sticky live header for:
    - vessel name
-   - MMSI
+   - MMSI from observed connection identity when available
    - latitude
    - longitude
    - apparent wind speed
@@ -253,6 +286,15 @@ authenticated IA:
 The dashboard stats panel is fixed at launch. Per-user panel configurability is
 explicitly deferred.
 
+Dashboard identity behavior:
+
+- MMSI and other source-derived identifiers should come from the observed vessel
+  identity record
+- `Pending` or equivalent placeholder copy is valid only until the collector has
+  not yet observed identity for that vessel
+- manual profile fields are fallback and presentation metadata, not the source
+  of truth for MMSI
+
 ## Domain model
 
 - `public_profiles`: public captain handle and profile metadata
@@ -260,6 +302,8 @@ explicitly deferred.
 - `vessel_installations`: onboard device installs
 - `vessel_installation_api_keys`: mapping from install to layer-owned API keys
 - `vessel_live_snapshots`: last known live state per vessel
+- `vessel_observed_identities`: latest connection-derived MMSI, observed name,
+  callsign, dimensions, ship type, source context, and last-observed timestamps
 - `followed_vessels`: saved buddy boats for captain surfaces
 - `passages`: voyage summaries and optional route geometry
 - `waypoints`: geo-linked annotations and visited places
@@ -299,9 +343,15 @@ explicitly deferred.
 - the spec reflects the external Narduk auth authority and rollback hostname
 - the spec reflects InfluxDB as historical time-series storage and D1 as the
   operational state store
+- the spec reflects connection-derived vessel identity as app-owned operational
+  state, not a browser concern
 - logged-in visits to `/` redirect to `/dashboard`
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
+- `/api/ingest/v1/delta` is capable of carrying collector-normalized self
+  identity context alongside telemetry
 - owner and public vessel pages read live deltas through MyBoat-managed live
   routes, not raw SignalK browser sockets
+- dashboard identity surfaces do not depend on manual MMSI entry when the
+  collector can discover it from the connection
 - no placeholder home/about/contact scaffold remains
 - docs describe the real migrated product, not the provision brief

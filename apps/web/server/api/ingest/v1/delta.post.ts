@@ -13,28 +13,68 @@ import { useAppDatabase } from '#server/utils/database'
 import { writeTelemetryToInflux } from '#server/utils/influx'
 import { publishVesselLiveMessage } from '#server/utils/liveBroker'
 import {
+  type IngestDelta,
   buildInfluxLines,
   buildLivePublishMessage,
   resolveObservedAt,
 } from '#server/utils/telemetry'
+import type { VesselLivePublishMessage } from '../../../../shared/myboatLive'
 
-const ingestSchema = z.object({
-  timestamp: z.string().datetime().optional(),
-  delta: z.object({
-    context: z.string().optional(),
-    updates: z.array(
-      z.object({
-        timestamp: z.string().optional(),
-        values: z.array(
-          z.object({
-            path: z.string(),
-            value: z.unknown(),
-          }),
-        ),
-      }),
-    ),
-  }),
+const deltaSchema = z.object({
+  context: z.string().optional(),
+  self: z.string().optional(),
+  updates: z.array(
+    z.object({
+      timestamp: z.string().optional(),
+      values: z.array(
+        z.object({
+          path: z.string(),
+          value: z.unknown(),
+        }),
+      ),
+    }),
+  ),
 })
+
+const ingestItemSchema = z.object({
+  timestamp: z.string().datetime().optional(),
+  delta: deltaSchema,
+})
+
+const ingestSchema = z.union([
+  ingestItemSchema,
+  z.object({
+    timestamp: z.string().datetime().optional(),
+    deltas: z.array(ingestItemSchema).min(1),
+  }),
+])
+
+type IngestRequestBody = z.infer<typeof ingestSchema>
+type NormalizedIngestItem = {
+  timestamp?: string
+  delta: IngestDelta
+}
+
+function normalizeIngestItems(body: IngestRequestBody): NormalizedIngestItem[] {
+  if ('deltas' in body) {
+    return body.deltas.map((item) => ({
+      timestamp: item.timestamp || body.timestamp,
+      delta: item.delta,
+    }))
+  }
+
+  return [
+    {
+      timestamp: body.timestamp,
+      delta: body.delta,
+    },
+  ]
+}
+
+function getObservedAtMs(observedAt: string) {
+  const observedAtMs = Date.parse(observedAt)
+  return Number.isFinite(observedAtMs) ? observedAtMs : Number.NEGATIVE_INFINITY
+}
 
 async function sha256(value: string) {
   const encoded = new TextEncoder().encode(value)
@@ -81,58 +121,103 @@ export default defineWebhookMutation(
       throw createError({ statusCode: 401, message: 'Invalid ingest key.' })
     }
 
-    const observedAt = resolveObservedAt(body.timestamp, body.delta)
+    const ingestItems = normalizeIngestItems(body)
     const now = new Date().toISOString()
-    const livePayload = buildLivePublishMessage({
-      delta: body.delta,
-      observedAt,
-      vesselId: installationBinding.vesselId,
-      source: installationBinding.installationType,
-      connectionState: 'live',
-    })
-    const influxLines = buildInfluxLines({
-      delta: body.delta,
-      observedAt,
-      installationId: installationBinding.installationId,
-      vesselId: installationBinding.vesselId,
-    })
+    const aggregatedAisContacts = new Map<string, NonNullable<VesselLivePublishMessage['aisContacts']>[number]>()
+    const influxLines: string[] = []
+    let latestObservedAt: string | null = null
+    let latestObservedAtMs = Number.NEGATIVE_INFINITY
+    let latestSnapshot: VesselLivePublishMessage['snapshot']
+    let latestSnapshotObservedAt: string | null = null
+    let latestSnapshotObservedAtMs = Number.NEGATIVE_INFINITY
 
-    if (installationBinding.isPrimary && livePayload.snapshot) {
+    for (const item of ingestItems) {
+      const observedAt = resolveObservedAt(item.timestamp, item.delta)
+      const observedAtMs = getObservedAtMs(observedAt)
+
+      if (observedAtMs >= latestObservedAtMs) {
+        latestObservedAtMs = observedAtMs
+        latestObservedAt = observedAt
+      }
+
+      const livePayload = buildLivePublishMessage({
+        delta: item.delta,
+        observedAt,
+        vesselId: installationBinding.vesselId,
+        source: installationBinding.installationType,
+        connectionState: 'live',
+      })
+
+      if (livePayload.snapshot && observedAtMs >= latestSnapshotObservedAtMs) {
+        latestSnapshotObservedAtMs = observedAtMs
+        latestSnapshotObservedAt = observedAt
+        latestSnapshot = livePayload.snapshot
+      }
+
+      for (const contact of livePayload.aisContacts || []) {
+        aggregatedAisContacts.set(contact.id, contact)
+      }
+
+      influxLines.push(
+        ...buildInfluxLines({
+          delta: item.delta,
+          observedAt,
+          installationId: installationBinding.installationId,
+          vesselId: installationBinding.vesselId,
+        }),
+      )
+    }
+
+    const livePayload: VesselLivePublishMessage = {
+      type: 'telemetry',
+      connectionState: 'live',
+      lastObservedAt: latestObservedAt,
+    }
+
+    if (latestSnapshot !== undefined) {
+      livePayload.snapshot = latestSnapshot
+    }
+
+    if (aggregatedAisContacts.size) {
+      livePayload.aisContacts = Array.from(aggregatedAisContacts.values())
+    }
+
+    if (installationBinding.isPrimary && latestSnapshot && latestSnapshotObservedAt) {
       await db
         .insert(vesselLiveSnapshots)
         .values({
           vesselId: installationBinding.vesselId,
           source: installationBinding.installationType,
-          observedAt,
-          positionLat: livePayload.snapshot.positionLat,
-          positionLng: livePayload.snapshot.positionLng,
-          headingMagnetic: livePayload.snapshot.headingMagnetic,
-          speedOverGround: livePayload.snapshot.speedOverGround,
-          speedThroughWater: livePayload.snapshot.speedThroughWater,
-          windSpeedApparent: livePayload.snapshot.windSpeedApparent,
-          windAngleApparent: livePayload.snapshot.windAngleApparent,
-          depthBelowTransducer: livePayload.snapshot.depthBelowTransducer,
-          waterTemperatureKelvin: livePayload.snapshot.waterTemperatureKelvin,
-          batteryVoltage: livePayload.snapshot.batteryVoltage,
-          engineRpm: livePayload.snapshot.engineRpm,
+          observedAt: latestSnapshotObservedAt,
+          positionLat: latestSnapshot.positionLat,
+          positionLng: latestSnapshot.positionLng,
+          headingMagnetic: latestSnapshot.headingMagnetic,
+          speedOverGround: latestSnapshot.speedOverGround,
+          speedThroughWater: latestSnapshot.speedThroughWater,
+          windSpeedApparent: latestSnapshot.windSpeedApparent,
+          windAngleApparent: latestSnapshot.windAngleApparent,
+          depthBelowTransducer: latestSnapshot.depthBelowTransducer,
+          waterTemperatureKelvin: latestSnapshot.waterTemperatureKelvin,
+          batteryVoltage: latestSnapshot.batteryVoltage,
+          engineRpm: latestSnapshot.engineRpm,
           updatedAt: now,
         })
         .onConflictDoUpdate({
           target: vesselLiveSnapshots.vesselId,
           set: {
             source: installationBinding.installationType,
-            observedAt,
-            positionLat: livePayload.snapshot.positionLat,
-            positionLng: livePayload.snapshot.positionLng,
-            headingMagnetic: livePayload.snapshot.headingMagnetic,
-            speedOverGround: livePayload.snapshot.speedOverGround,
-            speedThroughWater: livePayload.snapshot.speedThroughWater,
-            windSpeedApparent: livePayload.snapshot.windSpeedApparent,
-            windAngleApparent: livePayload.snapshot.windAngleApparent,
-            depthBelowTransducer: livePayload.snapshot.depthBelowTransducer,
-            waterTemperatureKelvin: livePayload.snapshot.waterTemperatureKelvin,
-            batteryVoltage: livePayload.snapshot.batteryVoltage,
-            engineRpm: livePayload.snapshot.engineRpm,
+            observedAt: latestSnapshotObservedAt,
+            positionLat: latestSnapshot.positionLat,
+            positionLng: latestSnapshot.positionLng,
+            headingMagnetic: latestSnapshot.headingMagnetic,
+            speedOverGround: latestSnapshot.speedOverGround,
+            speedThroughWater: latestSnapshot.speedThroughWater,
+            windSpeedApparent: latestSnapshot.windSpeedApparent,
+            windAngleApparent: latestSnapshot.windAngleApparent,
+            depthBelowTransducer: latestSnapshot.depthBelowTransducer,
+            waterTemperatureKelvin: latestSnapshot.waterTemperatureKelvin,
+            batteryVoltage: latestSnapshot.batteryVoltage,
+            engineRpm: latestSnapshot.engineRpm,
             updatedAt: now,
           },
         })
@@ -142,16 +227,16 @@ export default defineWebhookMutation(
       .update(vesselInstallations)
       .set({
         connectionState: 'live',
-        lastSeenAt: observedAt,
+        lastSeenAt: latestObservedAt || now,
         updatedAt: now,
-        eventCount: sql`${vesselInstallations.eventCount} + 1`,
+        eventCount: sql`${vesselInstallations.eventCount} + ${ingestItems.length}`,
       })
       .where(eq(vesselInstallations.id, installationBinding.installationId))
 
     await db
       .update(apiKeys)
       .set({
-        lastUsedAt: observedAt,
+        lastUsedAt: latestObservedAt || now,
       })
       .where(eq(apiKeys.id, installationBinding.apiKeyId))
 
@@ -177,7 +262,8 @@ export default defineWebhookMutation(
     return {
       ok: true,
       installationId: installationBinding.installationId,
-      observedAt,
+      observedAt: latestObservedAt || now,
+      processedDeltas: ingestItems.length,
     }
   },
 )

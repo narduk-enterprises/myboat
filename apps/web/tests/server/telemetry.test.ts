@@ -84,6 +84,45 @@ describe('telemetry helpers', () => {
     })
   })
 
+  it('treats the upstream self context as a vessel snapshot instead of AIS', () => {
+    const observedAt = '2026-03-28T12:02:00.000Z'
+    const delta = {
+      context: 'vessels.urn:mrn:imo:mmsi:368327340',
+      self: 'vessels.urn:mrn:imo:mmsi:368327340',
+      updates: [
+        {
+          values: [
+            {
+              path: 'navigation.position',
+              value: { latitude: 29.5458, longitude: -95.1864 },
+            },
+            { path: 'navigation.speedOverGround', value: 6.4 },
+          ],
+        },
+      ],
+    }
+
+    expect(buildAisContactFromDelta({ delta, observedAt })).toBeNull()
+    expect(
+      buildLivePublishMessage({
+        delta,
+        observedAt,
+        vesselId: 'vessel-1',
+        source: 'collector_ingest',
+      }),
+    ).toMatchObject({
+      type: 'telemetry',
+      connectionState: 'live',
+      lastObservedAt: observedAt,
+      snapshot: {
+        vesselId: 'vessel-1',
+        positionLat: 29.5458,
+        positionLng: -95.1864,
+        speedOverGround: 6.4,
+      },
+    })
+  })
+
   it('builds influx lines for numeric and structured values', () => {
     const lines = buildInfluxLines({
       delta: {

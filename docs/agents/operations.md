@@ -10,7 +10,7 @@ pnpm run setup -- --name="my-app" --display="My App" --url="https://my-app.com"
 pnpm run validate
 pnpm run db:migrate
 doppler setup --project my-app --config dev
-doppler run -- pnpm run dev
+pnpm run dev
 ```
 
 Bootstrap guard:
@@ -65,8 +65,32 @@ Typical local setup:
 
 ```bash
 doppler setup --project <app-name> --config dev
-doppler run -- pnpm run dev
+pnpm run dev
 ```
+
+`pnpm dev` is the supported entrypoint in this repo. When Doppler is installed,
+the web workspace runs inside `doppler run` automatically. The local dev flow
+also:
+
+- migrates and seeds local D1
+- verifies Cloudflare development bindings
+- starts the vessel live broker worker and Durable Object on `127.0.0.1:8791`
+- starts the Nuxt app on `NUXT_PORT`
+
+The dev startup now fails fast if either the requested web port or the local
+broker port is already occupied, instead of silently drifting to a different
+port.
+
+For telemetry smoke tests, keep `pnpm dev` running and start the Tideye-backed
+collector container from the repo root:
+
+```bash
+MYBOAT_INGEST_KEY=nk_replace_me pnpm run dev:collector:tideye
+```
+
+That helper forwards the public Tideye SignalK stream through the collector,
+posts normalized deltas into MyBoat ingest, and republishes the collector-owned
+local websocket on `ws://localhost:4011/myboat/v1/stream`.
 
 Declare secrets explicitly in `runtimeConfig`:
 

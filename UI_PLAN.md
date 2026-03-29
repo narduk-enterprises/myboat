@@ -199,8 +199,14 @@ Status: UNLOCKED
   - depth
 - Behavior:
   - the route-level captain hero is removed
-  - the left sidebar keeps only nav links; the old owner-board promo panel is removed
+  - the left sidebar keeps only nav links; the old owner-board promo panel is
+    removed
   - the stats panel is fixed at launch and not user-configurable yet
+  - MMSI and other source-derived identifiers come from observed connection
+    identity, not manual vessel-form entry
+  - when no observed identity exists yet, show an explicit pending / unavailable
+    state tied to collector discovery rather than implying the user must type
+    the value in
 - Empty:
   - no captain setup yet
   - no vessel yet
@@ -256,8 +262,9 @@ Status: UNLOCKED
   - create or finish the canonical first-time setup
 - Primary sections:
   - captain identity
-  - vessel identity
+  - captain-managed vessel profile
   - installation and collector setup
+  - observed identity preview when a collector has already reported source data
 - Primary CTA:
   - save and continue
 - Secondary CTA:
@@ -299,6 +306,7 @@ Status: UNLOCKED
 - Primary sections:
   - installation summary
   - connection status
+  - observed vessel identity
   - ingest key creation
   - collector command and setup guidance
   - local boat-mode guidance
@@ -311,6 +319,7 @@ Status: UNLOCKED
 - Empty:
   - no keys issued yet
   - no telemetry observed yet
+  - no observed identity yet
 - Error:
   - installation not found state
   - key generation failure toast or inline alert
@@ -322,7 +331,8 @@ Status: UNLOCKED
 - Primary sections:
   - hero
   - captain profile section
-  - vessel profile section
+  - captain-managed vessel profile section
+  - observed connection identity section
   - collector setup section
   - sharing section
   - security section
@@ -506,6 +516,12 @@ Status: UNLOCKED
 - Private vessel pages are denser than public vessel pages.
 - Empty states must explain what is missing and what action unlocks the feature.
 - Error states should preserve route shell and context where possible.
+- Source-derived vessel identity should be visually distinct from
+  captain-managed profile fields.
+- UI should minimize manual entry for fields the collector can reliably observe
+  from SignalK.
+- AIS and vessel identity cards should preserve last known non-null values when
+  live updates are sparse.
 
 ## Open UI questions
 

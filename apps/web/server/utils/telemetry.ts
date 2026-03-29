@@ -51,6 +51,7 @@ export type IngestDeltaUpdate = {
 
 export type IngestDelta = {
   context?: string
+  self?: string
   updates: IngestDeltaUpdate[]
 }
 
@@ -154,8 +155,15 @@ function normalizeContext(context: string | undefined) {
   return context?.trim() || ''
 }
 
-function isSelfContext(context: string | undefined) {
-  return TELEMETRY_SELF_CONTEXTS.has(normalizeContext(context))
+function isSelfContext(context: string | undefined, selfContext?: string | undefined) {
+  const normalizedContext = normalizeContext(context)
+
+  if (TELEMETRY_SELF_CONTEXTS.has(normalizedContext)) {
+    return true
+  }
+
+  const normalizedSelfContext = normalizeContext(selfContext)
+  return Boolean(normalizedContext && normalizedSelfContext && normalizedContext === normalizedSelfContext)
 }
 
 function escapeTagValue(value: string) {
@@ -219,7 +227,7 @@ export function buildAisContactFromDelta(input: {
   delta: IngestDelta
   observedAt: string
 }): AisContactSummary | null {
-  if (isSelfContext(input.delta.context)) {
+  if (isSelfContext(input.delta.context, input.delta.self)) {
     return null
   }
 
@@ -340,7 +348,7 @@ export function buildLivePublishMessage(input: {
     connectionState: input.connectionState || 'live',
   }
 
-  if (isSelfContext(input.delta.context)) {
+  if (isSelfContext(input.delta.context, input.delta.self)) {
     payload.snapshot = buildSnapshotFromDelta({
       delta: input.delta,
       observedAt: input.observedAt,

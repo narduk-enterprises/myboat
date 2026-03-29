@@ -50,6 +50,7 @@ let lastPostStartedAt = 0
 let nextPostNotBefore = 0
 let lastPublishedAt: string | null = null
 let lastPublishedDeltaRaw: string | null = null
+let signalkSelfContext: string | null = null
 
 const liveClients = new Set<ServerWebSocket>()
 
@@ -184,10 +185,47 @@ function broadcastToLiveClients(message: string) {
   }
 }
 
+function maybeUpdateSignalKSelfContext(nextSelf: unknown) {
+  if (typeof nextSelf !== 'string') {
+    return
+  }
+
+  const normalized = nextSelf.trim()
+  if (!normalized || normalized === signalkSelfContext) {
+    return
+  }
+
+  signalkSelfContext = normalized
+
+  const hello = buildCollectorHelloMessage()
+  for (const client of liveClients) {
+    if (client.readyState !== client.OPEN) {
+      liveClients.delete(client)
+      continue
+    }
+
+    client.send(hello)
+  }
+}
+
+function normalizeDeltaForIngest(delta: SignalKDeltaMessage): SignalKDeltaMessage {
+  const self =
+    typeof delta.self === 'string' && delta.self.trim() ? delta.self.trim() : signalkSelfContext
+
+  if (!self) {
+    return delta
+  }
+
+  return {
+    ...delta,
+    self,
+  }
+}
+
 function buildCollectorHelloMessage() {
   return JSON.stringify({
     name: 'myboat-edge-collector',
-    self: 'vessels.self',
+    self: signalkSelfContext || 'vessels.self',
     version: '0.1.0',
   })
 }
@@ -315,6 +353,7 @@ function msUntilPostAllowed(): number {
 
 function connect() {
   clearReconnectTimer()
+  hasLoggedServerHello = false
   log(`Connecting to SignalK`, config.signalkWsUrl)
 
   socket = new WebSocket(config.signalkWsUrl)
@@ -357,6 +396,7 @@ async function handleSocketMessage(data: unknown) {
     if (!hasLoggedServerHello && parsed && typeof parsed === 'object') {
       const hello = parsed as { name?: unknown; version?: unknown; self?: unknown }
       hasLoggedServerHello = true
+      maybeUpdateSignalKSelfContext(hello.self)
       log('Received non-delta SignalK message', {
         name: typeof hello.name === 'string' ? hello.name : undefined,
         version: typeof hello.version === 'string' ? hello.version : undefined,
@@ -371,7 +411,7 @@ async function handleSocketMessage(data: unknown) {
 function enqueueDelta(delta: SignalKDeltaMessage) {
   batch.push({
     timestamp: new Date().toISOString(),
-    delta,
+    delta: normalizeDeltaForIngest(delta),
   })
 
   scheduleFlush()
@@ -379,14 +419,41 @@ function enqueueDelta(delta: SignalKDeltaMessage) {
 
 function mergeBatchItems(items: BatchItem[]) {
   const latestTimestamp = items[items.length - 1]?.timestamp || new Date().toISOString()
-  const context = items.find((item) => item.delta.context)?.delta.context
 
   return {
     timestamp: latestTimestamp,
-    delta: {
-      ...(context ? { context } : {}),
-      updates: items.flatMap((item) => item.delta.updates),
-    },
+    deltas: Array.from(
+      items.reduce<
+        Map<
+          string,
+          {
+            timestamp: string
+            delta: SignalKDeltaMessage
+          }
+        >
+      >((groups, item) => {
+        const context = item.delta.context?.trim() || ''
+        const self = item.delta.self?.trim() || ''
+        const groupKey = `${context}\u0000${self}`
+        const currentGroup = groups.get(groupKey)
+
+        if (!currentGroup) {
+          groups.set(groupKey, {
+            timestamp: item.timestamp,
+            delta: {
+              ...(item.delta.context ? { context: item.delta.context } : {}),
+              ...(item.delta.self ? { self: item.delta.self } : {}),
+              updates: [...item.delta.updates],
+            },
+          })
+          return groups
+        }
+
+        currentGroup.timestamp = item.timestamp
+        currentGroup.delta.updates.push(...item.delta.updates)
+        return groups
+      }, new Map()).values(),
+    ),
   }
 }
 
@@ -402,7 +469,7 @@ async function postDeltaBatch(items: BatchItem[]) {
     },
     body: JSON.stringify({
       timestamp: payload.timestamp,
-      delta: payload.delta,
+      deltas: payload.deltas,
     }),
     signal: AbortSignal.timeout(config.requestTimeoutMs),
   })

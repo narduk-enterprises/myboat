@@ -25,6 +25,7 @@ import type {
 import {
   createMyBoatLiveWebSocketUrl,
   isLiveDemandEmpty,
+  mergeAisContactSummary,
   mergeLiveDemands,
   normalizeLiveDemand,
 } from '../../shared/myboatLive'
@@ -979,7 +980,7 @@ export function useMyBoatVesselStore() {
       ...currentEntry,
       aisContacts: {
         ...currentEntry.aisContacts,
-        [contact.id]: contact,
+        [contact.id]: mergeAisContactSummary(currentEntry.aisContacts[contact.id], contact),
       },
       live: {
         ...currentEntry.live,
@@ -1014,7 +1015,7 @@ export function useMyBoatVesselStore() {
         updateEntry(namespace, entryKey, (currentEntry) => {
           const nextContacts = message.aisContacts.reduce<Record<string, AisContactSummary>>(
             (accumulator, contact) => {
-              accumulator[contact.id] = contact
+              accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
               return accumulator
             },
             {},
