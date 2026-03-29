@@ -116,7 +116,9 @@ const hasMapData = computed(
     trafficVectorGeojson.value.features.length > 0,
 )
 
-const selectedPin = computed(() => allPins.value.find((item) => item.id === selectedId.value) || null)
+const selectedPin = computed(
+  () => allPins.value.find((item) => item.id === selectedId.value) || null,
+)
 const selectedVessel = computed(() => {
   const selected = selectedPin.value
   if (!selected || selected.pinKind !== 'vessel') {
@@ -454,7 +456,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="hasMapData" class="overflow-hidden rounded-[1.5rem] border border-default/70 bg-default/90">
+  <div
+    v-if="hasMapData"
+    class="overflow-hidden rounded-[1.5rem] border border-default/70 bg-default/90"
+  >
     <MyBoatMap
       ref="mapRoot"
       v-model:selected-id="selectedId"
@@ -489,10 +494,22 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <UButton icon="i-lucide-scan-search" color="neutral" variant="soft" size="xs" @click="fitToContent(0)">
+            <UButton
+              icon="i-lucide-scan-search"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="fitToContent(0)"
+            >
               Fit map
             </UButton>
-            <UButton icon="i-lucide-crosshair" color="neutral" variant="soft" size="xs" @click="centerOnFocusVessel">
+            <UButton
+              icon="i-lucide-crosshair"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="centerOnFocusVessel"
+            >
               Center vessel
             </UButton>
             <UButton
@@ -528,7 +545,13 @@ onBeforeUnmount(() => {
       </template>
 
       <template
-        #overlay="{ clearRememberedView, fitToContent, isFullscreen, savedRegion, toggleFullscreen }"
+        #overlay="{
+          clearRememberedView,
+          fitToContent,
+          isFullscreen,
+          savedRegion,
+          toggleFullscreen,
+        }"
       >
         <div
           v-if="showFocusPanel"
@@ -541,8 +564,22 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
-          <UButton class="pointer-events-auto" icon="i-lucide-scan-search" color="neutral" variant="soft" size="sm" @click="fitToContent(0)" />
-          <UButton class="pointer-events-auto" icon="i-lucide-crosshair" color="neutral" variant="soft" size="sm" @click="centerOnFocusVessel" />
+          <UButton
+            class="pointer-events-auto"
+            icon="i-lucide-scan-search"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            @click="fitToContent(0)"
+          />
+          <UButton
+            class="pointer-events-auto"
+            icon="i-lucide-crosshair"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            @click="centerOnFocusVessel"
+          />
           <UButton
             class="pointer-events-auto"
             :icon="showPointsOfInterest ? 'i-lucide-map' : 'i-lucide-map-off'"
@@ -646,10 +683,22 @@ onBeforeUnmount(() => {
       <template v-if="showLayerToggles || showStatsRail" #footer>
         <div class="space-y-3 border-t border-default/70 px-4 py-3 lg:hidden">
           <div v-if="showLayerToggles" class="flex flex-wrap gap-2">
-            <UButton icon="i-lucide-route" :color="showRoutes ? 'primary' : 'neutral'" :variant="showRoutes ? 'soft' : 'outline'" size="xs" @click="showRoutes = !showRoutes">
+            <UButton
+              icon="i-lucide-route"
+              :color="showRoutes ? 'primary' : 'neutral'"
+              :variant="showRoutes ? 'soft' : 'outline'"
+              size="xs"
+              @click="showRoutes = !showRoutes"
+            >
               Routes {{ baseGeojson.features.length ? `(${baseGeojson.features.length})` : '' }}
             </UButton>
-            <UButton icon="i-lucide-map-pinned" :color="showWaypoints ? 'primary' : 'neutral'" :variant="showWaypoints ? 'soft' : 'outline'" size="xs" @click="showWaypoints = !showWaypoints">
+            <UButton
+              icon="i-lucide-map-pinned"
+              :color="showWaypoints ? 'primary' : 'neutral'"
+              :variant="showWaypoints ? 'soft' : 'outline'"
+              size="xs"
+              @click="showWaypoints = !showWaypoints"
+            >
               Waypoints {{ waypointPins.length ? `(${waypointPins.length})` : '' }}
             </UButton>
             <UButton

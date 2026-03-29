@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type {
-  PublicInstallationSummary,
-} from '~/types/myboat'
+import type { PublicInstallationSummary } from '~/types/myboat'
 import {
   formatCoordinate,
   formatRelativeTime,

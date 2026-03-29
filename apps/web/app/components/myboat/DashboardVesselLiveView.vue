@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type { InstallationSummary, VesselDetailResponse, VesselSnapshotSummary } from '~/types/myboat'
+import type {
+  InstallationSummary,
+  VesselDetailResponse,
+  VesselSnapshotSummary,
+} from '~/types/myboat'
 import { formatCoordinate, formatRelativeTime, formatTimestamp } from '~/utils/marine'
 
 const props = defineProps<{

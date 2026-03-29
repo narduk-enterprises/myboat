@@ -173,7 +173,10 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
 </script>
 
 <template>
-  <div v-if="vesselPins.length" class="overflow-hidden rounded-[1.75rem] border border-default/80 bg-default/90 shadow-card">
+  <div
+    v-if="vesselPins.length"
+    class="overflow-hidden rounded-[1.75rem] border border-default/80 bg-default/90 shadow-card"
+  >
     <MyBoatMap
       ref="mapRoot"
       v-model:selected-id="selectedId"

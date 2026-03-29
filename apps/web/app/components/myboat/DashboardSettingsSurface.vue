@@ -49,7 +49,8 @@ const setupIncomplete = computed(
               One place for captain, vessel, and live-feed decisions
             </h1>
             <p class="mt-3 max-w-3xl text-base leading-7 text-muted">
-              This is the canonical settings destination. The older settings subpages stay available as contextual editors, but the dashboard should point here first.
+              This is the canonical settings destination. The older settings subpages stay available
+              as contextual editors, but the dashboard should point here first.
             </p>
           </div>
         </div>
@@ -92,7 +93,9 @@ const setupIncomplete = computed(
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Captain profile</h2>
-            <p class="mt-1 text-sm text-muted">Public identity, handle, and shareable captain copy.</p>
+            <p class="mt-1 text-sm text-muted">
+              Public identity, handle, and shareable captain copy.
+            </p>
           </div>
         </template>
 
@@ -133,7 +136,10 @@ const setupIncomplete = computed(
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Vessel profile</h2>
-            <p class="mt-1 text-sm text-muted">Launch stays single-vessel, so this section is about the one boat the captain is actively operating.</p>
+            <p class="mt-1 text-sm text-muted">
+              Launch stays single-vessel, so this section is about the one boat the captain is
+              actively operating.
+            </p>
           </div>
         </template>
 
@@ -144,8 +150,9 @@ const setupIncomplete = computed(
               <p class="mt-2 font-medium text-default">{{ primaryVessel?.name || 'Pending' }}</p>
               <p class="mt-1 text-xs text-muted">
                 {{
-                  [primaryVessel?.vesselType, primaryVessel?.homePort].filter(Boolean).join(' · ') ||
-                  'Type and home port still need setup.'
+                  [primaryVessel?.vesselType, primaryVessel?.homePort]
+                    .filter(Boolean)
+                    .join(' · ') || 'Type and home port still need setup.'
                 }}
               </p>
             </div>
@@ -154,7 +161,9 @@ const setupIncomplete = computed(
               <p class="mt-2 font-medium text-default">
                 {{ primaryVessel?.sharePublic ? 'Enabled' : 'Private' }}
               </p>
-              <p class="mt-1 text-xs text-muted">{{ publicVesselCount }} public vessel record(s).</p>
+              <p class="mt-1 text-xs text-muted">
+                {{ publicVesselCount }} public vessel record(s).
+              </p>
             </div>
           </div>
 
@@ -179,7 +188,10 @@ const setupIncomplete = computed(
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Live-feed setup</h2>
-            <p class="mt-1 text-sm text-muted">Installation is still part of the model, but this is where the captain should think about the active source.</p>
+            <p class="mt-1 text-sm text-muted">
+              Installation is still part of the model, but this is where the captain should think
+              about the active source.
+            </p>
           </div>
         </template>
 
@@ -187,7 +199,9 @@ const setupIncomplete = computed(
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
               <p class="text-xs uppercase tracking-wide text-muted">Primary source</p>
-              <p class="mt-2 font-medium text-default">{{ primaryInstallation?.label || 'Pending' }}</p>
+              <p class="mt-2 font-medium text-default">
+                {{ primaryInstallation?.label || 'Pending' }}
+              </p>
               <p class="mt-1 text-xs text-muted">
                 {{
                   primaryInstallation?.lastSeenAt
@@ -202,7 +216,11 @@ const setupIncomplete = computed(
                 {{ primaryInstallation?.connectionState || 'setup pending' }}
               </p>
               <p class="mt-1 text-xs text-muted">
-                {{ primaryInstallation?.edgeHostname || primaryInstallation?.signalKUrl || 'Signal K target still needs configuration.' }}
+                {{
+                  primaryInstallation?.edgeHostname ||
+                  primaryInstallation?.signalKUrl ||
+                  'Signal K target still needs configuration.'
+                }}
               </p>
             </div>
           </div>
@@ -230,7 +248,10 @@ const setupIncomplete = computed(
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Sharing and Buddy Boats</h2>
-            <p class="mt-1 text-sm text-muted">Public profile posture and the extra vessels that should show up around the captain story.</p>
+            <p class="mt-1 text-sm text-muted">
+              Public profile posture and the extra vessels that should show up around the captain
+              story.
+            </p>
           </div>
         </template>
 
@@ -239,12 +260,18 @@ const setupIncomplete = computed(
             <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
               <p class="text-xs uppercase tracking-wide text-muted">Public vessels</p>
               <p class="mt-2 font-medium text-default">{{ publicVesselCount }}</p>
-              <p class="mt-1 text-xs text-muted">Captain-facing sharing posture for the launch vessel.</p>
+              <p class="mt-1 text-xs text-muted">
+                Captain-facing sharing posture for the launch vessel.
+              </p>
             </div>
             <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
               <p class="text-xs uppercase tracking-wide text-muted">Buddy Boats</p>
-              <p class="mt-2 font-medium text-default">{{ props.overview.followedVessels.length }}</p>
-              <p class="mt-1 text-xs text-muted">Saved buddy boats tracked from the map-first workspace.</p>
+              <p class="mt-2 font-medium text-default">
+                {{ props.overview.followedVessels.length }}
+              </p>
+              <p class="mt-1 text-xs text-muted">
+                Saved buddy boats tracked from the map-first workspace.
+              </p>
             </div>
           </div>
 
@@ -252,7 +279,12 @@ const setupIncomplete = computed(
             <UButton to="/dashboard/settings/sharing" color="primary" icon="i-lucide-broadcast">
               Open sharing
             </UButton>
-            <UButton to="/dashboard/fleet-friends" color="neutral" variant="soft" icon="i-lucide-users">
+            <UButton
+              to="/dashboard/fleet-friends"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-users"
+            >
               Buddy Boats
             </UButton>
           </div>
@@ -263,7 +295,10 @@ const setupIncomplete = computed(
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Security and local preferences</h2>
-            <p class="mt-1 text-sm text-muted">Account hardening and local display defaults stay reachable, but do not need to own the dashboard navigation.</p>
+            <p class="mt-1 text-sm text-muted">
+              Account hardening and local display defaults stay reachable, but do not need to own
+              the dashboard navigation.
+            </p>
           </div>
         </template>
 
@@ -271,7 +306,9 @@ const setupIncomplete = computed(
           <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
             <p class="text-xs uppercase tracking-wide text-muted">Security</p>
             <p class="mt-2 font-medium text-default">Password and MFA</p>
-            <p class="mt-1 text-xs text-muted">Keep the captain account secure with password rotation and multi-factor auth.</p>
+            <p class="mt-1 text-xs text-muted">
+              Keep the captain account secure with password rotation and multi-factor auth.
+            </p>
             <div class="mt-4">
               <UButton
                 to="/dashboard/settings/security"
@@ -286,7 +323,9 @@ const setupIncomplete = computed(
           <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
             <p class="text-xs uppercase tracking-wide text-muted">Preferences</p>
             <p class="mt-2 font-medium text-default">Units and display defaults</p>
-            <p class="mt-1 text-xs text-muted">Speed, depth, and temperature preferences are local to this device and browser.</p>
+            <p class="mt-1 text-xs text-muted">
+              Speed, depth, and temperature preferences are local to this device and browser.
+            </p>
             <div class="mt-4">
               <UButton
                 to="/dashboard/settings/preferences"

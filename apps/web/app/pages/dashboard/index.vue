@@ -3,13 +3,15 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Dashboard',
-  description: 'The captain home for the primary vessel, live source, and current operating picture.',
+  description:
+    'The captain home for the primary vessel, live source, and current operating picture.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'MyBoat dashboard',
-  description: 'The captain home for the primary vessel, live source, and current operating picture.',
+  description:
+    'The captain home for the primary vessel, live source, and current operating picture.',
 })
 
 const { data, pending } = await useDashboardOverview()
@@ -29,8 +31,8 @@ watch(
   { immediate: false },
 )
 
-const hasDashboardState = computed(
-  () => Boolean(store.authActiveEntry.value || store.authState.value.profile),
+const hasDashboardState = computed(() =>
+  Boolean(store.authActiveEntry.value || store.authState.value.profile),
 )
 </script>
 

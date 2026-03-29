@@ -2,13 +2,8 @@
 import type { InstallationSummary, PassageSummary, VesselSnapshotSummary } from '~/types/myboat'
 import { formatCoordinate, formatRelativeTime, getConnectionTone } from '~/utils/marine'
 
-const {
-  convertAngle,
-  convertDepth,
-  convertSpeed,
-  depthUnitLabel,
-  speedUnitLabel,
-} = useMarineUnits()
+const { convertAngle, convertDepth, convertSpeed, depthUnitLabel, speedUnitLabel } =
+  useMarineUnits()
 
 function toRoundedText(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
@@ -33,7 +28,9 @@ const primaryInstallation = computed<InstallationSummary | null>(
       primaryEntry.value?.installations[0] ||
       null) as InstallationSummary | null,
 )
-const primarySnapshot = computed<VesselSnapshotSummary | null>(() => primaryVessel.value?.liveSnapshot ?? null)
+const primarySnapshot = computed<VesselSnapshotSummary | null>(
+  () => primaryVessel.value?.liveSnapshot ?? null,
+)
 const latestPassage = computed<PassageSummary | null>(
   () => primaryEntry.value?.passages[0] || primaryVessel.value?.latestPassage || null,
 )
@@ -44,10 +41,18 @@ const vesselLatitude = computed(() =>
 const vesselLongitude = computed(() =>
   formatCoordinate(primarySnapshot.value?.positionLng ?? null, false),
 )
-const apparentWind = computed(() => toRoundedText(convertSpeed(primarySnapshot.value?.windSpeedApparent)))
-const speedOverGround = computed(() => toRoundedText(convertSpeed(primarySnapshot.value?.speedOverGround)))
-const heading = computed(() => toRoundedText(convertAngle(primarySnapshot.value?.headingMagnetic), 0))
-const depth = computed(() => toRoundedText(convertDepth(primarySnapshot.value?.depthBelowTransducer)))
+const apparentWind = computed(() =>
+  toRoundedText(convertSpeed(primarySnapshot.value?.windSpeedApparent)),
+)
+const speedOverGround = computed(() =>
+  toRoundedText(convertSpeed(primarySnapshot.value?.speedOverGround)),
+)
+const heading = computed(() =>
+  toRoundedText(convertAngle(primarySnapshot.value?.headingMagnetic), 0),
+)
+const depth = computed(() =>
+  toRoundedText(convertDepth(primarySnapshot.value?.depthBelowTransducer)),
+)
 const headerMetrics = computed(() => [
   { label: 'MMSI', value: vesselMmsi.value },
   { label: 'Lat', value: vesselLatitude.value },
@@ -108,7 +113,8 @@ const statsCards = computed(() => [
 const setupAlert = computed(() => {
   if (!store.authState.value.profile) {
     return {
-      description: 'Finish onboarding to attach the captain identity, primary vessel, and first live-data source.',
+      description:
+        'Finish onboarding to attach the captain identity, primary vessel, and first live-data source.',
       to: '/dashboard/onboarding',
       title: 'Captain setup is still incomplete',
     }
@@ -116,7 +122,8 @@ const setupAlert = computed(() => {
 
   if (!primaryVessel.value) {
     return {
-      description: 'Add the primary vessel so the dashboard has a real boat to anchor the map and bridge stats.',
+      description:
+        'Add the primary vessel so the dashboard has a real boat to anchor the map and bridge stats.',
       to: '/dashboard/onboarding',
       title: 'No primary vessel yet',
     }
@@ -124,7 +131,8 @@ const setupAlert = computed(() => {
 
   if (!primaryInstallation.value) {
     return {
-      description: 'Link one live-data source for the vessel so the dashboard can fill in the bridge stats.',
+      description:
+        'Link one live-data source for the vessel so the dashboard can fill in the bridge stats.',
       to: '/dashboard/settings',
       title: 'No live-data source linked',
     }
@@ -132,8 +140,11 @@ const setupAlert = computed(() => {
 
   if (!primarySnapshot.value?.observedAt) {
     return {
-      description: 'The source is saved, but telemetry has not landed yet. Open the source detail and start sending data.',
-      to: primaryInstallation.value ? `/dashboard/installations/${primaryInstallation.value.id}` : '/dashboard/settings',
+      description:
+        'The source is saved, but telemetry has not landed yet. Open the source detail and start sending data.',
+      to: primaryInstallation.value
+        ? `/dashboard/installations/${primaryInstallation.value.id}`
+        : '/dashboard/settings',
       title: 'Waiting for the first live fix',
     }
   }
@@ -195,7 +206,9 @@ const sourceTone = computed(() =>
       </template>
     </UAlert>
 
-    <section class="overflow-hidden rounded-[1.75rem] border border-default/80 bg-default/90 shadow-card">
+    <section
+      class="overflow-hidden rounded-[1.75rem] border border-default/80 bg-default/90 shadow-card"
+    >
       <div data-testid="dashboard-current-location-map">
         <MyBoatCurrentLocationMiniMap
           :vessel="primaryVessel"

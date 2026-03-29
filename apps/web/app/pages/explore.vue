@@ -39,7 +39,8 @@ const featuredItems = computed<PublicExploreItem[]>(() => {
         profile: entry.profile,
         vessel: entry.vessel,
         freshnessState: entry.freshnessState,
-        lastObservedAt: entry.mergedSnapshot?.observedAt || entry.storedSnapshot?.observedAt || null,
+        lastObservedAt:
+          entry.mergedSnapshot?.observedAt || entry.storedSnapshot?.observedAt || null,
       } satisfies PublicExploreItem
     }) ?? []
   )

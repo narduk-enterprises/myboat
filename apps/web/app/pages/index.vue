@@ -132,12 +132,7 @@ const boundaryRules = [
             </div>
 
             <div class="flex flex-wrap gap-3">
-              <UButton
-                to="/register"
-                color="primary"
-                size="xl"
-                icon="i-lucide-ship-wheel"
-              >
+              <UButton to="/register" color="primary" size="xl" icon="i-lucide-ship-wheel">
                 Create account
               </UButton>
               <UButton

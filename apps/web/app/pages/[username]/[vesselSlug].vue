@@ -9,9 +9,13 @@ const store = useMyBoatVesselStore()
 const { data, error, pending, refreshDetail, lastRefreshCompletedAt, refreshIntervalMs } =
   await useLivePublicVesselDetail(username.value, vesselSlug.value)
 
-watch([username, vesselSlug], () => {
-  store.setActivePublicVessel(null)
-}, { immediate: true })
+watch(
+  [username, vesselSlug],
+  () => {
+    store.setActivePublicVessel(null)
+  },
+  { immediate: true },
+)
 
 watch(
   () => data.value,

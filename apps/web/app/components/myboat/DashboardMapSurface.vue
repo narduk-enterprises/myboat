@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import type { InstallationSummary, VesselSnapshotSummary } from '~/types/myboat'
-import {
-  formatRelativeTime,
-  formatTimestamp,
-} from '~/utils/marine'
+import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
 
-const {
-  convertDepth,
-  convertSpeed,
-  depthUnitLabel,
-  speedUnitLabel,
-} = useMarineUnits()
+const { convertDepth, convertSpeed, depthUnitLabel, speedUnitLabel } = useMarineUnits()
 const store = useMyBoatVesselStore()
 const entry = computed(() => store.authActiveEntry.value)
 const detail = computed(() =>
@@ -40,7 +32,9 @@ const metricCards = computed(() => [
     icon: 'i-lucide-clock-3',
     label: 'Observed',
     unit: '',
-    value: liveSnapshot.value?.observedAt ? formatRelativeTime(liveSnapshot.value.observedAt) : '--',
+    value: liveSnapshot.value?.observedAt
+      ? formatRelativeTime(liveSnapshot.value.observedAt)
+      : '--',
   },
   {
     hint: 'Speed over ground from the current vessel feed.',
@@ -75,7 +69,8 @@ const metricCards = computed(() => [
             <div>
               <h2 class="font-display text-2xl text-default">Operational chart</h2>
               <p class="mt-1 text-sm text-muted">
-                AIS traffic is on here by default. Select a contact on the map to inspect the nearby picture without leaving the route.
+                AIS traffic is on here by default. Select a contact on the map to inspect the nearby
+                picture without leaving the route.
               </p>
               <div class="mt-3 flex flex-wrap gap-2">
                 <UBadge color="neutral" variant="soft">
@@ -115,7 +110,9 @@ const metricCards = computed(() => [
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Live bridge metrics</h2>
-            <p class="mt-1 text-sm text-muted">The full metric board lives under the chart so the map stays dominant.</p>
+            <p class="mt-1 text-sm text-muted">
+              The full metric board lives under the chart so the map stays dominant.
+            </p>
           </div>
         </template>
 
@@ -126,7 +123,9 @@ const metricCards = computed(() => [
         <template #header>
           <div>
             <h2 class="font-display text-2xl text-default">Fast read</h2>
-            <p class="mt-1 text-sm text-muted">The shortest way to understand the vessel state before drilling into details.</p>
+            <p class="mt-1 text-sm text-muted">
+              The shortest way to understand the vessel state before drilling into details.
+            </p>
           </div>
         </template>
 

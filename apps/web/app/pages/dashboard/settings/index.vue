@@ -3,13 +3,15 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Settings',
-  description: 'Canonical captain settings for vessel profile, live-feed setup, sharing, security, and local preferences.',
+  description:
+    'Canonical captain settings for vessel profile, live-feed setup, sharing, security, and local preferences.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'Settings',
-  description: 'Canonical captain settings for vessel profile, live-feed setup, sharing, security, and local preferences.',
+  description:
+    'Canonical captain settings for vessel profile, live-feed setup, sharing, security, and local preferences.',
 })
 
 const { data, pending } = await useDashboardOverview('myboat-settings-index')

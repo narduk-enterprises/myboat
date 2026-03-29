@@ -5,16 +5,19 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
   title: 'Live map',
-  description: 'Large operational chart with AIS traffic, selected-contact detail, and live vessel diagnostics.',
+  description:
+    'Large operational chart with AIS traffic, selected-contact detail, and live vessel diagnostics.',
   robots: 'noindex, nofollow',
 })
 
 useWebPageSchema({
   name: 'Live map',
-  description: 'Large operational chart with AIS traffic, selected-contact detail, and live vessel diagnostics.',
+  description:
+    'Large operational chart with AIS traffic, selected-contact detail, and live vessel diagnostics.',
 })
 
-const { data: overviewData, pending: overviewPending } = await useDashboardOverview('myboat-dashboard-map')
+const { data: overviewData, pending: overviewPending } =
+  await useDashboardOverview('myboat-dashboard-map')
 const store = useMyBoatVesselStore()
 
 const overview = computed(() => overviewData.value)

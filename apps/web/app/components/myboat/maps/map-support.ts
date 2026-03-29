@@ -260,10 +260,7 @@ export function buildAisVectorFeatureCollection(pins: MyBoatAisPin[]) {
 
       const projectedDistanceNm = Math.min(
         AIS_VECTOR_MAX_DISTANCE_NM,
-        Math.max(
-          AIS_VECTOR_MIN_DISTANCE_NM,
-          speedOverGround * (AIS_VECTOR_LOOKAHEAD_MINUTES / 60),
-        ),
+        Math.max(AIS_VECTOR_MIN_DISTANCE_NM, speedOverGround * (AIS_VECTOR_LOOKAHEAD_MINUTES / 60)),
       )
       const projectedPoint = projectPoint(pin.lat, pin.lng, course, projectedDistanceNm)
 
@@ -481,15 +478,16 @@ export function createVesselPinElement(
 
   shell.appendChild(marker)
 
-  const shouldShowLabel = options.showLabel === false
-    ? false
-    : options.alwaysShowLabel
-    ? true
-    : options.isCompactViewport
-      ? isSelected
-      : Boolean(options.showsDenseLabels) ||
-        isSelected ||
-        (options.showPrimaryLabel !== false && item.isPrimary)
+  const shouldShowLabel =
+    options.showLabel === false
+      ? false
+      : options.alwaysShowLabel
+        ? true
+        : options.isCompactViewport
+          ? isSelected
+          : Boolean(options.showsDenseLabels) ||
+            isSelected ||
+            (options.showPrimaryLabel !== false && item.isPrimary)
 
   if (shouldShowLabel) {
     const label = document.createElement('div')
@@ -671,8 +669,7 @@ export function createAisPinElement(
   element.appendChild(tone)
 
   const shouldShowLabel =
-    options.showLabel !== false &&
-    isSelected ||
+    (options.showLabel !== false && isSelected) ||
     (options.showLabel !== false &&
       !options.isCompactViewport &&
       (options.pinCount ?? 0) <= 5 &&

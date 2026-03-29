@@ -102,7 +102,9 @@ const hasSignalKSource = computed(() =>
     : internalTraffic.hasSignalKSource.value,
 )
 const lastDeltaAt = computed(() =>
-  usingExternalTrafficState.value ? props.liveLastDeltaAt ?? null : internalTraffic.lastDeltaAt.value,
+  usingExternalTrafficState.value
+    ? (props.liveLastDeltaAt ?? null)
+    : internalTraffic.lastDeltaAt.value,
 )
 
 const mapItems = computed(() => [
@@ -118,10 +120,7 @@ const geojson = computed(() => ({
     ...(showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : []),
   ],
 }))
-const allPins = computed(() => [
-  ...mapItems.value,
-  ...(showTraffic.value ? aisPins.value : []),
-])
+const allPins = computed(() => [...mapItems.value, ...(showTraffic.value ? aisPins.value : [])])
 const hasMapData = computed(
   () =>
     mapItems.value.length > 0 ||
@@ -129,7 +128,9 @@ const hasMapData = computed(
     trafficVectorGeojson.value.features.length > 0,
 )
 
-const selectedPin = computed(() => allPins.value.find((item) => item.id === selectedId.value) || null)
+const selectedPin = computed(
+  () => allPins.value.find((item) => item.id === selectedId.value) || null,
+)
 const selectedVessel = computed(() => {
   const selected = selectedPin.value
   if (!selected || selected.pinKind !== 'vessel') return null
@@ -438,7 +439,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="hasMapData" class="overflow-hidden rounded-[1.5rem] border border-default/70 bg-default/90">
+  <div
+    v-if="hasMapData"
+    class="overflow-hidden rounded-[1.5rem] border border-default/70 bg-default/90"
+  >
     <MyBoatMap
       ref="mapRoot"
       v-model:selected-id="selectedId"
@@ -459,13 +463,7 @@ onBeforeUnmount(() => {
       @map-ready="handleMapReady"
     >
       <template
-        #header="{
-          clearRememberedView,
-          fitToContent,
-          isFullscreen,
-          savedRegion,
-          toggleFullscreen,
-        }"
+        #header="{ clearRememberedView, fitToContent, isFullscreen, savedRegion, toggleFullscreen }"
       >
         <div class="space-y-3 border-b border-default/70 px-4 py-3 lg:hidden">
           <div

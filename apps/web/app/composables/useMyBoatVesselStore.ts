@@ -222,7 +222,9 @@ function buildCollectorOnlyUrls(
   return Array.from(urls)
 }
 
-function buildPublicLiveUrls(installations: Array<InstallationSummary | PublicInstallationSummary>) {
+function buildPublicLiveUrls(
+  installations: Array<InstallationSummary | PublicInstallationSummary>,
+) {
   const urls = new Set<string>()
 
   for (const installation of installations) {
@@ -330,12 +332,9 @@ function mergeSnapshots(
     positionLng: liveSnapshot?.positionLng ?? storedSnapshot?.positionLng ?? null,
     headingMagnetic: liveSnapshot?.headingMagnetic ?? storedSnapshot?.headingMagnetic ?? null,
     speedOverGround: liveSnapshot?.speedOverGround ?? storedSnapshot?.speedOverGround ?? null,
-    speedThroughWater:
-      liveSnapshot?.speedThroughWater ?? storedSnapshot?.speedThroughWater ?? null,
-    windSpeedApparent:
-      liveSnapshot?.windSpeedApparent ?? storedSnapshot?.windSpeedApparent ?? null,
-    windAngleApparent:
-      liveSnapshot?.windAngleApparent ?? storedSnapshot?.windAngleApparent ?? null,
+    speedThroughWater: liveSnapshot?.speedThroughWater ?? storedSnapshot?.speedThroughWater ?? null,
+    windSpeedApparent: liveSnapshot?.windSpeedApparent ?? storedSnapshot?.windSpeedApparent ?? null,
+    windAngleApparent: liveSnapshot?.windAngleApparent ?? storedSnapshot?.windAngleApparent ?? null,
     depthBelowTransducer:
       liveSnapshot?.depthBelowTransducer ?? storedSnapshot?.depthBelowTransducer ?? null,
     waterTemperatureKelvin:
@@ -531,8 +530,7 @@ export function useMyBoatVesselStore() {
     recipe: (current: VesselStoreEntry) => VesselStoreEntry,
   ) {
     updateNamespace(namespace, (currentState) => {
-      const currentEntry =
-        currentState.entriesByKey[key] || createEmptyEntry(key, namespace)
+      const currentEntry = currentState.entriesByKey[key] || createEmptyEntry(key, namespace)
       const nextEntry = recipe(currentEntry)
 
       return {
@@ -570,10 +568,7 @@ export function useMyBoatVesselStore() {
     })
   }
 
-  function setRouteStatus(
-    namespace: VesselStoreNamespace,
-    routeStatus: VesselStoreRouteStatus,
-  ) {
+  function setRouteStatus(namespace: VesselStoreNamespace, routeStatus: VesselStoreRouteStatus) {
     updateNamespace(namespace, (currentState) => ({
       ...currentState,
       routeStatus,
@@ -636,7 +631,9 @@ export function useMyBoatVesselStore() {
         mergedSnapshot,
         namespace: 'auth',
         passages:
-          currentEntry.passages.length || !vessel.latestPassage ? currentEntry.passages : [vessel.latestPassage],
+          currentEntry.passages.length || !vessel.latestPassage
+            ? currentEntry.passages
+            : [vessel.latestPassage],
         profile: overview.profile,
         publicUsername: overview.profile?.username || null,
         storedSnapshot,
@@ -872,7 +869,9 @@ export function useMyBoatVesselStore() {
     }
 
     setRouteStatus('public', 'loading')
-    const detail = await appFetch<PublicVesselDetailResponse>(`/api/public/${username}/${vesselSlug}`)
+    const detail = await appFetch<PublicVesselDetailResponse>(
+      `/api/public/${username}/${vesselSlug}`,
+    )
     hydratePublicVesselDetail(detail)
     return getPublicDetail(username, vesselSlug)
   }
@@ -905,7 +904,10 @@ export function useMyBoatVesselStore() {
     return key ? authState.value.entriesByKey[key] || null : null
   }
 
-  function getPublicEntry(username: string | null | undefined, vesselSlug: string | null | undefined) {
+  function getPublicEntry(
+    username: string | null | undefined,
+    vesselSlug: string | null | undefined,
+  ) {
     if (!username || !vesselSlug) {
       return null
     }
@@ -925,7 +927,9 @@ export function useMyBoatVesselStore() {
       return []
     }
 
-    return Object.values(entry.aisContacts).sort((left, right) => right.lastUpdateAt - left.lastUpdateAt)
+    return Object.values(entry.aisContacts).sort(
+      (left, right) => right.lastUpdateAt - left.lastUpdateAt,
+    )
   }
 
   function toAuthDetail(entry: VesselStoreEntry | null): VesselDetailResponse | null {
@@ -963,16 +967,18 @@ export function useMyBoatVesselStore() {
     return toAuthDetail(getAuthEntryBySlug(slug))
   }
 
-  function getPublicDetail(username: string | null | undefined, vesselSlug: string | null | undefined) {
+  function getPublicDetail(
+    username: string | null | undefined,
+    vesselSlug: string | null | undefined,
+  ) {
     return toPublicDetail(getPublicEntry(username, vesselSlug))
   }
 
   function getPublicExploreItems() {
     return publicState.value.orderedKeys
       .map((key) => publicState.value.entriesByKey[key])
-      .filter(
-        (entry): entry is VesselStoreEntry =>
-          Boolean(entry?.vessel && entry.profile && entry.freshnessState),
+      .filter((entry): entry is VesselStoreEntry =>
+        Boolean(entry?.vessel && entry.profile && entry.freshnessState),
       )
       .map(
         (entry) =>
@@ -980,7 +986,8 @@ export function useMyBoatVesselStore() {
             profile: entry.profile!,
             vessel: entry.vessel!,
             freshnessState: entry.freshnessState!,
-            lastObservedAt: entry.mergedSnapshot?.observedAt || entry.storedSnapshot?.observedAt || null,
+            lastObservedAt:
+              entry.mergedSnapshot?.observedAt || entry.storedSnapshot?.observedAt || null,
           }) satisfies PublicExploreItem,
       )
   }
@@ -988,9 +995,8 @@ export function useMyBoatVesselStore() {
   function getPublicProfileEntries(username: string) {
     return publicState.value.orderedKeys
       .map((key) => publicState.value.entriesByKey[key])
-      .filter(
-        (entry): entry is VesselStoreEntry =>
-          Boolean(entry?.profile?.username === username && entry.vessel),
+      .filter((entry): entry is VesselStoreEntry =>
+        Boolean(entry?.profile?.username === username && entry.vessel),
       )
       .map((entry) => entry.vessel!)
   }
@@ -1371,8 +1377,10 @@ export function useMyBoatVesselStore() {
     }
 
     nextSnapshot.observedAt = observedAt ?? new Date().toISOString()
-    nextSnapshot.source = activeEntry.storedSnapshot?.source || activeEntry.vessel?.liveSnapshot?.source || 'live_feed'
-    nextSnapshot.statusNote = namespace === 'auth' ? 'Live MyBoat collector telemetry' : 'Live public vessel telemetry'
+    nextSnapshot.source =
+      activeEntry.storedSnapshot?.source || activeEntry.vessel?.liveSnapshot?.source || 'live_feed'
+    nextSnapshot.statusNote =
+      namespace === 'auth' ? 'Live MyBoat collector telemetry' : 'Live public vessel telemetry'
     nextSnapshot.updatedAt = new Date().toISOString()
 
     updateEntry(namespace, activeEntry.key, (currentEntry) => {
