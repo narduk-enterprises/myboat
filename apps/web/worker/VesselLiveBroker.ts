@@ -27,6 +27,7 @@ type SocketAttachment = {
 }
 
 const STORAGE_KEY = 'state'
+const LIVE_BROKER_DEBUG_PREFIX = 'LIVE_BROKER_DEBUG'
 
 function createEmptyState(): PersistedBrokerState {
   return {
@@ -35,6 +36,13 @@ function createEmptyState(): PersistedBrokerState {
     connectionState: 'idle',
     lastObservedAt: null,
   }
+}
+
+function emitLiveBrokerDebug(event: string, fields: Record<string, unknown>) {
+  console.info(LIVE_BROKER_DEBUG_PREFIX, {
+    event,
+    ...fields,
+  })
 }
 
 function isOpenSocket(socket: WebSocket) {
@@ -57,10 +65,15 @@ function parseClientMessage(message: string | ArrayBuffer): VesselLiveClientMess
 function sendSocketMessage(socket: WebSocket, message: VesselLiveServerMessage) {
   try {
     socket.send(JSON.stringify(message))
+    return true
   } catch {
     // Durable Object hibernation sockets can still surface through getWebSockets()
     // during close handshakes; ignore failed sends and let later fanout attempts
     // target the remaining active sockets.
+    emitLiveBrokerDebug('do_send_error', {
+      messageType: message.type,
+    })
+    return false
   }
 }
 
@@ -107,18 +120,39 @@ export class VesselLiveBroker extends DurableObject {
   }
 
   private fanout(message: VesselLiveServerMessage, predicate?: (demand: LiveDemand) => boolean) {
-    for (const socket of this.ctx.getWebSockets()) {
+    const sockets = this.ctx.getWebSockets()
+    let sentSocketCount = 0
+    let candidateSocketCount = 0
+
+    for (const socket of sockets) {
       const demand = this.socketAttachment(socket).demand
       if (predicate && !predicate(demand)) {
         continue
       }
-      sendSocketMessage(socket, message)
+      candidateSocketCount += 1
+      if (sendSocketMessage(socket, message)) {
+        sentSocketCount += 1
+      }
     }
+
+    emitLiveBrokerDebug('do_fanout', {
+      messageType: message.type,
+      candidateSocketCount,
+      sentSocketCount,
+      totalSocketCount: sockets.length,
+    })
   }
 
   private async handlePublish(payload: VesselLivePublishMessage) {
     const aisRemovals: string[] = []
     const aisUpserts: AisContactSummary[] = []
+
+    emitLiveBrokerDebug('do_publish_start', {
+      snapshotPresent: payload.snapshot !== undefined && payload.snapshot !== null,
+      aisContactCount: payload.aisContacts?.length || 0,
+      connectionState: payload.connectionState || null,
+      lastObservedAt: payload.lastObservedAt || null,
+    })
 
     if (payload.snapshot !== undefined) {
       this.stateRecord.snapshot = payload.snapshot || null
@@ -187,6 +221,13 @@ export class VesselLiveBroker extends DurableObject {
   async fetch(request: Request) {
     const url = new URL(request.url)
 
+    emitLiveBrokerDebug('do_fetch_start', {
+      pathname: url.pathname,
+      method: request.method,
+      upgrade: request.headers.get('upgrade'),
+      currentSocketCount: this.ctx.getWebSockets().length,
+    })
+
     if (url.pathname === '/publish' && request.method === 'POST') {
       const payload = (await request.json()) as VesselLivePublishMessage
       await this.handlePublish(payload)
@@ -203,6 +244,12 @@ export class VesselLiveBroker extends DurableObject {
 
     this.updateSocketDemand(server, DEFAULT_LIVE_DEMAND)
     this.ctx.acceptWebSocket(server)
+    emitLiveBrokerDebug('do_accept_ws', {
+      socketCount: this.ctx.getWebSockets().length,
+    })
+    emitLiveBrokerDebug('do_initial_sync_attempt', {
+      socketCount: this.ctx.getWebSockets().length,
+    })
     sendSocketMessage(server, this.buildSyncMessage(DEFAULT_LIVE_DEMAND))
 
     return new Response(null, {
@@ -212,6 +259,11 @@ export class VesselLiveBroker extends DurableObject {
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer) {
+    emitLiveBrokerDebug('do_client_message_raw', {
+      messageType: typeof message,
+      socketCount: this.ctx.getWebSockets().length,
+    })
+
     const parsed = parseClientMessage(message)
 
     if (!parsed) {
@@ -219,6 +271,11 @@ export class VesselLiveBroker extends DurableObject {
     }
 
     const demand = normalizeLiveDemand(parsed.demand || parsed)
+    emitLiveBrokerDebug('do_client_demand', {
+      selfLevel: demand.selfLevel,
+      ais: demand.ais,
+      socketCount: this.ctx.getWebSockets().length,
+    })
     this.updateSocketDemand(socket, demand)
     sendSocketMessage(socket, this.buildSyncMessage(demand))
   }
