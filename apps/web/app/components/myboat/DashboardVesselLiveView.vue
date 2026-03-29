@@ -33,6 +33,24 @@ const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => entry.value?.mergedSnapshot || props.detail.vessel.liveSnapshot || null,
 )
 const liveVessel = computed(() => entry.value?.vessel || props.detail.vessel)
+const observedIdentity = computed(
+  () => liveVessel.value?.observedIdentity || primaryInstallation.value?.observedIdentity || null,
+)
+const observedDimensions = computed(() => {
+  if (!observedIdentity.value) {
+    return 'Dimensions pending'
+  }
+
+  const segments = [
+    observedIdentity.value.lengthOverall
+      ? `LOA ${observedIdentity.value.lengthOverall.toFixed(1)} m`
+      : null,
+    observedIdentity.value.beam ? `Beam ${observedIdentity.value.beam.toFixed(1)} m` : null,
+    observedIdentity.value.draft ? `Draft ${observedIdentity.value.draft.toFixed(1)} m` : null,
+  ].filter(Boolean)
+
+  return segments.join(' · ') || 'Dimensions pending'
+})
 const liveFeedSourceUrl = computed(
   () => entry.value?.live.activeUrl || primaryInstallation.value?.edgeHostname || null,
 )
@@ -113,6 +131,53 @@ const liveFeedStatus = computed(() => {
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
+              <h2 class="font-display text-2xl text-default">Observed identity</h2>
+              <p class="mt-1 text-sm text-muted">
+                Source-derived vessel identity from the current primary collector path.
+              </p>
+            </div>
+          </template>
+
+          <div class="space-y-4 text-sm text-muted">
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">MMSI</p>
+              <p class="mt-2 font-medium text-default">{{ observedIdentity?.mmsi || 'Pending' }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{
+                  observedIdentity?.observedAt
+                    ? `Observed ${formatRelativeTime(observedIdentity.observedAt)}`
+                    : 'No observed identity reported yet.'
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">Observed name / callsign</p>
+              <p class="mt-2 font-medium text-default">
+                {{ observedIdentity?.observedName || 'Pending' }}
+              </p>
+              <p class="mt-1 text-xs text-muted">
+                {{
+                  [observedIdentity?.callSign, observedIdentity?.shipType]
+                    .filter(Boolean)
+                    .join(' · ') || 'Callsign and ship type are pending.'
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">Dimensions</p>
+              <p class="mt-2 font-medium text-default">{{ observedDimensions }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{ observedIdentity?.selfContext || 'Waiting for collector self context.' }}
+              </p>
+            </div>
+          </div>
+        </UCard>
+
+        <UCard class="border-default/80 bg-default/90 shadow-card">
+          <template #header>
+            <div>
               <h2 class="font-display text-2xl text-default">Live position</h2>
               <p class="mt-1 text-sm text-muted">
                 Current fix, public route, and the freshest owner-facing position context.
@@ -190,10 +255,7 @@ const liveFeedStatus = computed(() => {
                     </UBadge>
                   </div>
                   <p class="mt-2 text-sm text-muted">
-                    {{
-                      installation.edgeHostname ||
-                      'Connector details pending'
-                    }}
+                    {{ installation.edgeHostname || 'Connector details pending' }}
                   </p>
                   <p class="mt-1 text-xs text-muted">
                     {{

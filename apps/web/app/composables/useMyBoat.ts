@@ -1,12 +1,13 @@
 import type {
   AisHubSearchResponse,
   AisHubSearchResult,
+  AisHubSyncStatus,
   DashboardOverview,
   FollowedVesselSummary,
-  PublicExploreResponse,
+  InstallationDetailResponse,
   InstallationKeySummary,
-  InstallationSummary,
   OnboardingPayload,
+  PublicExploreResponse,
   PublicProfileResponse,
   PublicVesselDetailResponse,
   VesselDetailResponse,
@@ -93,10 +94,7 @@ export function useVesselDetail(vesselSlug: string) {
 }
 
 export function useInstallationDetail(installationId: string) {
-  return useFetch<{
-    installation: InstallationSummary
-    keys: InstallationKeySummary[]
-  }>(`/api/app/installations/${installationId}`, {
+  return useFetch<InstallationDetailResponse>(`/api/app/installations/${installationId}`, {
     key: `myboat-installation-${installationId}`,
   })
 }
@@ -143,6 +141,34 @@ export function useSearchAisHubVessels() {
   return {
     pending: readonly(pending),
     search,
+  }
+}
+
+export function useAdminAisHubSyncStatus() {
+  return useFetch<AisHubSyncStatus>('/api/admin/aishub/sync', {
+    key: 'myboat-admin-aishub-sync',
+  })
+}
+
+export function useRunAdminAisHubSync() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function runSync() {
+    pending.value = true
+
+    try {
+      return await appFetch<AisHubSyncStatus>('/api/admin/aishub/sync', {
+        method: 'POST',
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    pending: readonly(pending),
+    runSync,
   }
 }
 

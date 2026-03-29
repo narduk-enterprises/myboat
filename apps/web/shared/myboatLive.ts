@@ -137,7 +137,10 @@ export function mergeAisContactSummary(
 }
 
 export function createMyBoatLiveWebSocketUrl(path: string, baseOrigin?: string) {
-  const origin = baseOrigin || (import.meta.client ? globalThis.location?.origin : null) || 'http://localhost:3000'
+  const origin =
+    baseOrigin ||
+    (import.meta.client ? globalThis.location?.origin : null) ||
+    'http://localhost:3000'
   const url = new URL(path, origin)
   if (url.protocol === 'http:') {
     url.protocol = 'ws:'

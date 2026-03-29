@@ -1,6 +1,7 @@
 import type { AisHubSearchResult } from '../app/types/myboat'
 
 export const AISHUB_SEARCH_COOLDOWN_MS = 60_000
+export const AISHUB_ROLLING_SYNC_LOOKBACK_MINUTES = 60
 
 const AISHUB_SEARCH_RESULT_LIMIT = 12
 
@@ -14,6 +15,29 @@ const HTML_ENTITY_MAP: Record<string, string> = {
 }
 
 type AisHubSearchMode = AisHubSearchResult['matchMode']
+
+export interface AisHubApiVesselRecord {
+  mmsi: string
+  imo: string | null
+  name: string
+  callSign: string | null
+  destination: string | null
+  lastReportAt: string | null
+  positionLat: number | null
+  positionLng: number | null
+  shipType: number | null
+  courseOverGround: number | null
+  speedOverGround: number | null
+  heading: number | null
+  rateOfTurn: number | null
+  navStatus: number | null
+  dimensionBow: number | null
+  dimensionStern: number | null
+  dimensionPort: number | null
+  dimensionStarboard: number | null
+  draughtMeters: number | null
+  etaRaw: string | null
+}
 
 function emptyToNull(value: string | null | undefined) {
   const normalized = value?.trim()
@@ -51,6 +75,35 @@ function normalizeApiTimestamp(value: unknown) {
 
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null
+}
+
+function normalizeFiniteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function normalizeCourseOverGround(value: unknown) {
+  const normalized = normalizeFiniteNumber(value)
+  return normalized === null || normalized >= 360 ? null : normalized
+}
+
+function normalizeSpeedOverGround(value: unknown) {
+  const normalized = normalizeFiniteNumber(value)
+  return normalized === null || normalized >= 102.4 ? null : normalized
+}
+
+function normalizeHeading(value: unknown) {
+  const normalized = normalizeFiniteNumber(value)
+  return normalized === null || normalized === 511 ? null : normalized
+}
+
+function normalizeRateOfTurn(value: unknown) {
+  const normalized = normalizeFiniteNumber(value)
+  return normalized === null || normalized === 128 ? null : normalized
+}
+
+function normalizeEta(value: unknown) {
+  const normalized = emptyToNull(typeof value === 'string' ? value : null)
+  return normalized && normalized !== '00-00 24:60' ? normalized : null
 }
 
 export function parseAisHubListTimestamp(value: string) {
@@ -99,13 +152,30 @@ export function normalizeAisHubSearchQuery(value: string) {
 }
 
 export function parseAisHubApiSearchResponse(payload: string): AisHubSearchResult[] {
+  return parseAisHubApiSnapshotResponse(payload).map((result) => ({
+    source: 'aishub',
+    matchMode: 'mmsi',
+    mmsi: result.mmsi,
+    imo: result.imo,
+    name: result.name,
+    callSign: result.callSign,
+    destination: result.destination,
+    lastReportAt: result.lastReportAt,
+    positionLat: result.positionLat,
+    positionLng: result.positionLng,
+    shipType: result.shipType,
+    sourceStations: [],
+  }))
+}
+
+export function parseAisHubApiSnapshotResponse(payload: string): AisHubApiVesselRecord[] {
   const parsed = JSON.parse(payload) as unknown
 
   if (!Array.isArray(parsed) || parsed.length < 2 || !Array.isArray(parsed[1])) {
     return []
   }
 
-  const results: AisHubSearchResult[] = []
+  const results: AisHubApiVesselRecord[] = []
 
   for (const row of parsed[1]) {
     if (!row || typeof row !== 'object') {
@@ -119,18 +189,26 @@ export function parseAisHubApiSearchResponse(payload: string): AisHubSearchResul
     }
 
     results.push({
-      source: 'aishub',
-      matchMode: 'mmsi',
       mmsi,
       imo: normalizeImo(String(record.IMO || '')),
       name: emptyToNull(String(record.NAME || '')) || `MMSI ${mmsi}`,
       callSign: emptyToNull(String(record.CALLSIGN || '')),
       destination: emptyToNull(String(record.DEST || '')),
       lastReportAt: normalizeApiTimestamp(record.TIME),
-      positionLat: typeof record.LATITUDE === 'number' ? record.LATITUDE : null,
-      positionLng: typeof record.LONGITUDE === 'number' ? record.LONGITUDE : null,
-      shipType: typeof record.TYPE === 'number' ? record.TYPE : null,
-      sourceStations: [],
+      positionLat: normalizeFiniteNumber(record.LATITUDE),
+      positionLng: normalizeFiniteNumber(record.LONGITUDE),
+      shipType: normalizeFiniteNumber(record.TYPE),
+      courseOverGround: normalizeCourseOverGround(record.COG),
+      speedOverGround: normalizeSpeedOverGround(record.SOG),
+      heading: normalizeHeading(record.HEADING),
+      rateOfTurn: normalizeRateOfTurn(record.ROT),
+      navStatus: normalizeFiniteNumber(record.NAVSTAT),
+      dimensionBow: normalizeFiniteNumber(record.A),
+      dimensionStern: normalizeFiniteNumber(record.B),
+      dimensionPort: normalizeFiniteNumber(record.C),
+      dimensionStarboard: normalizeFiniteNumber(record.D),
+      draughtMeters: normalizeFiniteNumber(record.DRAUGHT),
+      etaRaw: normalizeEta(record.ETA),
     })
   }
 

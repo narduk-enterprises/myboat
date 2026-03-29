@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   normalizeAisHubSearchQuery,
   parseAisHubApiSearchResponse,
+  parseAisHubApiSnapshotResponse,
   parseAisHubListTimestamp,
   parseAisHubVesselsHtml,
 } from '../../shared/aishub'
@@ -37,6 +38,36 @@ describe('AIS Hub helpers', () => {
         positionLng: 5.03807,
         shipType: 69,
         sourceStations: [],
+      },
+    ])
+  })
+
+  it('parses the richer authenticated AIS Hub API vessel fields for rolling sync', () => {
+    const payload =
+      '[{"ERROR":false,"USERNAME":"REDACTED","FORMAT":"HUMAN","RECORDS":1},[{"MMSI":244750034,"TIME":"2026-03-28 16:50:52 GMT","LONGITUDE":5.03807,"LATITUDE":52.46028,"COG":360,"SOG":0,"HEADING":511,"ROT":128,"PAC":0,"NAVSTAT":8,"IMO":0,"NAME":"CHATEAUROUX","CALLSIGN":"PH7002","TYPE":69,"A":24,"B":6,"C":1,"D":5,"DRAUGHT":1.2,"DEST":"ENKHUIZEN","ETA":"01-01 00:00"}]]'
+
+    expect(parseAisHubApiSnapshotResponse(payload)).toEqual([
+      {
+        mmsi: '244750034',
+        imo: null,
+        name: 'CHATEAUROUX',
+        callSign: 'PH7002',
+        destination: 'ENKHUIZEN',
+        lastReportAt: '2026-03-28T16:50:52.000Z',
+        positionLat: 52.46028,
+        positionLng: 5.03807,
+        shipType: 69,
+        courseOverGround: null,
+        speedOverGround: 0,
+        heading: null,
+        rateOfTurn: null,
+        navStatus: 8,
+        dimensionBow: 24,
+        dimensionStern: 6,
+        dimensionPort: 1,
+        dimensionStarboard: 5,
+        draughtMeters: 1.2,
+        etaRaw: '01-01 00:00',
       },
     ])
   })

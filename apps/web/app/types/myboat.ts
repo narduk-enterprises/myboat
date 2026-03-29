@@ -6,6 +6,23 @@ export interface PublicProfileSummary {
   homePort: string | null
 }
 
+export interface ObservedVesselIdentitySummary {
+  source: string
+  observedAt: string | null
+  selfContext: string | null
+  mmsi: string | null
+  observedName: string | null
+  callSign: string | null
+  shipType: string | null
+  shipTypeCode: number | null
+  lengthOverall: number | null
+  beam: number | null
+  draft: number | null
+  registrationNumber: string | null
+  imo: string | null
+  sourceInstallationId?: string | null
+}
+
 export interface VesselSnapshotSummary {
   vesselId?: string
   source?: string | null
@@ -65,6 +82,7 @@ export interface VesselCardSummary {
   vesselType: string | null
   homePort: string | null
   summary: string | null
+  observedIdentity?: ObservedVesselIdentitySummary | null
   isPrimary: boolean
   sharePublic: boolean
   latestPassage: PassageSummary | null
@@ -85,6 +103,7 @@ export interface InstallationSummary {
   connectionState: string
   lastSeenAt: string | null
   eventCount: number
+  observedIdentity?: ObservedVesselIdentitySummary | null
 }
 
 export interface AisContactSummary {
@@ -147,6 +166,23 @@ export interface AisHubSearchResponse {
   results: AisHubSearchResult[]
 }
 
+export interface AisHubSyncStatus {
+  catalogSize: number
+  lastRequestAt: string | null
+  sync: {
+    lastStartedAt: string | null
+    lastCompletedAt: string | null
+    lastSuccessAt: string | null
+    lastStatus: string
+    lastMode: string | null
+    lastLookbackMinutes: number | null
+    lastRecordCount: number | null
+    lastBatchCount: number | null
+    lastError: string | null
+    updatedAt: string | null
+  }
+}
+
 export interface PublicInstallationSummary {
   id: string
   vesselId: string
@@ -204,6 +240,11 @@ export interface VesselDetailResponse {
   passages: PassageSummary[]
   media: MediaItemSummary[]
   waypoints: WaypointSummary[]
+}
+
+export interface InstallationDetailResponse {
+  installation: InstallationSummary
+  keys: InstallationKeySummary[]
 }
 
 export type PublicFreshnessState = 'live' | 'recent' | 'stale' | 'offline'

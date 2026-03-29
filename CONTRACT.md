@@ -32,6 +32,7 @@ Status: UNLOCKED
 - `GET /api/app/installations/[installationId]`
 - `POST /api/app/installations/[installationId]/keys`
 - `POST /api/ingest/v1/delta`
+- `POST /api/ingest/v1/identity`
 - `GET /api/public/[username]`
 - `GET /api/public/[username]/[vesselSlug]`
 - `GET /api/public/[username]/[vesselSlug]/live`
@@ -158,6 +159,8 @@ Status: UNLOCKED
   require browser-side SignalK parsing
 - `POST /api/ingest/v1/delta` may accept collector-normalized batched deltas and
   upstream self-context metadata
+- `POST /api/ingest/v1/identity` accepts collector-derived observed self
+  identity from SignalK bootstrap / refresh reads
 - local boat deployments may read onboard telemetry directly, but they must
   expose the same MyBoat-shaped browser contract as `mybo.at`
 

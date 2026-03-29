@@ -247,8 +247,8 @@ authenticated IA:
 1. Open settings or vessel context and reach the current installation detail.
 2. Generate an ingest key.
 3. Copy the collector command template.
-4. Point the collector at `/api/ingest/v1/delta` and its local onboard telemetry
-   source.
+4. Point the collector at `/api/ingest/v1/delta`, `/api/ingest/v1/identity`, and
+   its local onboard telemetry source.
 5. Confirm live snapshot, observed vessel identity, and last-seen updates on
    dashboard and vessel pages.
 6. Allow the same normalized telemetry stream to feed both:
@@ -347,8 +347,9 @@ Dashboard identity behavior:
   state, not a browser concern
 - logged-in visits to `/` redirect to `/dashboard`
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
-- `/api/ingest/v1/delta` is capable of carrying collector-normalized self
-  identity context alongside telemetry
+- `/api/ingest/v1/identity` exists and updates observed vessel identity state
+- `/api/ingest/v1/delta` can still carry collector-normalized self identity
+  context alongside telemetry when it shows up in deltas
 - owner and public vessel pages read live deltas through MyBoat-managed live
   routes, not raw SignalK browser sockets
 - dashboard identity surfaces do not depend on manual MMSI entry when the

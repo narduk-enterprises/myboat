@@ -4,12 +4,9 @@ import { apiKeys } from '#layer/server/database/schema'
 import { useLogger } from '#layer/server/utils/logger'
 import { defineWebhookMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
-import {
-  vesselInstallationApiKeys,
-  vesselInstallations,
-  vesselLiveSnapshots,
-} from '#server/database/app-schema'
+import { vesselInstallations, vesselLiveSnapshots } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { requireIngestInstallationBinding } from '#server/utils/ingest'
 import { writeTelemetryToInflux } from '#server/utils/influx'
 import { publishVesselLiveMessage } from '#server/utils/liveBroker'
 import {
@@ -18,6 +15,12 @@ import {
   buildLivePublishMessage,
   resolveObservedAt,
 } from '#server/utils/telemetry'
+import {
+  extractObservedSelfIdentityPatchFromDelta,
+  mergeObservedIdentityPatches,
+  syncVesselObservedIdentityFromPrimaryInstallation,
+  upsertInstallationObservedIdentity,
+} from '#server/utils/vesselIdentity'
 import type { VesselLivePublishMessage } from '../../../../shared/myboatLive'
 
 const deltaSchema = z.object({
@@ -76,14 +79,6 @@ function getObservedAtMs(observedAt: string) {
   return Number.isFinite(observedAtMs) ? observedAtMs : Number.NEGATIVE_INFINITY
 }
 
-async function sha256(value: string) {
-  const encoded = new TextEncoder().encode(value)
-  const digest = await crypto.subtle.digest('SHA-256', encoded)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
 export default defineWebhookMutation(
   {
     rateLimit: RATE_LIMIT_POLICIES.authApiKeys,
@@ -91,40 +86,21 @@ export default defineWebhookMutation(
   },
   async ({ event, body }) => {
     const logger = useLogger(event).child('TelemetryIngest')
-    const authHeader = getHeader(event, 'authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw createError({ statusCode: 401, message: 'Missing ingest bearer token.' })
-    }
-
-    const rawKey = authHeader.slice(7).trim()
     const db = useAppDatabase(event)
-    const keyHash = await sha256(rawKey)
-
-    const installationBinding = await db
-      .select({
-        apiKeyId: apiKeys.id,
-        installationId: vesselInstallationApiKeys.installationId,
-        vesselId: vesselInstallations.vesselId,
-        installationType: vesselInstallations.installationType,
-        isPrimary: vesselInstallations.isPrimary,
-      })
-      .from(apiKeys)
-      .innerJoin(vesselInstallationApiKeys, eq(apiKeys.id, vesselInstallationApiKeys.apiKeyId))
-      .innerJoin(
-        vesselInstallations,
-        eq(vesselInstallationApiKeys.installationId, vesselInstallations.id),
-      )
-      .where(eq(apiKeys.keyHash, keyHash))
-      .get()
-
-    if (!installationBinding) {
-      throw createError({ statusCode: 401, message: 'Invalid ingest key.' })
-    }
+    const installationBinding = await requireIngestInstallationBinding(event)
 
     const ingestItems = normalizeIngestItems(body)
     const now = new Date().toISOString()
-    const aggregatedAisContacts = new Map<string, NonNullable<VesselLivePublishMessage['aisContacts']>[number]>()
+    const aggregatedAisContacts = new Map<
+      string,
+      NonNullable<VesselLivePublishMessage['aisContacts']>[number]
+    >()
     const influxLines: string[] = []
+    let aggregatedObservedIdentityPatch: ReturnType<
+      typeof extractObservedSelfIdentityPatchFromDelta
+    > = null
+    let latestIdentityObservedAt: string | null = null
+    let latestIdentityObservedAtMs = Number.NEGATIVE_INFINITY
     let latestObservedAt: string | null = null
     let latestObservedAtMs = Number.NEGATIVE_INFINITY
     let latestSnapshot: VesselLivePublishMessage['snapshot']
@@ -134,10 +110,23 @@ export default defineWebhookMutation(
     for (const item of ingestItems) {
       const observedAt = resolveObservedAt(item.timestamp, item.delta)
       const observedAtMs = getObservedAtMs(observedAt)
+      const observedIdentityPatch = extractObservedSelfIdentityPatchFromDelta(item.delta)
 
       if (observedAtMs >= latestObservedAtMs) {
         latestObservedAtMs = observedAtMs
         latestObservedAt = observedAt
+      }
+
+      if (observedIdentityPatch) {
+        aggregatedObservedIdentityPatch = mergeObservedIdentityPatches(
+          aggregatedObservedIdentityPatch,
+          observedIdentityPatch,
+        )
+
+        if (observedAtMs >= latestIdentityObservedAtMs) {
+          latestIdentityObservedAtMs = observedAtMs
+          latestIdentityObservedAt = observedAt
+        }
       }
 
       const livePayload = buildLivePublishMessage({
@@ -221,6 +210,21 @@ export default defineWebhookMutation(
             updatedAt: now,
           },
         })
+    }
+
+    if (aggregatedObservedIdentityPatch && latestIdentityObservedAt) {
+      await upsertInstallationObservedIdentity({
+        event,
+        installationId: installationBinding.installationId,
+        vesselId: installationBinding.vesselId,
+        patch: aggregatedObservedIdentityPatch,
+        observedAt: latestIdentityObservedAt,
+        source: 'signalk_delta',
+      })
+
+      if (installationBinding.isPrimary) {
+        await syncVesselObservedIdentityFromPrimaryInstallation(event, installationBinding.vesselId)
+      }
     }
 
     await db

@@ -79,16 +79,13 @@ export async function publishVesselLiveMessage(
         },
         body: JSON.stringify(payload),
       })
-    : await getVesselLiveBrokerStub(event, vesselId).fetch(
-        'https://vessel-live.internal/publish',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(payload),
+    : await getVesselLiveBrokerStub(event, vesselId).fetch('https://vessel-live.internal/publish', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
         },
-      )
+        body: JSON.stringify(payload),
+      })
 
   if (!response.ok) {
     throw createError({

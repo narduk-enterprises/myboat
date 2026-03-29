@@ -13,10 +13,28 @@ const installation = computed(() => detail.value?.installation || null)
 const appFetch = useAppFetch()
 const toast = useToast()
 const actionPending = ref<'primary' | 'archive' | null>(null)
-const localBoatHostname = computed(() => useRuntimeConfig().public.localBoatHostname || 'myboat.local')
+const localBoatHostname = computed(
+  () => useRuntimeConfig().public.localBoatHostname || 'myboat.local',
+)
 const collectorModeLabel = computed(() =>
   installation.value?.installationType === 'collector_ingest' ? 'Collector ingest' : 'Collector',
 )
+const observedIdentity = computed(() => detail.value?.installation.observedIdentity || null)
+const observedDimensions = computed(() => {
+  if (!observedIdentity.value) {
+    return 'Dimensions pending'
+  }
+
+  const segments = [
+    observedIdentity.value.lengthOverall
+      ? `LOA ${observedIdentity.value.lengthOverall.toFixed(1)} m`
+      : null,
+    observedIdentity.value.beam ? `Beam ${observedIdentity.value.beam.toFixed(1)} m` : null,
+    observedIdentity.value.draft ? `Draft ${observedIdentity.value.draft.toFixed(1)} m` : null,
+  ].filter(Boolean)
+
+  return segments.join(' · ') || 'Dimensions pending'
+})
 
 const lastSeenLabel = computed(() => {
   if (!installation.value?.lastSeenAt) {
@@ -160,9 +178,7 @@ async function archiveInstallation() {
               <p class="text-xs uppercase tracking-[0.24em] text-muted">Collector briefing</p>
               <p class="mt-2 font-display text-2xl text-default">
                 {{
-                  detail.installation.edgeHostname ||
-                  localBoatHostname ||
-                  'Hostname still pending'
+                  detail.installation.edgeHostname || localBoatHostname || 'Hostname still pending'
                 }}
               </p>
               <p class="mt-2 text-sm text-muted">{{ lastSeenLabel }}</p>
@@ -241,6 +257,70 @@ async function archiveInstallation() {
           icon="i-lucide-waypoints"
         />
       </section>
+
+      <UCard class="border-default/80 bg-default/90 shadow-card">
+        <template #header>
+          <div>
+            <h2 class="font-display text-2xl text-default">Observed connection identity</h2>
+            <p class="mt-1 text-sm text-muted">
+              What this collector install has actually derived from the upstream boat feed.
+            </p>
+          </div>
+        </template>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MarineMetricCard
+            label="MMSI"
+            :value="observedIdentity?.mmsi || 'Pending'"
+            icon="i-lucide-radio-tower"
+          />
+          <MarineMetricCard
+            label="Observed name"
+            :value="observedIdentity?.observedName || 'Pending'"
+            icon="i-lucide-ship-wheel"
+          />
+          <MarineMetricCard
+            label="Callsign / type"
+            :value="
+              [observedIdentity?.callSign, observedIdentity?.shipType]
+                .filter(Boolean)
+                .join(' · ') || 'Pending'
+            "
+            icon="i-lucide-badge-info"
+          />
+          <MarineMetricCard label="Dimensions" :value="observedDimensions" icon="i-lucide-ruler" />
+        </div>
+
+        <div class="mt-4 grid gap-3 lg:grid-cols-2">
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Source context</p>
+            <p class="mt-2 break-all font-medium text-default">
+              {{ observedIdentity?.selfContext || 'Waiting for self context' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                observedIdentity?.observedAt
+                  ? `Observed ${formatRelativeTime(observedIdentity.observedAt)}`
+                  : 'No observed identity heartbeat yet.'
+              }}
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Registration identifiers</p>
+            <p class="mt-2 font-medium text-default">
+              {{ observedIdentity?.registrationNumber || observedIdentity?.imo || 'Pending' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                observedIdentity?.imo
+                  ? `IMO ${observedIdentity.imo}`
+                  : 'No IMO or registration number observed yet.'
+              }}
+            </p>
+          </div>
+        </div>
+      </UCard>
 
       <UCard class="border-default/80 bg-default/90 shadow-card">
         <template #header>

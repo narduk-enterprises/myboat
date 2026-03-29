@@ -1,5 +1,5 @@
 import { apiKeys, users } from '#layer/server/database/schema'
-import { integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 const isoTimestamp = () => new Date().toISOString()
 
@@ -72,6 +72,70 @@ export const vesselInstallationApiKeys = sqliteTable('vessel_installation_api_ke
     .references(() => vesselInstallations.id, { onDelete: 'cascade' }),
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
 })
+
+export const vesselInstallationObservedIdentities = sqliteTable(
+  'vessel_installation_observed_identities',
+  {
+    installationId: text('installation_id')
+      .primaryKey()
+      .references(() => vesselInstallations.id, { onDelete: 'cascade' }),
+    vesselId: text('vessel_id')
+      .notNull()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    source: text('source').notNull().default('signalk_delta'),
+    selfContext: text('self_context'),
+    mmsi: text('mmsi'),
+    observedName: text('observed_name'),
+    callSign: text('call_sign'),
+    shipType: text('ship_type'),
+    shipTypeCode: integer('ship_type_code'),
+    lengthOverall: real('length_overall'),
+    beam: real('beam'),
+    draft: real('draft'),
+    registrationNumber: text('registration_number'),
+    imo: text('imo'),
+    observedAt: text('observed_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+    updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    vesselIdx: index('vessel_installation_observed_identities_vessel_idx').on(table.vesselId),
+    mmsiIdx: index('vessel_installation_observed_identities_mmsi_idx').on(table.mmsi),
+  }),
+)
+
+export const vesselObservedIdentities = sqliteTable(
+  'vessel_observed_identities',
+  {
+    vesselId: text('vessel_id')
+      .primaryKey()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    sourceInstallationId: text('source_installation_id').references(() => vesselInstallations.id, {
+      onDelete: 'set null',
+    }),
+    source: text('source').notNull().default('signalk_delta'),
+    selfContext: text('self_context'),
+    mmsi: text('mmsi'),
+    observedName: text('observed_name'),
+    callSign: text('call_sign'),
+    shipType: text('ship_type'),
+    shipTypeCode: integer('ship_type_code'),
+    lengthOverall: real('length_overall'),
+    beam: real('beam'),
+    draft: real('draft'),
+    registrationNumber: text('registration_number'),
+    imo: text('imo'),
+    observedAt: text('observed_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+    updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    sourceInstallationIdx: index('vessel_observed_identities_installation_idx').on(
+      table.sourceInstallationId,
+    ),
+    mmsiIdx: index('vessel_observed_identities_mmsi_idx').on(table.mmsi),
+  }),
+)
 
 export const vesselLiveSnapshots = sqliteTable('vessel_live_snapshots', {
   vesselId: text('vessel_id')
@@ -186,6 +250,17 @@ export const aishubVessels = sqliteTable('aishub_vessels', {
   positionLat: real('position_lat'),
   positionLng: real('position_lng'),
   shipType: integer('ship_type'),
+  courseOverGround: real('course_over_ground'),
+  speedOverGround: real('speed_over_ground'),
+  heading: real('heading'),
+  rateOfTurn: real('rate_of_turn'),
+  navStatus: integer('nav_status'),
+  dimensionBow: integer('dimension_bow'),
+  dimensionStern: integer('dimension_stern'),
+  dimensionPort: integer('dimension_port'),
+  dimensionStarboard: integer('dimension_starboard'),
+  draughtMeters: real('draught_meters'),
+  etaRaw: text('eta_raw'),
   sourceStationsJson: text('source_stations_json').notNull().default('[]'),
   searchDocument: text('search_document').notNull(),
   firstSeenAt: text('first_seen_at').notNull().$defaultFn(isoTimestamp),
@@ -199,12 +274,30 @@ export const aishubRequestState = sqliteTable('aishub_request_state', {
   updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
 })
 
+export const aishubSyncState = sqliteTable('aishub_sync_state', {
+  id: text('id').primaryKey(),
+  lastStartedAt: text('last_started_at'),
+  lastCompletedAt: text('last_completed_at'),
+  lastSuccessAt: text('last_success_at'),
+  lastStatus: text('last_status').notNull().default('idle'),
+  lastMode: text('last_mode'),
+  lastLookbackMinutes: integer('last_lookback_minutes'),
+  lastRecordCount: integer('last_record_count'),
+  lastBatchCount: integer('last_batch_count'),
+  lastError: text('last_error'),
+  updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+})
+
 export type PublicProfile = typeof publicProfiles.$inferSelect
 export type Vessel = typeof vessels.$inferSelect
 export type VesselInstallation = typeof vesselInstallations.$inferSelect
+export type VesselInstallationObservedIdentity =
+  typeof vesselInstallationObservedIdentities.$inferSelect
 export type VesselLiveSnapshot = typeof vesselLiveSnapshots.$inferSelect
+export type VesselObservedIdentity = typeof vesselObservedIdentities.$inferSelect
 export type Passage = typeof passages.$inferSelect
 export type Waypoint = typeof waypoints.$inferSelect
 export type MediaItem = typeof mediaItems.$inferSelect
 export type FollowedVessel = typeof followedVessels.$inferSelect
 export type AisHubVessel = typeof aishubVessels.$inferSelect
+export type AisHubSyncState = typeof aishubSyncState.$inferSelect

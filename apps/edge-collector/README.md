@@ -1,8 +1,9 @@
 # MyBoat Edge Collector
 
-Small Node-based forwarder that subscribes to a SignalK websocket and relays
-delta updates to the MyBoat ingest endpoint. It also republishes those deltas
-on a MyBoat-owned websocket so the app can consume the same simulated
+Small Node-based forwarder that subscribes to a SignalK websocket, relays delta
+updates to the MyBoat ingest endpoint, and periodically bootstraps observed
+vessel identity from the SignalK REST self model. It also republishes the raw
+deltas on a MyBoat-owned websocket so the app can consume the same simulated
 boat-side feed that the collector is ingesting.
 
 ## Throughput and rate limits
@@ -36,8 +37,12 @@ the edge device is tight.
 
 - `SIGNALK_WS_URL`: SignalK websocket source. Defaults to
   `ws://localhost:3000/signalk/v1/stream?subscribe=all`.
+- `SIGNALK_HTTP_URL`: SignalK REST API base used for self-identity discovery.
+  Defaults to the websocket URL rewritten from `/stream` to `/api`.
 - `MYBOAT_INGEST_URL`: MyBoat ingest endpoint. Defaults to
   `https://mybo.at/api/ingest/v1/delta`.
+- `MYBOAT_IDENTITY_INGEST_URL`: MyBoat observed-identity ingest endpoint.
+  Defaults to the delta ingest URL rewritten from `/delta` to `/identity`.
 - `MYBOAT_INGEST_KEY`: Required ingest bearer token.
 - `MYBOAT_STREAM_PORT`: Port for the collector-published MyBoat websocket feed.
   Default `4011`.
@@ -47,6 +52,8 @@ the edge device is tight.
   attempted (may exceed this while throttled). Default `100`.
 - `COLLECTOR_FLUSH_INTERVAL_MS`: Upper bound on how long deltas sit before a
   timer-driven flush. Default `3000`.
+- `COLLECTOR_IDENTITY_REFRESH_INTERVAL_MS`: How often to refresh observed vessel
+  identity from SignalK REST. Default `900000` (15 minutes).
 - `COLLECTOR_MIN_POST_INTERVAL_MS`: Minimum milliseconds between ingest POST
   attempts. Default `2000`.
 - `COLLECTOR_429_BACKOFF_MS`: Minimum wait after a 429 before retrying, when
@@ -87,7 +94,8 @@ MYBOAT_INGEST_KEY=nk_replace_me pnpm run dev:collector:tideye
 
 Defaults:
 
-- SignalK source: `wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all`
+- SignalK source:
+  `wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all`
 - Ingest URL: `http://host.docker.internal:3000/api/ingest/v1/delta`
 - Published collector websocket: `ws://localhost:4011/myboat/v1/stream`
 

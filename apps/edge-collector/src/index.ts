@@ -23,14 +23,33 @@ type BatchItem = {
   delta: SignalKDeltaMessage
 }
 
+type ObservedIdentityPayload = {
+  timestamp: string
+  source: 'signalk_rest'
+  selfContext?: string
+  mmsi?: string
+  observedName?: string
+  callSign?: string
+  shipType?: string
+  shipTypeCode?: number
+  lengthOverall?: number
+  beam?: number
+  draft?: number
+  registrationNumber?: string
+  imo?: string
+}
+
 type CollectorConfig = {
   signalkWsUrl: string
+  signalkHttpUrl: string
   ingestUrl: string
+  identityIngestUrl: string
   ingestKey: string
   streamPort: number
   streamPath: string
   batchSize: number
   flushIntervalMs: number
+  identityRefreshIntervalMs: number
   minPostIntervalMs: number
   rateLimitBackoffMs: number
   reconnectDelayMs: number
@@ -42,7 +61,9 @@ type CollectorConfig = {
 let socket: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let flushTimer: ReturnType<typeof setTimeout> | null = null
+let identityRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let isFlushing = false
+let isRefreshingIdentity = false
 let hasLoggedServerHello = false
 let isShuttingDown = false
 let batch: BatchItem[] = []
@@ -86,6 +107,29 @@ function withDefaultSignalKSubscription(rawUrl: string) {
   return url.toString()
 }
 
+function deriveSignalKHttpUrl(rawWsUrl: string) {
+  const url = new URL(rawWsUrl)
+  url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
+  url.search = ''
+  url.pathname = url.pathname.replace(/\/stream$/, '/api')
+  return url.toString()
+}
+
+function withTrailingSlash(rawUrl: string) {
+  return rawUrl.endsWith('/') ? rawUrl : `${rawUrl}/`
+}
+
+function deriveIdentityIngestUrl(rawDeltaUrl: string) {
+  const url = new URL(rawDeltaUrl)
+  if (url.pathname.endsWith('/delta')) {
+    url.pathname = `${url.pathname.slice(0, -'/delta'.length)}/identity`
+    return url.toString()
+  }
+
+  url.pathname = `${url.pathname.replace(/\/+$/g, '')}/identity`
+  return url.toString()
+}
+
 function normalizeStreamPath(rawPath: string | null | undefined) {
   const normalizedPath = rawPath?.trim()
 
@@ -100,7 +144,10 @@ function loadConfig(): CollectorConfig {
   const signalkWsUrl = withDefaultSignalKSubscription(
     process.env.SIGNALK_WS_URL?.trim() || 'ws://localhost:3000/signalk/v1/stream',
   )
+  const signalkHttpUrl = process.env.SIGNALK_HTTP_URL?.trim() || deriveSignalKHttpUrl(signalkWsUrl)
   const ingestUrl = process.env.MYBOAT_INGEST_URL?.trim() || 'https://mybo.at/api/ingest/v1/delta'
+  const identityIngestUrl =
+    process.env.MYBOAT_IDENTITY_INGEST_URL?.trim() || deriveIdentityIngestUrl(ingestUrl)
   const ingestKey = process.env.MYBOAT_INGEST_KEY?.trim()
 
   if (!ingestKey) {
@@ -109,13 +156,19 @@ function loadConfig(): CollectorConfig {
 
   return {
     signalkWsUrl,
+    signalkHttpUrl,
     ingestUrl,
+    identityIngestUrl,
     ingestKey,
     streamPort: parsePositiveInteger('MYBOAT_STREAM_PORT', 4011),
     streamPath: normalizeStreamPath(process.env.MYBOAT_STREAM_PATH),
     // Larger batches + spacing keep ingest POSTs well under authApiKeys (60/min).
     batchSize: parsePositiveInteger('COLLECTOR_BATCH_SIZE', 100),
     flushIntervalMs: parsePositiveInteger('COLLECTOR_FLUSH_INTERVAL_MS', 3000),
+    identityRefreshIntervalMs: parsePositiveInteger(
+      'COLLECTOR_IDENTITY_REFRESH_INTERVAL_MS',
+      15 * 60 * 1000,
+    ),
     minPostIntervalMs: parsePositiveInteger('COLLECTOR_MIN_POST_INTERVAL_MS', 2000),
     rateLimitBackoffMs: parsePositiveInteger('COLLECTOR_429_BACKOFF_MS', 10_000),
     reconnectDelayMs: parsePositiveInteger('COLLECTOR_RECONNECT_DELAY_MS', 5000),
@@ -136,8 +189,10 @@ const streamServer = createServer((request, response) => {
       JSON.stringify({
         ok: true,
         connectedClients: liveClients.size,
+        identityIngestUrl: config.identityIngestUrl,
         ingestUrl: config.ingestUrl,
         lastPublishedAt,
+        signalkHttpUrl: config.signalkHttpUrl,
         signalkWsUrl: config.signalkWsUrl,
         streamPath: config.streamPath,
         streamPort: config.streamPort,
@@ -196,6 +251,7 @@ function maybeUpdateSignalKSelfContext(nextSelf: unknown) {
   }
 
   signalkSelfContext = normalized
+  void refreshObservedIdentity('self-context-update')
 
   const hello = buildCollectorHelloMessage()
   for (const client of liveClients) {
@@ -265,10 +321,7 @@ function startMyBoatStreamServer() {
   })
 
   streamServer.listen(config.streamPort, () => {
-    log(
-      'Publishing MyBoat stream',
-      `ws://0.0.0.0:${config.streamPort}${config.streamPath}`,
-    )
+    log('Publishing MyBoat stream', `ws://0.0.0.0:${config.streamPort}${config.streamPath}`)
   })
 }
 
@@ -305,6 +358,13 @@ function clearFlushTimer() {
   }
 }
 
+function clearIdentityRefreshTimer() {
+  if (identityRefreshTimer) {
+    clearTimeout(identityRefreshTimer)
+    identityRefreshTimer = null
+  }
+}
+
 function scheduleReconnect(reason: string) {
   if (isShuttingDown || reconnectTimer) return
 
@@ -321,6 +381,17 @@ function scheduleFlush(delayMs = config.flushIntervalMs) {
   flushTimer = setTimeout(() => {
     flushTimer = null
     void flushBatch()
+  }, delayMs)
+}
+
+function scheduleIdentityRefresh(delayMs = config.identityRefreshIntervalMs) {
+  if (isShuttingDown || identityRefreshTimer) {
+    return
+  }
+
+  identityRefreshTimer = setTimeout(() => {
+    identityRefreshTimer = null
+    void refreshObservedIdentity('scheduled-refresh')
   }, delayMs)
 }
 
@@ -351,6 +422,221 @@ function msUntilPostAllowed(): number {
   return Math.max(msUntilMinPostInterval(), Math.max(0, nextPostNotBefore - Date.now()))
 }
 
+function normalizeTrimmedString(value: unknown, maxLength: number) {
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return normalized ? normalized.slice(0, maxLength) : undefined
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value).slice(0, maxLength)
+  }
+
+  return undefined
+}
+
+function normalizeFiniteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function normalizeMmsi(value: unknown) {
+  const normalized = normalizeTrimmedString(value, 32)
+  if (!normalized) {
+    return undefined
+  }
+
+  const match = normalized.match(/\b(\d{9})\b/)
+  return match?.[1]
+}
+
+function unwrapSignalKValue(value: unknown): unknown {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'value' in value &&
+    Object.keys(value).length <= 6
+  ) {
+    return (value as { value?: unknown }).value
+  }
+
+  return value
+}
+
+function readSignalKPathValue(model: unknown, path: string): unknown {
+  const segments = path.split('.')
+  let current = model
+
+  for (const segment of segments) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) {
+      return undefined
+    }
+
+    current = (current as Record<string, unknown>)[segment]
+  }
+
+  return unwrapSignalKValue(current)
+}
+
+function looksLikeSignalKVesselModel(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  return ['name', 'navigation', 'communication', 'design', 'registrations'].some(
+    (key) => key in candidate,
+  )
+}
+
+function unwrapSignalKVesselModel(model: unknown) {
+  if (looksLikeSignalKVesselModel(model)) {
+    return model
+  }
+
+  if (!model || typeof model !== 'object' || Array.isArray(model)) {
+    return null
+  }
+
+  const values = Object.values(model as Record<string, unknown>)
+  if (values.length === 1 && looksLikeSignalKVesselModel(values[0])) {
+    return values[0]
+  }
+
+  return null
+}
+
+function extractMmsiFromContext(context: string | null) {
+  const normalized = context?.trim() || ''
+  if (!normalized) {
+    return undefined
+  }
+
+  const match = normalized.match(/mmsi:(\d{9})/i)
+  return match?.[1]
+}
+
+function buildObservedIdentityPayload(model: unknown): ObservedIdentityPayload | null {
+  const vesselModel = unwrapSignalKVesselModel(model)
+  if (!vesselModel) {
+    return null
+  }
+
+  const payload: ObservedIdentityPayload = {
+    timestamp: new Date().toISOString(),
+    source: 'signalk_rest',
+  }
+
+  if (signalkSelfContext) {
+    payload.selfContext = signalkSelfContext
+    payload.mmsi = extractMmsiFromContext(signalkSelfContext)
+  }
+
+  payload.observedName = normalizeTrimmedString(readSignalKPathValue(vesselModel, 'name'), 120)
+  payload.callSign = normalizeTrimmedString(
+    readSignalKPathValue(vesselModel, 'communication.callsignVhf') ??
+      readSignalKPathValue(vesselModel, 'communication.callsign'),
+    40,
+  )
+  payload.shipType = normalizeTrimmedString(readSignalKPathValue(vesselModel, 'design.type'), 120)
+  payload.shipTypeCode = normalizeFiniteNumber(
+    readSignalKPathValue(vesselModel, 'design.aisShipType'),
+  )
+  payload.lengthOverall = normalizeFiniteNumber(
+    readSignalKPathValue(vesselModel, 'design.length.overall'),
+  )
+  payload.beam = normalizeFiniteNumber(readSignalKPathValue(vesselModel, 'design.beam'))
+  payload.draft =
+    normalizeFiniteNumber(readSignalKPathValue(vesselModel, 'design.draft.current')) ??
+    normalizeFiniteNumber(readSignalKPathValue(vesselModel, 'design.draft.maximum'))
+  payload.registrationNumber = normalizeTrimmedString(
+    readSignalKPathValue(vesselModel, 'registrations.national') ??
+      readSignalKPathValue(vesselModel, 'registrations.other') ??
+      readSignalKPathValue(vesselModel, 'registrations.registration'),
+    80,
+  )
+  payload.imo = normalizeTrimmedString(readSignalKPathValue(vesselModel, 'registrations.imo'), 32)
+  payload.mmsi =
+    payload.mmsi ??
+    normalizeMmsi(readSignalKPathValue(vesselModel, 'registrations.mmsi')) ??
+    normalizeMmsi(readSignalKPathValue(vesselModel, 'mmsi'))
+
+  const hasData = Object.entries(payload).some(
+    ([key, value]) => key !== 'timestamp' && key !== 'source' && value !== undefined,
+  )
+  return hasData ? payload : null
+}
+
+async function fetchSignalKObservedIdentity() {
+  const url = new URL('vessels/self', withTrailingSlash(config.signalkHttpUrl))
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': config.userAgent,
+      'X-Requested-With': config.xRequestedWith,
+    },
+    signal: AbortSignal.timeout(config.requestTimeoutMs),
+  })
+
+  if (!response.ok) {
+    throw new Error(`SignalK identity fetch failed: ${response.status}`)
+  }
+
+  return buildObservedIdentityPayload(await response.json())
+}
+
+async function postObservedIdentity(payload: ObservedIdentityPayload) {
+  const response = await fetch(config.identityIngestUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.ingestKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': config.userAgent,
+      'X-Requested-With': config.xRequestedWith,
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(config.requestTimeoutMs),
+  })
+
+  const bodyText = await response.text()
+  if (!response.ok) {
+    throw new Error(`Identity ingest failed: ${response.status} ${bodyText}`.trim())
+  }
+}
+
+async function refreshObservedIdentity(reason: string) {
+  if (isRefreshingIdentity || isShuttingDown) {
+    return
+  }
+
+  isRefreshingIdentity = true
+  clearIdentityRefreshTimer()
+
+  try {
+    const payload = await fetchSignalKObservedIdentity()
+    if (!payload) {
+      log('No observed vessel identity found in SignalK self model', reason)
+      return
+    }
+
+    await postObservedIdentity(payload)
+    log('Forwarded observed vessel identity to MyBoat', {
+      reason,
+      mmsi: payload.mmsi,
+      selfContext: payload.selfContext,
+    })
+  } catch (error) {
+    warn(
+      'Failed to refresh observed vessel identity',
+      error instanceof Error ? error.message : error,
+    )
+  } finally {
+    isRefreshingIdentity = false
+    scheduleIdentityRefresh()
+  }
+}
+
 function connect() {
   clearReconnectTimer()
   hasLoggedServerHello = false
@@ -360,6 +646,7 @@ function connect() {
 
   socket.addEventListener('open', () => {
     log('Connected to SignalK')
+    void refreshObservedIdentity('socket-open')
   })
 
   socket.addEventListener('message', (event) => {
@@ -423,36 +710,38 @@ function mergeBatchItems(items: BatchItem[]) {
   return {
     timestamp: latestTimestamp,
     deltas: Array.from(
-      items.reduce<
-        Map<
-          string,
-          {
-            timestamp: string
-            delta: SignalKDeltaMessage
+      items
+        .reduce<
+          Map<
+            string,
+            {
+              timestamp: string
+              delta: SignalKDeltaMessage
+            }
+          >
+        >((groups, item) => {
+          const context = item.delta.context?.trim() || ''
+          const self = item.delta.self?.trim() || ''
+          const groupKey = `${context}\u0000${self}`
+          const currentGroup = groups.get(groupKey)
+
+          if (!currentGroup) {
+            groups.set(groupKey, {
+              timestamp: item.timestamp,
+              delta: {
+                ...(item.delta.context ? { context: item.delta.context } : {}),
+                ...(item.delta.self ? { self: item.delta.self } : {}),
+                updates: [...item.delta.updates],
+              },
+            })
+            return groups
           }
-        >
-      >((groups, item) => {
-        const context = item.delta.context?.trim() || ''
-        const self = item.delta.self?.trim() || ''
-        const groupKey = `${context}\u0000${self}`
-        const currentGroup = groups.get(groupKey)
 
-        if (!currentGroup) {
-          groups.set(groupKey, {
-            timestamp: item.timestamp,
-            delta: {
-              ...(item.delta.context ? { context: item.delta.context } : {}),
-              ...(item.delta.self ? { self: item.delta.self } : {}),
-              updates: [...item.delta.updates],
-            },
-          })
+          currentGroup.timestamp = item.timestamp
+          currentGroup.delta.updates.push(...item.delta.updates)
           return groups
-        }
-
-        currentGroup.timestamp = item.timestamp
-        currentGroup.delta.updates.push(...item.delta.updates)
-        return groups
-      }, new Map()).values(),
+        }, new Map())
+        .values(),
     ),
   }
 }
@@ -540,6 +829,7 @@ async function shutdown(signal: string) {
   log(`Shutting down after ${signal}`)
   clearReconnectTimer()
   clearFlushTimer()
+  clearIdentityRefreshTimer()
 
   if (socket && socket.readyState < WebSocket.CLOSING) {
     socket.close(1000, 'shutdown')

@@ -3,6 +3,7 @@ import {
   getCaptainProfileByUserId,
   getInstallationsForUser,
   getMediaForVesselIds,
+  getObservedIdentitiesForVesselIds,
   getPassagesForVesselIds,
   getSnapshotsForVesselIds,
   getVesselBySlug,
@@ -33,13 +34,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const vesselIds = [vessel.id]
-  const [snapshotRows, passageRows, mediaRows, waypointRows, installations] = await Promise.all([
-    getSnapshotsForVesselIds(event, vesselIds),
-    getPassagesForVesselIds(event, vesselIds),
-    getMediaForVesselIds(event, vesselIds),
-    getWaypointsForVesselIds(event, vesselIds),
-    getInstallationsForUser(event, user.id),
-  ])
+  const [snapshotRows, passageRows, mediaRows, waypointRows, installations, observedIdentityRows] =
+    await Promise.all([
+      getSnapshotsForVesselIds(event, vesselIds),
+      getPassagesForVesselIds(event, vesselIds),
+      getMediaForVesselIds(event, vesselIds),
+      getWaypointsForVesselIds(event, vesselIds),
+      getInstallationsForUser(event, user.id),
+      getObservedIdentitiesForVesselIds(event, vesselIds),
+    ])
 
   const vesselCards = serializeVesselCards(
     [vessel],
@@ -47,6 +50,7 @@ export default defineEventHandler(async (event) => {
     passageRows,
     mediaRows,
     waypointRows,
+    observedIdentityRows,
   )
 
   return {

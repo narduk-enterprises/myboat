@@ -13,11 +13,6 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
   return value.toFixed(digits)
 }
 
-function extractMmsi(source: string | null | undefined) {
-  const match = source?.match(/\b(\d{9})\b/)
-  return match?.[1] || 'Pending'
-}
-
 const store = useMyBoatVesselStore()
 useMyBoatLiveDemand({
   namespace: 'auth',
@@ -39,10 +34,14 @@ const primaryInstallation = computed<InstallationSummary | null>(
 const primarySnapshot = computed<VesselSnapshotSummary | null>(
   () => primaryVessel.value?.liveSnapshot ?? null,
 )
+const observedIdentity = computed(
+  () =>
+    primaryVessel.value?.observedIdentity || primaryInstallation.value?.observedIdentity || null,
+)
 const latestPassage = computed<PassageSummary | null>(
   () => primaryEntry.value?.passages[0] || primaryVessel.value?.latestPassage || null,
 )
-const vesselMmsi = computed(() => extractMmsi(primarySnapshot.value?.source))
+const vesselMmsi = computed(() => observedIdentity.value?.mmsi || 'Pending')
 const vesselLatitude = computed(() =>
   formatCoordinate(primarySnapshot.value?.positionLat ?? null, true),
 )
@@ -77,7 +76,9 @@ const statsCards = computed(() => [
     value: primaryVessel.value?.name || 'Pending',
   },
   {
-    hint: 'Reserved until a vessel MMSI is linked into the app record.',
+    hint: observedIdentity.value?.observedAt
+      ? `Observed ${formatRelativeTime(observedIdentity.value.observedAt)} from the collector path.`
+      : 'Waiting for observed vessel identity from the collector path.',
     label: 'MMSI',
     value: vesselMmsi.value,
   },
@@ -120,12 +121,12 @@ const statsCards = computed(() => [
 ])
 const setupAlert = computed(() => {
   if (!store.authState.value.profile) {
-      return {
-        description:
-          'Finish onboarding to attach the captain identity, primary vessel, and first collector install.',
-        to: '/dashboard/onboarding',
-        title: 'Captain setup is still incomplete',
-      }
+    return {
+      description:
+        'Finish onboarding to attach the captain identity, primary vessel, and first collector install.',
+      to: '/dashboard/onboarding',
+      title: 'Captain setup is still incomplete',
+    }
   }
 
   if (!primaryVessel.value) {
@@ -138,12 +139,12 @@ const setupAlert = computed(() => {
   }
 
   if (!primaryInstallation.value) {
-      return {
-        description:
-          'Link one collector install for the vessel so the dashboard can fill in the bridge stats.',
-        to: '/dashboard/settings',
-        title: 'No collector install linked',
-      }
+    return {
+      description:
+        'Link one collector install for the vessel so the dashboard can fill in the bridge stats.',
+      to: '/dashboard/settings',
+      title: 'No collector install linked',
+    }
   }
 
   if (!primarySnapshot.value?.observedAt) {

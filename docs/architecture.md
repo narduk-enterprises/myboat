@@ -23,7 +23,7 @@ flowchart TB
 
   subgraph Cloudflare["Cloudflare edge"]
     DNS["DNS + TLS for <br/>mybo.at"]
-    Web["Nuxt app on Cloudflare Workers<br/>https://mybo.at<br/>routes + APIs<br/>/api/ingest/v1/delta<br/>/api/app/.../live<br/>/api/public/.../live"]
+    Web["Nuxt app on Cloudflare Workers<br/>https://mybo.at<br/>routes + APIs<br/>/api/ingest/v1/delta<br/>/api/ingest/v1/identity<br/>/api/app/.../live<br/>/api/public/.../live"]
     D1["D1<br/>myboat-db<br/>vessels, installs,<br/>sharing + snapshot cache"]
     KV["Cloudflare KV<br/>binding: KV"]
     Live["Per-vessel MyBoat live broker<br/>owner + public live updates"]
@@ -51,7 +51,8 @@ flowchart TB
   AuthProd --> Caddy --> Auth --> AuthPg
   AuthStage --> Caddy
 
-  Boat -->|"POST normalized deltas + observed self identity<br/>/api/ingest/v1/delta"| Web
+  Boat -->|"POST normalized deltas<br/>/api/ingest/v1/delta"| Web
+  Boat -->|"POST observed self identity<br/>/api/ingest/v1/identity"| Web
   Boat -->|"direct local telemetry"| LocalApp
   Web -->|"latest snapshot, install heartbeat,<br/>sharing state, observed identity"| D1
   Web -->|"write time-series history"| Influx
@@ -72,6 +73,7 @@ flowchart TB
 - The app already exposes:
   - dashboard and public profile routes
   - `POST /api/ingest/v1/delta`
+  - `POST /api/ingest/v1/identity`
 - Auth is no longer app-local only. The app is configured to use the external
   Supabase-compatible authority when `AUTH_AUTHORITY_URL` and the Supabase keys
   are present.
@@ -107,7 +109,7 @@ flowchart TB
 - Discovery may come from:
   - SignalK websocket hello / self context
   - SignalK paths carried in deltas
-  - future SignalK self / metadata endpoint reads when needed
+  - SignalK self / metadata endpoint reads for identity bootstrap and refresh
 - MyBoat persists the latest observed vessel identity so UI surfaces do not need
   to infer MMSI or source metadata directly from raw live deltas.
 - Captain-managed vessel profile remains separate from observed identity:
@@ -122,9 +124,9 @@ flowchart TB
 Remote browser flow:
 
 1. Boat collector reads local telemetry and learns the upstream self context.
-2. Collector normalizes telemetry and observed self identity into MyBoat ingest
-   payloads.
-3. Collector posts those payloads to `POST /api/ingest/v1/delta`.
+2. Collector posts batched telemetry deltas to `POST /api/ingest/v1/delta`.
+3. Collector posts observed self identity bootstrap and refresh payloads to
+   `POST /api/ingest/v1/identity`.
 4. MyBoat updates D1 with latest vessel snapshot, install heartbeat, and
    observed vessel identity.
 5. MyBoat writes telemetry history to InfluxDB.

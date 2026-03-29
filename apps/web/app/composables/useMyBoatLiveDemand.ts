@@ -5,7 +5,9 @@ import type { VesselStoreNamespace } from './useMyBoatVesselStore'
 export function useMyBoatLiveDemand(options: {
   namespace: VesselStoreNamespace
   consumerId: string
-  demand: Ref<Partial<LiveDemand> | null | undefined> | ComputedRef<Partial<LiveDemand> | null | undefined>
+  demand:
+    | Ref<Partial<LiveDemand> | null | undefined>
+    | ComputedRef<Partial<LiveDemand> | null | undefined>
 }) {
   const store = useMyBoatVesselStore()
 

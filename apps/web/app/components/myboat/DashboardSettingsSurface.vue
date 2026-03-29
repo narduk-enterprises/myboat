@@ -33,6 +33,25 @@ const vesselDetailPath = computed(() =>
 const installationDetailPath = computed(() =>
   primaryInstallation.value ? `/dashboard/installations/${primaryInstallation.value.id}` : null,
 )
+const observedIdentity = computed(
+  () =>
+    primaryVessel.value?.observedIdentity || primaryInstallation.value?.observedIdentity || null,
+)
+const observedDimensions = computed(() => {
+  if (!observedIdentity.value) {
+    return 'Pending'
+  }
+
+  const segments = [
+    observedIdentity.value.lengthOverall
+      ? `LOA ${observedIdentity.value.lengthOverall.toFixed(1)} m`
+      : null,
+    observedIdentity.value.beam ? `Beam ${observedIdentity.value.beam.toFixed(1)} m` : null,
+    observedIdentity.value.draft ? `Draft ${observedIdentity.value.draft.toFixed(1)} m` : null,
+  ].filter(Boolean)
+
+  return segments.join(' · ') || 'Dimensions not observed yet'
+})
 const setupIncomplete = computed(
   () => !props.overview.profile || !primaryVessel.value || !primaryInstallation.value,
 )
@@ -237,6 +256,90 @@ const setupIncomplete = computed(
             </UButton>
             <UButton to="/dashboard/map" color="neutral" variant="soft" icon="i-lucide-map">
               Open live map
+            </UButton>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="border-default/80 bg-default/90 shadow-card">
+        <template #header>
+          <div>
+            <h2 class="font-display text-2xl text-default">Observed connection identity</h2>
+            <p class="mt-1 text-sm text-muted">
+              Source-derived vessel identity from the primary collector path. These values come from
+              the MyBoat ingest boundary, not direct browser access to SignalK.
+            </p>
+          </div>
+        </template>
+
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">MMSI</p>
+              <p class="mt-2 font-medium text-default">{{ observedIdentity?.mmsi || 'Pending' }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{
+                  observedIdentity?.observedAt
+                    ? `Observed ${formatRelativeTime(observedIdentity.observedAt)}`
+                    : 'No observed identity reported yet.'
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">Observed name</p>
+              <p class="mt-2 font-medium text-default">
+                {{ observedIdentity?.observedName || 'Pending' }}
+              </p>
+              <p class="mt-1 text-xs text-muted">
+                {{
+                  [observedIdentity?.callSign, observedIdentity?.shipType]
+                    .filter(Boolean)
+                    .join(' · ') || 'Callsign and ship type are not observed yet.'
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">Dimensions</p>
+              <p class="mt-2 font-medium text-default">{{ observedDimensions }}</p>
+              <p class="mt-1 text-xs text-muted">
+                {{
+                  observedIdentity?.registrationNumber ||
+                  observedIdentity?.imo ||
+                  'No registration identifiers observed yet.'
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+              <p class="text-xs uppercase tracking-wide text-muted">Source context</p>
+              <p class="mt-2 break-all font-medium text-default">
+                {{ observedIdentity?.selfContext || 'Waiting for self context' }}
+              </p>
+              <p class="mt-1 text-xs text-muted">
+                {{ primaryInstallation?.label || 'No collector install linked yet.' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              v-if="installationDetailPath"
+              :to="installationDetailPath"
+              color="primary"
+              icon="i-lucide-cpu"
+            >
+              Open live source
+            </UButton>
+            <UButton
+              v-if="vesselDetailPath"
+              :to="vesselDetailPath"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-ship"
+            >
+              Vessel detail
             </UButton>
           </div>
         </div>

@@ -163,7 +163,9 @@ function isSelfContext(context: string | undefined, selfContext?: string | undef
   }
 
   const normalizedSelfContext = normalizeContext(selfContext)
-  return Boolean(normalizedContext && normalizedSelfContext && normalizedContext === normalizedSelfContext)
+  return Boolean(
+    normalizedContext && normalizedSelfContext && normalizedContext === normalizedSelfContext,
+  )
 }
 
 function escapeTagValue(value: string) {
@@ -199,7 +201,11 @@ function getContextIdentity(context: string | undefined) {
 }
 
 export function resolveObservedAt(timestamp: string | undefined, delta: IngestDelta) {
-  return timestamp || delta.updates.find((update) => update.timestamp)?.timestamp || new Date().toISOString()
+  return (
+    timestamp ||
+    delta.updates.find((update) => update.timestamp)?.timestamp ||
+    new Date().toISOString()
+  )
 }
 
 export function buildSnapshotFromDelta(input: {

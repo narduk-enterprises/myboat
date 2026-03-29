@@ -6,13 +6,16 @@ import {
   mediaItems,
   passages,
   publicProfiles,
+  vesselInstallationObservedIdentities,
   vesselInstallations,
   vesselInstallationApiKeys,
   vesselLiveSnapshots,
+  vesselObservedIdentities,
   vessels,
   waypoints,
 } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { serializeObservedIdentitySummary } from '#server/utils/vesselIdentity'
 
 function normalizeSlugPart(value: string) {
   return value
@@ -331,6 +334,35 @@ export async function getSnapshotsForVesselIds(event: H3Event, vesselIds: string
     .all()
 }
 
+export async function getObservedIdentitiesForVesselIds(event: H3Event, vesselIds: string[]) {
+  if (!vesselIds.length) {
+    return []
+  }
+
+  const db = useAppDatabase(event)
+  return db
+    .select()
+    .from(vesselObservedIdentities)
+    .where(inArray(vesselObservedIdentities.vesselId, vesselIds))
+    .all()
+}
+
+export async function getInstallationObservedIdentitiesForInstallationIds(
+  event: H3Event,
+  installationIds: string[],
+) {
+  if (!installationIds.length) {
+    return []
+  }
+
+  const db = useAppDatabase(event)
+  return db
+    .select()
+    .from(vesselInstallationObservedIdentities)
+    .where(inArray(vesselInstallationObservedIdentities.installationId, installationIds))
+    .all()
+}
+
 export async function getPassagesForVesselIds(event: H3Event, vesselIds: string[]) {
   if (!vesselIds.length) {
     return []
@@ -433,7 +465,7 @@ export async function getWaypointsForVesselIds(event: H3Event, vesselIds: string
 
 export async function getInstallationsForUser(event: H3Event, userId: string) {
   const db = useAppDatabase(event)
-  return db
+  const installations = await db
     .select({
       id: vesselInstallations.id,
       vesselId: vesselInstallations.vesselId,
@@ -452,6 +484,19 @@ export async function getInstallationsForUser(event: H3Event, userId: string) {
     .where(and(eq(vessels.ownerUserId, userId), isNull(vesselInstallations.archivedAt)))
     .orderBy(desc(vesselInstallations.isPrimary), desc(vesselInstallations.updatedAt))
     .all()
+
+  const observedIdentityRows = await getInstallationObservedIdentitiesForInstallationIds(
+    event,
+    installations.map((installation) => installation.id),
+  )
+  const observedIdentityMap = new Map(
+    observedIdentityRows.map((row) => [row.installationId, row] as const),
+  )
+
+  return installations.map((installation) => ({
+    ...installation,
+    observedIdentity: serializeObservedIdentitySummary(observedIdentityMap.get(installation.id)),
+  }))
 }
 
 export async function getInstallationDetail(
@@ -490,6 +535,12 @@ export async function getInstallationDetail(
     return null
   }
 
+  const observedIdentity = await db
+    .select()
+    .from(vesselInstallationObservedIdentities)
+    .where(eq(vesselInstallationObservedIdentities.installationId, installationId))
+    .get()
+
   const keys = await db
     .select({
       id: apiKeys.id,
@@ -505,7 +556,10 @@ export async function getInstallationDetail(
     .all()
 
   return {
-    installation,
+    installation: {
+      ...installation,
+      observedIdentity: serializeObservedIdentitySummary(observedIdentity),
+    },
     keys,
   }
 }
@@ -538,8 +592,12 @@ export function serializeVesselCards(
   passageRows: Awaited<ReturnType<typeof getPassagesForVesselIds>>,
   mediaRows: Awaited<ReturnType<typeof getMediaForVesselIds>>,
   waypointRows: Awaited<ReturnType<typeof getWaypointsForVesselIds>>,
+  observedIdentityRows: Awaited<ReturnType<typeof getObservedIdentitiesForVesselIds>> = [],
 ) {
   const snapshotMap = new Map(snapshotRows.map((row) => [row.vesselId, row]))
+  const observedIdentityMap = new Map(
+    observedIdentityRows.map((row) => [row.vesselId, row] as const),
+  )
   const latestPassageByVessel = new Map<string, (typeof passageRows)[number]>()
   for (const row of passageRows) {
     if (!latestPassageByVessel.has(row.vesselId)) {
@@ -564,6 +622,7 @@ export function serializeVesselCards(
     vesselType: vessel.vesselType,
     homePort: vessel.homePort,
     summary: vessel.summary,
+    observedIdentity: serializeObservedIdentitySummary(observedIdentityMap.get(vessel.id)),
     isPrimary: vessel.isPrimary,
     sharePublic: vessel.sharePublic,
     latestPassage: latestPassageByVessel.get(vessel.id) || null,

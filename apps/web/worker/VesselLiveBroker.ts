@@ -9,7 +9,11 @@ import type {
   VesselLiveSyncMessage,
   VesselLiveConnectionState,
 } from '../shared/myboatLive'
-import { DEFAULT_LIVE_DEMAND, mergeAisContactSummary, normalizeLiveDemand } from '../shared/myboatLive'
+import {
+  DEFAULT_LIVE_DEMAND,
+  mergeAisContactSummary,
+  normalizeLiveDemand,
+} from '../shared/myboatLive'
 
 type PersistedBrokerState = {
   aisContacts: Record<string, AisContactSummary>
@@ -131,7 +135,10 @@ export class VesselLiveBroker extends DurableObject {
         continue
       }
 
-      const mergedContact = mergeAisContactSummary(this.stateRecord.aisContacts[contact.id], contact)
+      const mergedContact = mergeAisContactSummary(
+        this.stateRecord.aisContacts[contact.id],
+        contact,
+      )
       this.stateRecord.aisContacts[contact.id] = mergedContact
       aisUpserts.push(mergedContact)
     }

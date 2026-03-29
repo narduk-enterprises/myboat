@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { formatRelativeTime } from '~/utils/marine'
 import type { AuthUser } from '~/composables/useAuthApi'
 
-definePageMeta({ layout: 'admin', middleware: ['auth'] })
+definePageMeta({ layout: 'admin', middleware: ['admin'] })
 
 useSeo({
   title: 'Admin',
@@ -14,17 +15,65 @@ useWebPageSchema({
   description: 'Internal ops console for MyBoat.',
 })
 
+const toast = useToast()
 const session = useUserSession()
 const currentUser = computed(() => session.user.value as AuthUser | null)
 const { data, pending } = await useDashboardOverview('myboat-admin-index')
+const {
+  data: syncData,
+  pending: syncPending,
+  refresh: refreshSyncStatus,
+} = await useAdminAisHubSyncStatus()
+const { runSync, pending: syncRunning } = useRunAdminAisHubSync()
 
 const overview = computed(() => data.value)
+const syncStatus = computed(() => syncData.value)
+const syncBadgeColor = computed(() => {
+  switch (syncStatus.value?.sync.lastStatus) {
+    case 'success':
+      return 'success'
+    case 'running':
+      return 'info'
+    case 'error':
+      return 'error'
+    case 'skipped':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+})
+const syncLastSuccessLabel = computed(() =>
+  syncStatus.value?.sync.lastSuccessAt
+    ? formatRelativeTime(syncStatus.value.sync.lastSuccessAt)
+    : 'No successful sync yet',
+)
+const syncLastRequestLabel = computed(() =>
+  syncStatus.value?.lastRequestAt ? formatRelativeTime(syncStatus.value.lastRequestAt) : 'Never',
+)
 
 watchEffect(() => {
   if (session.loggedIn.value && currentUser.value && !currentUser.value.isAdmin) {
     void navigateTo('/dashboard', { replace: true })
   }
 })
+
+async function onRunAisHubSync() {
+  try {
+    syncData.value = await runSync()
+    await refreshSyncStatus()
+    toast.add({
+      title: 'AIS Hub sync started',
+      description: 'The rolling catalog refresh completed and the admin status has been updated.',
+      color: 'success',
+    })
+  } catch (error) {
+    toast.add({
+      title: 'Unable to run AIS Hub sync',
+      description: error instanceof Error ? error.message : 'Please try again.',
+      color: 'error',
+    })
+  }
+}
 </script>
 
 <template>
@@ -137,11 +186,58 @@ watchEffect(() => {
             </div>
           </template>
 
-          <div class="space-y-4 text-sm text-muted">
-            <p>Revoke keys when an install is compromised.</p>
-            <p>Disable sharing when a public vessel needs to go dark.</p>
-            <p>Mark installs unhealthy when telemetry is stale or misconfigured.</p>
-            <p>Audit trails should remain lightweight but visible to operators.</p>
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-default bg-elevated/60 p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="font-medium text-default">AIS Hub catalog sync</p>
+                    <UBadge :color="syncBadgeColor" variant="soft">
+                      {{ syncStatus?.sync.lastStatus || 'idle' }}
+                    </UBadge>
+                  </div>
+                  <p class="mt-1 text-sm text-muted">
+                    Pull the rolling AIS Hub vessel catalog into the local database on demand.
+                  </p>
+                </div>
+
+                <UButton
+                  color="primary"
+                  icon="i-lucide-refresh-cw"
+                  :loading="syncRunning"
+                  :disabled="syncPending || syncRunning"
+                  @click="onRunAisHubSync"
+                >
+                  Run sync now
+                </UButton>
+              </div>
+
+              <div class="mt-4 grid gap-3 text-sm text-muted md:grid-cols-2">
+                <p>Catalog size: {{ syncStatus?.catalogSize ?? 0 }} vessels</p>
+                <p>Last request: {{ syncLastRequestLabel }}</p>
+                <p>Last success: {{ syncLastSuccessLabel }}</p>
+                <p>
+                  Last batch: {{ syncStatus?.sync.lastRecordCount ?? 0 }} records across
+                  {{ syncStatus?.sync.lastBatchCount ?? 0 }} batches
+                </p>
+              </div>
+
+              <UAlert
+                v-if="syncStatus?.sync.lastError"
+                class="mt-4"
+                color="warning"
+                variant="soft"
+                title="Last sync note"
+                :description="syncStatus.sync.lastError"
+              />
+            </div>
+
+            <div class="space-y-4 text-sm text-muted">
+              <p>Revoke keys when an install is compromised.</p>
+              <p>Disable sharing when a public vessel needs to go dark.</p>
+              <p>Mark installs unhealthy when telemetry is stale or misconfigured.</p>
+              <p>Audit trails should remain lightweight but visible to operators.</p>
+            </div>
           </div>
         </UCard>
       </section>

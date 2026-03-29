@@ -13,7 +13,9 @@ const { createInstallationKey, pending: loading } = useCreateInstallationKey(pro
 const keys = ref<InstallationKeySummary[]>(props.initialKeys)
 const pendingKey = shallowRef<string | null>(null)
 const baseUrl = computed(() => useRuntimeConfig().public.appUrl || routeUrl.origin)
-const localBoatHostname = computed(() => useRuntimeConfig().public.localBoatHostname || 'myboat.local')
+const localBoatHostname = computed(
+  () => useRuntimeConfig().public.localBoatHostname || 'myboat.local',
+)
 
 function buildCollectorCommand() {
   return `docker run -d -e SIGNALK_WS_URL=ws://your-signalk:3000/signalk/v1/stream -e MYBOAT_INGEST_URL=${baseUrl.value}/api/ingest/v1/delta -e MYBOAT_INGEST_KEY=<YOUR_API_KEY> <collector-image>`
@@ -93,9 +95,7 @@ async function copyValue(value: string, message: string) {
               Point `SIGNALK_WS_URL` at the onboard feed. MyBoat only receives normalized deltas.
             </p>
           </div>
-          <UBadge color="primary" variant="soft">
-            MyBoat ingest
-          </UBadge>
+          <UBadge color="primary" variant="soft"> MyBoat ingest </UBadge>
         </div>
 
         <p class="mt-4 break-all rounded-xl bg-default px-3 py-2 font-mono text-sm text-default">
@@ -142,9 +142,7 @@ async function copyValue(value: string, message: string) {
         }}</pre>
       </div>
 
-      <div
-        class="rounded-2xl border border-default bg-elevated/60 p-4"
-      >
+      <div class="rounded-2xl border border-default bg-elevated/60 p-4">
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="rounded-2xl border border-default bg-default/70 px-4 py-3">
             <p class="text-xs uppercase tracking-wide text-muted">Local boat host</p>

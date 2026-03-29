@@ -3,6 +3,7 @@ import { defineUserMutation } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
 import { vesselInstallations, vessels } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { syncVesselObservedIdentityFromPrimaryInstallation } from '#server/utils/vesselIdentity'
 
 export default defineUserMutation(
   {
@@ -53,6 +54,8 @@ export default defineUserMutation(
         updatedAt: now,
       })
       .where(eq(vesselInstallations.id, installation.id))
+
+    await syncVesselObservedIdentityFromPrimaryInstallation(event, installation.vesselId)
 
     return {
       ok: true,

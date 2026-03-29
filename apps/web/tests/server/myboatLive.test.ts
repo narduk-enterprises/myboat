@@ -32,9 +32,9 @@ describe('myboat live helpers', () => {
 
   it('detects empty demand and builds websocket urls', () => {
     expect(isLiveDemandEmpty(DEFAULT_LIVE_DEMAND)).toBe(true)
-    expect(createMyBoatLiveWebSocketUrl('/api/app/vessels/north-star/live', 'https://mybo.at')).toBe(
-      'wss://mybo.at/api/app/vessels/north-star/live',
-    )
+    expect(
+      createMyBoatLiveWebSocketUrl('/api/app/vessels/north-star/live', 'https://mybo.at'),
+    ).toBe('wss://mybo.at/api/app/vessels/north-star/live')
   })
 
   it('merges sparse AIS upserts onto the previous contact state', () => {
