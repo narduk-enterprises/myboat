@@ -1,6 +1,7 @@
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type {
   AisContactSummary,
+  MediaItemSummary,
   PassageSummary,
   VesselCardSummary,
   VesselSnapshotSummary,
@@ -66,6 +67,19 @@ export interface MyBoatWaypointPin {
   visitedAt: string | null
 }
 
+export interface MyBoatMediaPin {
+  id: string
+  lat: number
+  lng: number
+  pinKind: 'media'
+  title: string
+  caption: string | null
+  imageUrl: string
+  capturedAt: string | null
+  sharePublic: boolean
+  isCover: boolean
+}
+
 export interface MyBoatAisPin {
   id: string
   lat: number
@@ -88,7 +102,7 @@ export interface MyBoatAisPin {
   lastUpdateAt: number
 }
 
-export type MyBoatSurfacePin = MyBoatVesselPin | MyBoatWaypointPin
+export type MyBoatSurfacePin = MyBoatVesselPin | MyBoatWaypointPin | MyBoatMediaPin
 export type MyBoatPin = MyBoatSurfacePin | MyBoatAisPin
 
 export const AIS_NEARBY_RADIUS_NM = 24
@@ -131,6 +145,30 @@ export function buildWaypointPins(waypoints: WaypointSummary[]) {
     kind: waypoint.kind,
     visitedAt: waypoint.visitedAt,
   }))
+}
+
+export function buildMediaPins(media: MediaItemSummary[]) {
+  return media
+    .filter(
+      (item) =>
+        item.matchStatus === 'attached' &&
+        item.lat !== null &&
+        item.lat !== undefined &&
+        item.lng !== null &&
+        item.lng !== undefined,
+    )
+    .map((item) => ({
+      id: item.id,
+      lat: item.lat!,
+      lng: item.lng!,
+      pinKind: 'media' as const,
+      title: item.title,
+      caption: item.caption,
+      imageUrl: item.imageUrl,
+      capturedAt: item.capturedAt,
+      sharePublic: item.sharePublic,
+      isCover: item.isCover,
+    }))
 }
 
 export function buildNearbyAisPins(options: {
@@ -302,14 +340,19 @@ export function buildAisVectorFeatureCollection(pins: MyBoatAisPin[]) {
 
 export function routeOverlayStyle(properties: Record<string, unknown>): MyBoatMapOverlayStyle {
   if (properties.featureKind === 'ais-vector') {
+    const shipType =
+      typeof properties.shipType === 'number' && Number.isFinite(properties.shipType)
+        ? properties.shipType
+        : null
+    const category = getAisCategory(shipType, 1)
     const isDangerous = Boolean(properties.danger)
 
     return {
-      strokeColor: isDangerous ? 'rgb(239 68 68)' : 'rgb(249 115 22)',
-      strokeOpacity: isDangerous ? 0.88 : 0.68,
+      strokeColor: isDangerous ? 'rgb(239 68 68)' : category.color,
+      strokeOpacity: isDangerous ? 0.92 : 0.76,
       fillColor: 'rgb(15 23 42)',
       fillOpacity: 0,
-      lineWidth: isDangerous ? 2.8 : 2,
+      lineWidth: isDangerous ? 3 : 2.25,
     }
   }
 
@@ -352,6 +395,10 @@ export function waypointGlyph(kind: string) {
   return '•'
 }
 
+function withAlpha(color: string, alpha: number) {
+  return color.replace('rgb(', 'rgb(').replace(')', ` / ${alpha})`)
+}
+
 export function aisDisplayName(contact: AisContactSummary) {
   if (contact.name) {
     return contact.name
@@ -366,31 +413,87 @@ export function aisDisplayName(contact: AisContactSummary) {
 
 export function getAisCategory(shipType: number | null, sog: number | null) {
   if (shipType === 30)
-    return { label: 'Fishing', color: 'rgb(14 165 233)', fill: 'rgb(224 242 254)' }
+    return {
+      label: 'Fishing',
+      color: 'rgb(14 165 233)',
+      fill: 'rgb(224 242 254)',
+      shape: 'trawler' as const,
+    }
   if (shipType !== null && shipType >= 31 && shipType <= 33) {
-    return { label: 'Tow', color: 'rgb(245 158 11)', fill: 'rgb(254 243 199)' }
+    return {
+      label: 'Tow',
+      color: 'rgb(245 158 11)',
+      fill: 'rgb(254 243 199)',
+      shape: 'tow' as const,
+    }
   }
-  if (shipType === 36) return { label: 'Sail', color: 'rgb(6 182 212)', fill: 'rgb(207 250 254)' }
+  if (shipType === 36)
+    return {
+      label: 'Sail',
+      color: 'rgb(6 182 212)',
+      fill: 'rgb(207 250 254)',
+      shape: 'sail' as const,
+    }
   if (shipType === 37)
-    return { label: 'Pleasure', color: 'rgb(168 85 247)', fill: 'rgb(243 232 255)' }
+    return {
+      label: 'Pleasure',
+      color: 'rgb(236 72 153)',
+      fill: 'rgb(252 231 243)',
+      shape: 'yacht' as const,
+    }
   if (shipType !== null && shipType >= 60 && shipType <= 69) {
-    return { label: 'Passenger', color: 'rgb(59 130 246)', fill: 'rgb(219 234 254)' }
+    return {
+      label: 'Passenger',
+      color: 'rgb(59 130 246)',
+      fill: 'rgb(219 234 254)',
+      shape: 'ferry' as const,
+    }
   }
   if (shipType !== null && shipType >= 70 && shipType <= 79) {
-    return { label: 'Cargo', color: 'rgb(132 204 22)', fill: 'rgb(236 252 203)' }
+    return {
+      label: 'Cargo',
+      color: 'rgb(132 204 22)',
+      fill: 'rgb(236 252 203)',
+      shape: 'cargo' as const,
+    }
   }
   if (shipType !== null && shipType >= 80 && shipType <= 89) {
-    return { label: 'Tanker', color: 'rgb(239 68 68)', fill: 'rgb(254 226 226)' }
+    return {
+      label: 'Tanker',
+      color: 'rgb(239 68 68)',
+      fill: 'rgb(254 226 226)',
+      shape: 'tanker' as const,
+    }
   }
   if (shipType === 35)
-    return { label: 'Military', color: 'rgb(15 23 42)', fill: 'rgb(226 232 240)' }
+    return {
+      label: 'Military',
+      color: 'rgb(15 23 42)',
+      fill: 'rgb(226 232 240)',
+      shape: 'naval' as const,
+    }
   if (shipType !== null && shipType >= 40 && shipType <= 55) {
-    return { label: 'Service', color: 'rgb(249 115 22)', fill: 'rgb(255 237 213)' }
+    return {
+      label: 'Service',
+      color: 'rgb(249 115 22)',
+      fill: 'rgb(255 237 213)',
+      shape: 'utility' as const,
+    }
   }
 
   return (sog ?? 0) > 0.5
-    ? { label: 'Traffic', color: 'rgb(249 115 22)', fill: 'rgb(255 237 213)' }
-    : { label: 'At rest', color: 'rgb(148 163 184)', fill: 'rgb(241 245 249)' }
+    ? {
+        label: 'Traffic',
+        color: 'rgb(249 115 22)',
+        fill: 'rgb(255 237 213)',
+        shape: 'utility' as const,
+      }
+    : {
+        label: 'At rest',
+        color: 'rgb(148 163 184)',
+        fill: 'rgb(241 245 249)',
+        shape: 'generic' as const,
+      }
 }
 
 export function formatDistanceNm(distanceNm: number | null) {
@@ -596,6 +699,119 @@ export function createWaypointPinElement(
   return { element }
 }
 
+interface MediaPinRenderOptions {
+  isCompactViewport?: boolean
+  showLabel?: boolean
+}
+
+export function createMediaPinElement(
+  item: MyBoatMediaPin,
+  isSelected: boolean,
+  options: MediaPinRenderOptions = {},
+) {
+  const shell = document.createElement('div')
+  shell.style.cssText =
+    'display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;pointer-events:none;'
+
+  const marker = document.createElement('div')
+  marker.style.cssText = [
+    'position:relative',
+    'display:flex',
+    'height:42px',
+    'width:42px',
+    'overflow:hidden',
+    'align-items:center',
+    'justify-content:center',
+    'border-radius:16px',
+    'border:1px solid rgb(255 255 255 / 0.82)',
+    'background:linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(30 41 59 / 0.9))',
+    `box-shadow:${isSelected ? '0 14px 28px rgb(14 116 144 / 0.26)' : '0 10px 24px rgb(15 23 42 / 0.2)'}`,
+    `transform:${isSelected ? 'scale(1.08)' : 'scale(1)'}`,
+    'transition:transform 180ms ease, box-shadow 180ms ease',
+  ].join(';')
+
+  const image = document.createElement('img')
+  image.src = item.imageUrl
+  image.alt = item.title
+  image.loading = 'lazy'
+  image.decoding = 'async'
+  image.style.cssText = 'height:100%;width:100%;object-fit:cover;'
+
+  const fallback = document.createElement('div')
+  fallback.style.cssText = [
+    'position:absolute',
+    'inset:0',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'font-size:16px',
+    'font-weight:700',
+    'color:rgb(248 250 252)',
+    'background:linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(8 47 73 / 0.92))',
+    'opacity:0',
+    'transition:opacity 140ms ease',
+  ].join(';')
+  fallback.textContent = 'P'
+
+  image.onerror = () => {
+    fallback.style.opacity = '1'
+  }
+
+  marker.appendChild(image)
+  marker.appendChild(fallback)
+
+  const badge = document.createElement('div')
+  badge.style.cssText = [
+    'position:absolute',
+    'right:3px',
+    'bottom:3px',
+    'display:flex',
+    'height:16px',
+    'min-width:16px',
+    'align-items:center',
+    'justify-content:center',
+    'border-radius:999px',
+    'border:1px solid rgb(255 255 255 / 0.84)',
+    'background:rgb(15 23 42 / 0.82)',
+    'padding:0 4px',
+    'font-size:9px',
+    'font-weight:800',
+    'color:rgb(248 250 252)',
+    'backdrop-filter:blur(8px)',
+  ].join(';')
+  badge.textContent = item.isCover ? 'C' : 'P'
+  marker.appendChild(badge)
+
+  shell.appendChild(marker)
+
+  const shouldShowLabel =
+    options.showLabel === false ? false : !options.isCompactViewport || isSelected
+
+  if (shouldShowLabel) {
+    const label = document.createElement('div')
+    label.style.cssText = [
+      'max-width:156px',
+      'overflow:hidden',
+      'text-overflow:ellipsis',
+      'white-space:nowrap',
+      'border-radius:999px',
+      'border:1px solid rgb(255 255 255 / 0.74)',
+      `background:${isSelected ? 'rgb(8 47 73 / 0.94)' : 'rgb(255 255 255 / 0.92)'}`,
+      `color:${isSelected ? 'rgb(240 249 255)' : 'rgb(15 23 42)'}`,
+      'padding:4px 10px',
+      'font-size:11px',
+      'font-weight:700',
+      'letter-spacing:0.01em',
+      'box-shadow:0 10px 24px rgb(15 23 42 / 0.14)',
+      'backdrop-filter:blur(12px)',
+    ].join(';')
+    label.textContent = item.isCover ? `Cover · ${item.title}` : item.title
+    shell.appendChild(label)
+  }
+
+  return { element: shell }
+}
+
 interface AisPinRenderOptions {
   isCompactViewport?: boolean
   pinCount?: number
@@ -608,65 +824,48 @@ export function createAisPinElement(
   options: AisPinRenderOptions = {},
 ) {
   const category = getAisCategory(item.shipType, item.sog)
+  const movementHeading = Math.round(item.heading ?? item.cog ?? 0)
+  const isMoving = (item.sog ?? 0) > 0.5
+  const freshness = aisFreshnessTone(item.lastUpdateAt)
 
   const element = document.createElement('div')
   element.style.cssText = [
     'position:relative',
     'display:flex',
-    'height:24px',
-    'width:24px',
+    'height:28px',
+    'width:28px',
     'align-items:center',
     'justify-content:center',
     'pointer-events:none',
   ].join(';')
 
-  if (isSelected) {
-    const halo = document.createElement('div')
-    halo.style.cssText = [
-      'position:absolute',
-      'inset:-5px',
-      'border-radius:999px',
-      `background:${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.16)')}`,
-      `box-shadow:0 8px 18px ${category.color.replace('rgb(', 'rgb(').replace(')', ' / 0.24)')}`,
-    ].join(';')
-    element.appendChild(halo)
-  }
+  const halo = document.createElement('div')
+  halo.style.cssText = [
+    'position:absolute',
+    'inset:-2px',
+    'border-radius:999px',
+    `background:${withAlpha(category.fill, isSelected ? 0.92 : 0.72)}`,
+    `border:1px solid ${withAlpha(freshness, 0.6)}`,
+    `box-shadow:${isSelected ? `0 10px 22px ${withAlpha(category.color, 0.24)}` : `0 7px 18px ${withAlpha(category.color, 0.12)}`}`,
+    `transform:${isSelected ? 'scale(1.05)' : 'scale(1)'}`,
+    'transition:transform 180ms ease, box-shadow 180ms ease',
+  ].join(';')
+  element.appendChild(halo)
 
   const ship = document.createElement('div')
   ship.style.cssText = [
     'position:relative',
     'z-index:1',
-    `transform:rotate(${Math.round(item.heading ?? item.cog ?? 0)}deg) scale(${isSelected ? 1.05 : 1})`,
+    `transform:rotate(${movementHeading}deg) scale(${isSelected ? 1.08 : 1})`,
     'transition:transform 180ms ease',
     'filter:drop-shadow(0 1px 3px rgb(15 23 42 / 0.24))',
   ].join(';')
-  ship.innerHTML = `
-    <svg viewBox="0 0 32 32" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        d="M16 4 L22 24 Q22 28 16 28 Q10 28 10 24 Z"
-        fill="${category.color}"
-        stroke="white"
-        stroke-width="1.15"
-        stroke-linejoin="round"
-      />
-      <circle cx="16" cy="17" r="2" fill="${category.fill}" opacity="0.85" />
-    </svg>
-  `
+  ship.innerHTML = buildAisShipSvg(category.shape, {
+    color: category.color,
+    deck: withAlpha('rgb(15 23 42)', isSelected ? 0.92 : 0.76),
+    accent: withAlpha('rgb(255 255 255)', isMoving ? 0.94 : 0.82),
+  })
   element.appendChild(ship)
-
-  const tone = document.createElement('div')
-  tone.style.cssText = [
-    'position:absolute',
-    'right:1px',
-    'top:1px',
-    'z-index:2',
-    'height:7px',
-    'width:7px',
-    'border-radius:999px',
-    'border:1px solid rgb(255 255 255 / 0.85)',
-    `background:${aisFreshnessTone(item.lastUpdateAt)}`,
-  ].join(';')
-  element.appendChild(tone)
 
   const shouldShowLabel =
     (options.showLabel !== false && isSelected) ||
@@ -720,5 +919,97 @@ export function createAisPinFingerprint(
       ? 'label'
       : 'dot'
 
-  return [item.title, category.label, freshness, headingBucket, labelMode, isSelected].join(':')
+  return [
+    item.title,
+    category.label,
+    category.shape,
+    freshness,
+    headingBucket,
+    labelMode,
+    isSelected,
+  ].join(':')
+}
+
+function buildAisShipSvg(
+  shape: ReturnType<typeof getAisCategory>['shape'],
+  palette: { color: string; deck: string; accent: string },
+) {
+  const common = `fill="${palette.color}" stroke="${palette.accent}" stroke-width="1.05" stroke-linejoin="round"`
+
+  switch (shape) {
+    case 'sail':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M16 4 L16 23 L9 23 Z" ${common} />
+          <path d="M15 6 L22.5 20.5 H15 Z" ${common} />
+          <path d="M10 23 L22 23 Q20 27 16 27 Q12 27 10 23 Z" fill="${palette.deck}" stroke="${palette.accent}" stroke-width="0.95" />
+        </svg>
+      `
+    case 'cargo':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M9 10 H21 L24 18 V24 Q24 27 16 28 Q8 27 8 23 V14 Z" ${common} />
+          <path d="M12 12 H20 V16 H12 Z" fill="${palette.deck}" opacity="0.82" />
+        </svg>
+      `
+    case 'tanker':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 9 H22 L24 15 V23 Q24 28 16 28 Q8 28 8 23 V13 Z" ${common} />
+          <path d="M13 11 H19 V17 H13 Z" fill="${palette.deck}" opacity="0.82" />
+          <path d="M11 21 H21" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        </svg>
+      `
+    case 'ferry':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M9 11 H23 L24 19 Q24 27 16 28 Q8 27 8 19 Z" ${common} />
+          <path d="M12 13 H20 V17 H12 Z" fill="${palette.deck}" opacity="0.82" />
+          <path d="M11 21 H21" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        </svg>
+      `
+    case 'trawler':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 10 H20 L23 17 V24 Q23 28 16 28 Q9 28 9 24 V14 Z" ${common} />
+          <path d="M16 6 V15" stroke="${palette.accent}" stroke-width="1.1" stroke-linecap="round" />
+          <path d="M13 12 H19" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        </svg>
+      `
+    case 'tow':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 10 H21 L23 16 V23 Q23 28 16 28 Q9 28 9 23 V14 Z" ${common} />
+          <path d="M16 6 V14" stroke="${palette.accent}" stroke-width="1.05" stroke-linecap="round" />
+          <path d="M16 6 L21 10" stroke="${palette.accent}" stroke-width="0.95" stroke-linecap="round" />
+        </svg>
+      `
+    case 'yacht':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M11 12 L21 11 L23 18 Q23 27 16 28 Q9 27 9 20 Z" ${common} />
+          <path d="M13 13 H19 V16 H13 Z" fill="${palette.deck}" opacity="0.84" />
+        </svg>
+      `
+    case 'naval':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M16 5 L22 13 L21 24 Q21 27 16 28 Q11 27 11 24 L10 13 Z" ${common} />
+          <path d="M14 11 H18 V15 H14 Z" fill="${palette.deck}" opacity="0.82" />
+        </svg>
+      `
+    case 'utility':
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 9 H22 L24 17 V23 Q24 28 16 28 Q8 28 8 23 V13 Z" ${common} />
+          <path d="M13 12 H19 V17 H13 Z" fill="${palette.deck}" opacity="0.82" />
+        </svg>
+      `
+    default:
+      return `
+        <svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M16 5 L22 21 Q22 28 16 28 Q10 28 10 21 Z" ${common} />
+        </svg>
+      `
+  }
 }

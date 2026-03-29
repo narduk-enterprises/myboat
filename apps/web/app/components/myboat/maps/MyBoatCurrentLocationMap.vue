@@ -3,12 +3,15 @@ import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import type { AisContactSummary, VesselCardSummary } from '~/types/myboat'
 import {
+  buildAisVectorFeatureCollection,
   buildNearbyAisPins,
   buildVesselPins,
   createAisPinElement,
   createAisPinFingerprint,
   createVesselPinElement,
+  routeOverlayStyle,
 } from './map-support'
+import { buildTrafficContactPath } from '~/utils/traffic'
 
 defineOptions({ inheritAttrs: false })
 
@@ -19,6 +22,7 @@ const props = withDefaults(
     aisContacts?: AisContactSummary[]
     hasSignalKSource?: boolean
     trafficEnabled?: boolean
+    trafficDetailBasePath?: string | null
     heightClass?: string
   }>(),
   {
@@ -26,6 +30,7 @@ const props = withDefaults(
     aisContacts: undefined,
     hasSignalKSource: undefined,
     trafficEnabled: undefined,
+    trafficDetailBasePath: null,
     heightClass: 'h-[22rem] sm:h-[28rem] lg:h-[32rem]',
   },
 )
@@ -38,6 +43,7 @@ const mapRef = useTemplateRef<MyBoatMapHandle>('mapRoot')
 const isCompactViewport = useCompactViewport()
 const selectedId = shallowRef<string | null>(null)
 const localTrafficEnabled = shallowRef(true)
+const showTrafficVectors = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
@@ -72,7 +78,19 @@ const aisPins = computed(() =>
     primaryVesselName: primaryVessel.value?.name || null,
   }),
 )
+const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
+const geojson = computed(() => ({
+  type: 'FeatureCollection' as const,
+  features:
+    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value.features : [],
+}))
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
+const selectedAisPin = computed(
+  () => aisPins.value.find((pin) => pin.id === selectedId.value) || null,
+)
+const selectedAisDetailPath = computed(() =>
+  buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
+)
 
 function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: boolean) {
   return createVesselPinElement(item, isSelected, {
@@ -141,8 +159,12 @@ watch(
 )
 
 watch(showTraffic, (enabled) => {
-  if (!enabled && selectedId.value?.startsWith('ais:')) {
-    selectedId.value = null
+  if (!enabled) {
+    showTrafficVectors.value = false
+
+    if (selectedId.value?.startsWith('ais:')) {
+      selectedId.value = null
+    }
   }
 })
 
@@ -181,7 +203,9 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
       ref="mapRoot"
       v-model:selected-id="selectedId"
       :items="vesselPins"
+      :geojson="geojson"
       :create-pin-element="renderMapPin"
+      :overlay-style-fn="routeOverlayStyle"
       :fallback-center="fallbackCenter"
       :annotation-size="{ width: 92, height: 72 }"
       :zoom-span="{ lat: 0.018, lng: 0.022 }"
@@ -210,6 +234,22 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
           >
             {{ toggleTrafficLabel }}
           </UButton>
+          <UButton
+            v-if="showTraffic"
+            class="pointer-events-auto"
+            :color="showTrafficVectors ? 'primary' : 'neutral'"
+            :variant="showTrafficVectors ? 'soft' : 'outline'"
+            icon="i-lucide-navigation-2"
+            @click="showTrafficVectors = !showTrafficVectors"
+          >
+            Vectors
+          </UButton>
+        </div>
+      </template>
+
+      <template #footer>
+        <div v-if="selectedAisPin" class="border-t border-default/70 px-4 py-3">
+          <TrafficContactFocusCard :contact="selectedAisPin" :detail-path="selectedAisDetailPath" />
         </div>
       </template>
     </MyBoatMap>

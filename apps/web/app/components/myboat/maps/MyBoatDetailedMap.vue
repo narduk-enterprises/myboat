@@ -2,20 +2,24 @@
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type {
   AisContactSummary,
+  MediaItemSummary,
   PassageSummary,
   VesselCardSummary,
   WaypointSummary,
 } from '~/types/myboat'
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
+import { buildTrafficContactPath } from '~/utils/traffic'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import {
   buildAisVectorFeatureCollection,
   buildNearbyAisPins,
+  buildMediaPins,
   buildPassageFeatureCollection,
   buildVesselPins,
   buildWaypointPins,
   createAisPinElement,
   createAisPinFingerprint,
+  createMediaPinElement,
   createVesselPinElement,
   createWaypointPinElement,
   formatDistanceNm,
@@ -30,12 +34,14 @@ const props = withDefaults(
     vessel: VesselCardSummary | null
     passages?: PassageSummary[]
     waypoints?: WaypointSummary[]
+    media?: MediaItemSummary[]
     installations?: MyBoatMapInstallation[]
     aisContacts?: AisContactSummary[]
     liveConnectionState?: 'idle' | 'connecting' | 'connected' | 'error'
     liveLastDeltaAt?: number | null
     hasSignalKSource?: boolean
     trafficEnabled?: boolean
+    trafficDetailBasePath?: string | null
     heightClass?: string
     persistKey?: string | null
     showFocusPanel?: boolean
@@ -46,12 +52,14 @@ const props = withDefaults(
   {
     passages: () => [],
     waypoints: () => [],
+    media: () => [],
     installations: () => [],
     aisContacts: undefined,
     liveConnectionState: undefined,
     liveLastDeltaAt: null,
     hasSignalKSource: undefined,
     trafficEnabled: undefined,
+    trafficDetailBasePath: null,
     heightClass: 'h-[24rem] sm:h-[30rem] lg:h-[38rem] xl:h-[44rem]',
     persistKey: null,
     showFocusPanel: true,
@@ -69,8 +77,9 @@ const mapRef = useTemplateRef<MyBoatMapHandle>('mapRoot')
 const selectedId = shallowRef<string | null>(null)
 const showRoutes = shallowRef(true)
 const showWaypoints = shallowRef(true)
+const showMedia = shallowRef(true)
 const localTrafficEnabled = shallowRef(true)
-const showTrafficVectors = shallowRef(false)
+const showTrafficVectors = shallowRef(true)
 const showPointsOfInterest = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const isCompactViewport = useCompactViewport()
@@ -80,6 +89,7 @@ const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const waypointPins = computed(() => buildWaypointPins(props.waypoints))
+const mediaPins = computed(() => buildMediaPins(props.media))
 const showTraffic = computed({
   get: () => props.trafficEnabled ?? localTrafficEnabled.value,
   set: (value: boolean) => {
@@ -101,6 +111,7 @@ const lastDeltaAt = computed(() => props.liveLastDeltaAt ?? null)
 const mapItems = computed(() => [
   ...vesselPins.value,
   ...(showWaypoints.value ? waypointPins.value : []),
+  ...(showMedia.value ? mediaPins.value : []),
 ])
 const baseGeojson = computed(() => buildPassageFeatureCollection(props.passages))
 const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
@@ -116,7 +127,8 @@ const hasMapData = computed(
   () =>
     mapItems.value.length > 0 ||
     baseGeojson.value.features.length > 0 ||
-    trafficVectorGeojson.value.features.length > 0,
+    trafficVectorGeojson.value.features.length > 0 ||
+    mediaPins.value.length > 0,
 )
 
 const selectedPin = computed(
@@ -131,6 +143,13 @@ const selectedAisPin = computed(() => {
   const selected = selectedPin.value
   return selected?.pinKind === 'ais' ? selected : null
 })
+const selectedMediaPin = computed(() => {
+  const selected = selectedPin.value
+  return selected?.pinKind === 'media' ? selected : null
+})
+const selectedAisDetailPath = computed(() =>
+  buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
+)
 const focusVessel = computed(() => selectedVessel.value || primaryVessel.value)
 
 const showsDenseLabels = computed(() => mapItems.value.length <= 3)
@@ -160,6 +179,11 @@ const fallbackCenter = computed(() => {
     return { lat: firstWaypoint.lat, lng: firstWaypoint.lng }
   }
 
+  const firstMedia = mediaPins.value[0]
+  if (firstMedia) {
+    return { lat: firstMedia.lat, lng: firstMedia.lng }
+  }
+
   return { lat: 29.3043, lng: -94.7977 }
 })
 
@@ -180,6 +204,16 @@ const trafficStatus = computed(() => {
 })
 
 const focusedSummary = computed(() => {
+  if (selectedMediaPin.value) {
+    return {
+      eyebrow: 'Geo-tagged photo',
+      title: selectedMediaPin.value.title,
+      description:
+        selectedMediaPin.value.caption ||
+        'Attached media pinned from stored capture coordinates so the chart can show passage photos where they were taken.',
+    }
+  }
+
   if (selectedPin.value?.pinKind === 'waypoint') {
     return {
       eyebrow: 'Waypoint selected',
@@ -227,12 +261,24 @@ const focusedSummary = computed(() => {
 })
 
 const focusPanelLabel = computed(() => {
+  if (selectedPin.value?.pinKind === 'media') return 'Photo focus'
   if (selectedPin.value?.pinKind === 'waypoint') return 'Waypoint focus'
   if (selectedPin.value?.pinKind === 'ais') return 'AIS contact'
   return 'Map focus'
 })
 
 const focusPanelMeta = computed(() => {
+  if (selectedMediaPin.value) {
+    const capturedLabel = selectedMediaPin.value.capturedAt
+      ? `Captured ${formatTimestamp(selectedMediaPin.value.capturedAt)}`
+      : 'Capture time unavailable'
+    const visibilityLabel = selectedMediaPin.value.sharePublic ? 'Public photo' : 'Owner-only photo'
+
+    return selectedMediaPin.value.isCover
+      ? `${capturedLabel} · ${visibilityLabel} · Cover image`
+      : `${capturedLabel} · ${visibilityLabel}`
+  }
+
   if (selectedPin.value?.pinKind === 'waypoint' && selectedPin.value.visitedAt) {
     return `Logged ${formatTimestamp(selectedPin.value.visitedAt)}`
   }
@@ -254,6 +300,29 @@ const focusPanelMeta = computed(() => {
 })
 
 const stats = computed(() => {
+  if (selectedMediaPin.value) {
+    return [
+      {
+        label: 'Captured',
+        value: selectedMediaPin.value.capturedAt
+          ? formatRelativeTime(selectedMediaPin.value.capturedAt)
+          : '--',
+      },
+      {
+        label: 'Visibility',
+        value: selectedMediaPin.value.sharePublic ? 'Public' : 'Owner only',
+      },
+      {
+        label: 'Type',
+        value: selectedMediaPin.value.isCover ? 'Cover photo' : 'Photo',
+      },
+      {
+        label: 'Position',
+        value: `${selectedMediaPin.value.lat.toFixed(3)}, ${selectedMediaPin.value.lng.toFixed(3)}`,
+      },
+    ]
+  }
+
   if (selectedAisPin.value) {
     return [
       {
@@ -313,6 +382,7 @@ const stats = computed(() => {
   return [
     { label: 'Routes', value: String(baseGeojson.value.features.length) },
     { label: 'Waypoints', value: String(waypointPins.value.length) },
+    { label: 'Photos', value: String(mediaPins.value.length) },
     { label: 'Traffic', value: trafficStatus.value },
     { label: 'AIS', value: String(aisPins.value.length) },
   ]
@@ -328,6 +398,13 @@ function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: bo
 
 function renderWaypointPin(item: (typeof waypointPins.value)[number], isSelected: boolean) {
   return createWaypointPinElement(item, isSelected, {
+    isCompactViewport: isCompactViewport.value,
+    showLabel: props.showPinLabels,
+  })
+}
+
+function renderMediaPin(item: (typeof mediaPins.value)[number], isSelected: boolean) {
+  return createMediaPinElement(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
     showLabel: props.showPinLabels,
   })
@@ -352,6 +429,10 @@ function renderAisFingerprint(item: (typeof aisPins.value)[number], isSelected: 
 function createPinElement(item: (typeof mapItems.value)[number], isSelected: boolean) {
   if (item.pinKind === 'vessel') {
     return renderVesselPin(item, isSelected)
+  }
+
+  if (item.pinKind === 'media') {
+    return renderMediaPin(item, isSelected)
   }
 
   return renderWaypointPin(item, isSelected)
@@ -408,7 +489,7 @@ watch(showTraffic, (enabled) => {
   }
 })
 
-watch([showWaypoints, showTraffic], () => {
+watch([showWaypoints, showMedia, showTraffic], () => {
   if (!selectedId.value) return
   if (allPins.value.some((item) => item.id === selectedId.value)) return
   selectedId.value = null
@@ -461,11 +542,25 @@ onBeforeUnmount(() => {
             v-if="showFocusPanel"
             class="rounded-[1.25rem] border border-default/70 bg-default/82 px-4 py-3 shadow-card backdrop-blur-xl"
           >
+            <NuxtImg
+              v-if="selectedMediaPin"
+              :src="selectedMediaPin.imageUrl"
+              :alt="selectedMediaPin.title"
+              width="640"
+              height="360"
+              class="mb-3 h-28 w-full rounded-[1rem] object-cover"
+            />
             <p class="text-[11px] uppercase tracking-[0.22em] text-muted">{{ focusPanelLabel }}</p>
             <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
             <p class="mt-2 text-sm text-muted">{{ focusedSummary.description }}</p>
             <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
           </div>
+
+          <TrafficContactFocusCard
+            v-if="selectedAisPin"
+            :contact="selectedAisPin"
+            :detail-path="selectedAisDetailPath"
+          />
 
           <div class="flex flex-wrap gap-2">
             <UButton
@@ -531,10 +626,22 @@ onBeforeUnmount(() => {
           v-if="showFocusPanel"
           class="absolute left-4 top-4 hidden max-w-[18rem] rounded-[1.5rem] border border-default/70 bg-default/88 p-4 shadow-card backdrop-blur-xl lg:block"
         >
+          <NuxtImg
+            v-if="selectedMediaPin"
+            :src="selectedMediaPin.imageUrl"
+            :alt="selectedMediaPin.title"
+            width="640"
+            height="360"
+            class="mb-3 h-28 w-full rounded-[1rem] object-cover"
+          />
           <p class="text-[11px] uppercase tracking-[0.22em] text-muted">{{ focusPanelLabel }}</p>
           <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
           <p class="mt-2 text-sm text-muted">{{ focusedSummary.description }}</p>
           <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
+        </div>
+
+        <div v-if="selectedAisPin" class="absolute bottom-24 left-4 hidden max-w-[20rem] lg:block">
+          <TrafficContactFocusCard :contact="selectedAisPin" :detail-path="selectedAisDetailPath" />
         </div>
 
         <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
@@ -618,6 +725,16 @@ onBeforeUnmount(() => {
             </UButton>
             <UButton
               class="pointer-events-auto"
+              icon="i-lucide-camera"
+              :color="showMedia ? 'primary' : 'neutral'"
+              :variant="showMedia ? 'soft' : 'outline'"
+              size="xs"
+              @click="showMedia = !showMedia"
+            >
+              Photos {{ mediaPins.length ? `(${mediaPins.length})` : '' }}
+            </UButton>
+            <UButton
+              class="pointer-events-auto"
               icon="i-lucide-radar"
               :color="showTraffic ? 'primary' : 'neutral'"
               :variant="showTraffic ? 'soft' : 'outline'"
@@ -676,6 +793,15 @@ onBeforeUnmount(() => {
               @click="showWaypoints = !showWaypoints"
             >
               Waypoints {{ waypointPins.length ? `(${waypointPins.length})` : '' }}
+            </UButton>
+            <UButton
+              icon="i-lucide-camera"
+              :color="showMedia ? 'primary' : 'neutral'"
+              :variant="showMedia ? 'soft' : 'outline'"
+              size="xs"
+              @click="showMedia = !showMedia"
+            >
+              Photos {{ mediaPins.length ? `(${mediaPins.length})` : '' }}
             </UButton>
             <UButton
               icon="i-lucide-radar"

@@ -9,6 +9,14 @@ const entry = computed(() => store.authActiveEntry.value)
 const detail = computed(() =>
   entry.value?.vessel ? store.getAuthDetailBySlug(entry.value.vessel.slug) : null,
 )
+const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
+const trafficDetailBasePath = computed(() =>
+  detail.value ? `/dashboard/vessels/${detail.value.vessel.slug}/traffic` : null,
+)
+const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
+  computed(() => detail.value?.vessel.slug),
+  rawAisContacts,
+)
 
 function toRoundedText(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
@@ -26,6 +34,15 @@ const primaryInstallation = computed<InstallationSummary | null>(
 )
 const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => detail.value?.vessel.liveSnapshot ?? null,
+)
+const mapMedia = computed(() =>
+  (detail.value?.media ?? []).filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      item.lat !== null &&
+      item.lng !== null,
+  ),
 )
 useMyBoatLiveDemand({
   namespace: 'auth',
@@ -98,11 +115,13 @@ const metricCards = computed(() => [
             :vessel="detail?.vessel || null"
             :passages="[]"
             :waypoints="detail?.waypoints || []"
+            :media="mapMedia"
             :installations="detail?.installations || []"
-            :ais-contacts="store.serializeAisContacts(entry)"
+            :ais-contacts="enrichedAisContacts"
             :live-connection-state="entry?.live.connectionState"
             :live-last-delta-at="entry?.live.lastDeltaAt"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            :traffic-detail-base-path="trafficDetailBasePath"
             v-model:traffic-enabled="trafficEnabled"
             :persist-key="detail ? `dashboard-map:${detail.vessel.slug}` : 'dashboard-map'"
             height-class="h-[30rem] sm:h-[36rem] lg:h-[46rem] xl:h-[54rem]"

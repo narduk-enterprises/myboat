@@ -32,7 +32,15 @@ const trafficEnabled = ref(true)
 const { convertSpeed, speedUnitLabel } = useMarineUnits()
 const detail = computed(() => store.getPublicDetail(username.value, vesselSlug.value))
 const entry = computed(() => store.getPublicEntry(username.value, vesselSlug.value))
-const aisContacts = computed(() => store.serializeAisContacts(entry.value))
+const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
+const trafficDetailBasePath = computed(() =>
+  detail.value ? `/${detail.value.profile.username}/${detail.value.vessel.slug}/traffic` : null,
+)
+const { contacts: aisContacts } = usePublicEnrichedTrafficContacts(
+  username,
+  vesselSlug,
+  rawAisContacts,
+)
 const liveState = computed(() => entry.value?.live ?? null)
 
 const primaryInstallation = computed<PublicInstallationSummary | null>(
@@ -43,6 +51,27 @@ const primaryInstallation = computed<PublicInstallationSummary | null>(
 )
 const liveSnapshot = computed(() => detail.value?.vessel.liveSnapshot ?? null)
 const recentPassages = computed(() => detail.value?.passages.slice(0, 3) ?? [])
+const recentPassageIds = computed(() => new Set(recentPassages.value.map((passage) => passage.id)))
+const recentPassageMedia = computed(() =>
+  (detail.value?.media ?? []).filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      recentPassageIds.value.has(item.passageId!),
+  ),
+)
+const mapMedia = computed(() =>
+  (detail.value?.media ?? []).filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      item.lat !== null &&
+      item.lng !== null,
+  ),
+)
+const generalMedia = computed(() =>
+  (detail.value?.media ?? []).filter((item) => item.matchStatus === 'attached' && !item.passageId),
+)
 const latestPassage = computed(
   () => detail.value?.vessel.latestPassage || detail.value?.passages[0] || null,
 )
@@ -261,11 +290,13 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         :vessel="detail.vessel"
         :passages="detail.passages"
         :waypoints="detail.waypoints"
+        :media="mapMedia"
         :installations="detail.installations"
         :ais-contacts="aisContacts"
         :live-connection-state="liveState?.connectionState"
         :live-last-delta-at="liveState?.lastDeltaAt"
         :has-signal-k-source="liveState?.hasSignalKSource"
+        :traffic-detail-base-path="trafficDetailBasePath"
         v-model:traffic-enabled="trafficEnabled"
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
         :persist-key="`public-vessel:${detail.profile.username}/${detail.vessel.slug}`"
@@ -307,10 +338,10 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
             </div>
           </template>
 
-          <PassageTimeline :passages="recentPassages" />
+          <PassageTimeline :passages="recentPassages" :media="recentPassageMedia" />
         </UCard>
 
-        <MediaStrip v-if="detail.media.length" :media="detail.media" />
+        <MediaStrip v-if="generalMedia.length" :media="generalMedia" />
       </div>
 
       <div class="space-y-6">

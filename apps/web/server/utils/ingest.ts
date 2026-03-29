@@ -1,13 +1,18 @@
 import type { H3Event } from 'h3'
 import { eq } from 'drizzle-orm'
 import { apiKeys } from '#layer/server/database/schema'
-import { vesselInstallationApiKeys, vesselInstallations } from '#server/database/app-schema'
+import {
+  vesselInstallationApiKeys,
+  vesselInstallations,
+  vessels,
+} from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
 
 export interface IngestInstallationBinding {
   apiKeyId: string
   installationId: string
   vesselId: string
+  ownerUserId: string
   installationType: string
   isPrimary: boolean
 }
@@ -39,6 +44,7 @@ export async function requireIngestInstallationBinding(event: H3Event) {
       apiKeyId: apiKeys.id,
       installationId: vesselInstallationApiKeys.installationId,
       vesselId: vesselInstallations.vesselId,
+      ownerUserId: vessels.ownerUserId,
       installationType: vesselInstallations.installationType,
       isPrimary: vesselInstallations.isPrimary,
     })
@@ -48,6 +54,7 @@ export async function requireIngestInstallationBinding(event: H3Event) {
       vesselInstallations,
       eq(vesselInstallationApiKeys.installationId, vesselInstallations.id),
     )
+    .innerJoin(vessels, eq(vesselInstallations.vesselId, vessels.id))
     .where(eq(apiKeys.keyHash, keyHash))
     .get()
 

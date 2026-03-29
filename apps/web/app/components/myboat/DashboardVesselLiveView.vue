@@ -12,6 +12,14 @@ const props = defineProps<{
 const store = useMyBoatVesselStore()
 const trafficEnabled = ref(true)
 const entry = computed(() => store.getAuthEntryBySlug(props.detail.vessel.slug))
+const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
+const trafficDetailBasePath = computed(
+  () => `/dashboard/vessels/${props.detail.vessel.slug}/traffic`,
+)
+const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
+  computed(() => props.detail.vessel.slug),
+  rawAisContacts,
+)
 useMyBoatLiveDemand({
   namespace: 'auth',
   consumerId: 'dashboard-vessel-live',
@@ -28,6 +36,18 @@ const primaryInstallation = computed<InstallationSummary | null>(
     null,
 )
 const recentPassages = computed(() => props.detail.passages.slice(0, 3))
+const recentPassageIds = computed(() => new Set(recentPassages.value.map((passage) => passage.id)))
+const recentPassageMedia = computed(() =>
+  props.detail.media.filter(
+    (item) =>
+      item.matchStatus === 'attached' &&
+      Boolean(item.passageId) &&
+      recentPassageIds.value.has(item.passageId!),
+  ),
+)
+const generalMedia = computed(() =>
+  props.detail.media.filter((item) => item.matchStatus === 'attached' && !item.passageId),
+)
 const publicPath = computed(() => `/${props.detail.profile.username}/${props.detail.vessel.slug}`)
 const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => entry.value?.mergedSnapshot || props.detail.vessel.liveSnapshot || null,
@@ -73,24 +93,25 @@ const liveFeedStatus = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
-      <div class="space-y-6">
+  <div class="space-y-5 sm:space-y-6">
+    <div class="grid gap-5 xl:grid-cols-[1.18fr_0.82fr] xl:gap-6">
+      <div class="space-y-5 sm:space-y-6">
         <div data-testid="vessel-detail-live-map">
           <MyBoatCurrentLocationMap
             :vessel="liveVessel"
             :installations="detail.installations"
-            :ais-contacts="store.serializeAisContacts(entry)"
+            :ais-contacts="enrichedAisContacts"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            :traffic-detail-base-path="trafficDetailBasePath"
             v-model:traffic-enabled="trafficEnabled"
-            height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
+            height-class="h-[18rem] sm:h-[24rem] lg:h-[32rem]"
           />
         </div>
 
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Live data board</h2>
+              <h2 class="font-display text-xl text-default sm:text-2xl">Live data board</h2>
               <p class="mt-1 text-sm text-muted">
                 Dense bridge metrics for the current vessel feed, with live fix, wind, depth,
                 temperatures, and power in one place.
@@ -105,7 +126,7 @@ const liveFeedStatus = computed(() => {
           <template #header>
             <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h2 class="font-display text-2xl text-default">Recent route memory</h2>
+                <h2 class="font-display text-xl text-default sm:text-2xl">Recent route memory</h2>
                 <p class="mt-1 text-sm text-muted">
                   The live view keeps a short route recap nearby, while the full passage log lives
                   on its own page.
@@ -117,21 +138,22 @@ const liveFeedStatus = computed(() => {
                 color="neutral"
                 variant="soft"
                 icon="i-lucide-arrow-right"
+                class="w-full justify-center sm:w-auto"
               >
                 Open passages
               </UButton>
             </div>
           </template>
 
-          <PassageTimeline :passages="recentPassages" />
+          <PassageTimeline :passages="recentPassages" :media="recentPassageMedia" />
         </UCard>
       </div>
 
-      <div class="space-y-6">
+      <div class="space-y-5 sm:space-y-6">
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Observed identity</h2>
+              <h2 class="font-display text-xl text-default sm:text-2xl">Observed identity</h2>
               <p class="mt-1 text-sm text-muted">
                 Source-derived vessel identity from the current primary collector path.
               </p>
@@ -178,7 +200,7 @@ const liveFeedStatus = computed(() => {
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Live position</h2>
+              <h2 class="font-display text-xl text-default sm:text-2xl">Live position</h2>
               <p class="mt-1 text-sm text-muted">
                 Current fix, public route, and the freshest owner-facing position context.
               </p>
@@ -230,7 +252,7 @@ const liveFeedStatus = computed(() => {
         <UCard class="border-default/80 bg-default/90 shadow-card">
           <template #header>
             <div>
-              <h2 class="font-display text-2xl text-default">Install posture</h2>
+              <h2 class="font-display text-xl text-default sm:text-2xl">Install posture</h2>
               <p class="mt-1 text-sm text-muted">
                 Primary and secondary ingest paths currently mapped to this vessel.
               </p>
@@ -271,6 +293,7 @@ const liveFeedStatus = computed(() => {
                   color="primary"
                   variant="soft"
                   icon="i-lucide-arrow-right"
+                  class="w-full justify-center sm:w-auto"
                 >
                   Manage install
                 </UButton>
@@ -289,6 +312,6 @@ const liveFeedStatus = computed(() => {
       </div>
     </div>
 
-    <MediaStrip v-if="detail.media.length" :media="detail.media" />
+    <MediaStrip v-if="generalMedia.length" :media="generalMedia" />
   </div>
 </template>

@@ -55,6 +55,8 @@ export interface PassageSummary {
   trackGeojson: string | null
 }
 
+export type MediaMatchStatus = 'attached' | 'review'
+
 export interface WaypointSummary {
   id: string
   title: string
@@ -67,9 +69,15 @@ export interface WaypointSummary {
 
 export interface MediaItemSummary {
   id: string
+  passageId: string | null
   title: string
   caption: string | null
   imageUrl: string
+  sharePublic: boolean
+  matchStatus: MediaMatchStatus
+  matchScore: number | null
+  matchReason: string | null
+  isCover: boolean
   lat: number | null
   lng: number | null
   capturedAt: string | null
@@ -264,6 +272,138 @@ export interface VesselDetailResponse {
   passages: PassageSummary[]
   media: MediaItemSummary[]
   waypoints: WaypointSummary[]
+}
+
+export interface VesselMediaImportResponse {
+  imported: MediaItemSummary[]
+  duplicates: Array<{
+    mediaId: string
+    sourceFingerprint: string
+  }>
+  counts: {
+    imported: number
+    duplicates: number
+  }
+}
+
+export interface VesselMediaUpdatePayload {
+  passageId?: string | null
+  sharePublic?: boolean
+  isCover?: boolean
+  matchStatus?: MediaMatchStatus
+}
+
+export type VesselHistoryAccessTier = 'free' | 'paid'
+export type VesselHistoryAggregator = 'last' | 'mean'
+export type VesselHistoryStorageMode = 'raw' | 'rollup'
+export type VesselHistoryResolution = 'raw' | '1m' | '5m' | '15m' | '1h'
+export type VesselHistoryVisibility = 'public' | 'owner'
+export type VesselHistorySeriesTier = 'core' | 'detail'
+export type TelemetryPublisherRole = 'primary' | 'shadow'
+
+export interface VesselHistoryPoint {
+  t: string
+  v: number
+}
+
+export interface VesselHistoryTrackPoint {
+  t: string
+  lat: number
+  lng: number
+}
+
+export interface VesselHistorySeriesDescriptor {
+  id: string
+  label: string
+  unit: string | null
+  visibility: VesselHistoryVisibility
+  tier: VesselHistorySeriesTier
+  aggregator: VesselHistoryAggregator
+}
+
+export interface VesselHistorySeries extends VesselHistorySeriesDescriptor {
+  points: VesselHistoryPoint[]
+}
+
+export interface VesselHistorySeriesFamily {
+  id: string
+  label: string
+  matcher: string
+  unit: string | null
+  visibility: VesselHistoryVisibility
+  tier: VesselHistorySeriesTier
+  aggregator: VesselHistoryAggregator
+}
+
+export interface VesselHistoryResponse {
+  range: {
+    start: string
+    end: string
+  }
+  resolution: VesselHistoryResolution
+  sourceWindow: {
+    accessTier: VesselHistoryAccessTier
+    storageMode: VesselHistoryStorageMode
+    maxDays: number
+  }
+  catalogVersion: string
+  track: VesselHistoryTrackPoint[]
+  series: VesselHistorySeries[]
+}
+
+export interface VesselHistoryCatalogResponse {
+  catalogVersion: string
+  series: VesselHistorySeriesDescriptor[]
+  families: VesselHistorySeriesFamily[]
+}
+
+export interface TelemetrySourceInventoryEntrySummary {
+  sourceId: string
+  family: string
+  label: string
+  metadata: Record<string, unknown>
+}
+
+export interface TelemetrySourceInventorySnapshotSummary {
+  observedAt: string
+  publisherRole: TelemetryPublisherRole
+  selfContext: string | null
+  sourceCount: number
+  sources: TelemetrySourceInventoryEntrySummary[]
+}
+
+export interface TelemetryDuplicateHotspotSummary {
+  canonicalPath: string
+  contenderCount: number
+  contenderSourceIds: string[]
+  pathFamily: string
+  winnerSourceId: string | null
+}
+
+export interface TelemetryCurrentWinnerSummary {
+  canonicalPath: string
+  context: string
+  pathFamily: string
+  publisherRole: TelemetryPublisherRole
+  receivedAt: string
+  sourceFamily: string
+  sourceId: string
+}
+
+export interface VesselTelemetrySourcesResponse {
+  duplicateHotspots: TelemetryDuplicateHotspotSummary[]
+  currentWinners: TelemetryCurrentWinnerSummary[]
+  latestSourceInventory: TelemetrySourceInventorySnapshotSummary | null
+  policyVersion: string
+  primaryInstallation: {
+    id: string
+    label: string
+    lastInventoryObservedAt: string | null
+    lastSelectionObservedAt: string | null
+    publisherRole: TelemetryPublisherRole
+  } | null
+  shadowPublisherSeen: boolean
+  vesselId: string
 }
 
 export interface InstallationDetailResponse {

@@ -660,9 +660,18 @@ export async function getMediaForVesselIds(event: H3Event, vesselIds: string[]) 
     .select({
       id: mediaItems.id,
       vesselId: mediaItems.vesselId,
+      passageId: mediaItems.passageId,
       title: mediaItems.title,
       caption: mediaItems.caption,
       imageUrl: mediaItems.imageUrl,
+      sharePublic: mediaItems.sharePublic,
+      matchStatus: mediaItems.matchStatus,
+      matchScore: mediaItems.matchScore,
+      matchReason: mediaItems.matchReason,
+      isCover: mediaItems.isCover,
+      sourceKind: mediaItems.sourceKind,
+      sourceAssetId: mediaItems.sourceAssetId,
+      sourceFingerprint: mediaItems.sourceFingerprint,
       lat: mediaItems.lat,
       lng: mediaItems.lng,
       capturedAt: mediaItems.capturedAt,
@@ -672,6 +681,59 @@ export async function getMediaForVesselIds(event: H3Event, vesselIds: string[]) 
     .where(inArray(mediaItems.vesselId, vesselIds))
     .orderBy(desc(mediaItems.capturedAt), desc(mediaItems.createdAt))
     .all()
+}
+
+export async function getPublicMediaForVesselIds(event: H3Event, vesselIds: string[]) {
+  if (!vesselIds.length) {
+    return []
+  }
+
+  const db = useAppDatabase(event)
+  return db
+    .select({
+      id: mediaItems.id,
+      vesselId: mediaItems.vesselId,
+      passageId: mediaItems.passageId,
+      title: mediaItems.title,
+      caption: mediaItems.caption,
+      imageUrl: mediaItems.imageUrl,
+      sharePublic: mediaItems.sharePublic,
+      matchStatus: mediaItems.matchStatus,
+      matchScore: mediaItems.matchScore,
+      matchReason: mediaItems.matchReason,
+      isCover: mediaItems.isCover,
+      sourceKind: mediaItems.sourceKind,
+      sourceAssetId: mediaItems.sourceAssetId,
+      sourceFingerprint: mediaItems.sourceFingerprint,
+      lat: mediaItems.lat,
+      lng: mediaItems.lng,
+      capturedAt: mediaItems.capturedAt,
+      createdAt: mediaItems.createdAt,
+    })
+    .from(mediaItems)
+    .where(and(inArray(mediaItems.vesselId, vesselIds), eq(mediaItems.sharePublic, true)))
+    .orderBy(desc(mediaItems.capturedAt), desc(mediaItems.createdAt))
+    .all()
+}
+
+export function serializeMediaItemSummary(
+  item: Awaited<ReturnType<typeof getMediaForVesselIds>>[number],
+) {
+  return {
+    id: item.id,
+    passageId: item.passageId,
+    title: item.title,
+    caption: item.caption,
+    imageUrl: item.imageUrl,
+    sharePublic: item.sharePublic,
+    matchStatus: item.matchStatus as 'attached' | 'review',
+    matchScore: item.matchScore,
+    matchReason: item.matchReason,
+    isCover: item.isCover,
+    lat: item.lat,
+    lng: item.lng,
+    capturedAt: item.capturedAt,
+  }
 }
 
 export async function getPublicInstallationsForVesselIds(event: H3Event, vesselIds: string[]) {

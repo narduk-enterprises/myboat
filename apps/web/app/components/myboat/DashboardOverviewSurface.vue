@@ -14,6 +14,7 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
 }
 
 const store = useMyBoatVesselStore()
+const isCompactViewport = useCompactViewport()
 useMyBoatLiveDemand({
   namespace: 'auth',
   consumerId: 'dashboard-overview',
@@ -60,15 +61,23 @@ const heading = computed(() =>
 const depth = computed(() =>
   toRoundedText(convertDepth(primarySnapshot.value?.depthBelowTransducer)),
 )
-const headerMetrics = computed(() => [
-  { label: 'MMSI', value: vesselMmsi.value },
-  { label: 'Lat', value: vesselLatitude.value },
-  { label: 'Lng', value: vesselLongitude.value },
-  { label: 'AWS', value: `${apparentWind.value} ${speedUnitLabel.value}` },
-  { label: 'SOG', value: `${speedOverGround.value} ${speedUnitLabel.value}` },
-  { label: 'Heading', value: `${heading.value}°` },
-  { label: 'Depth', value: `${depth.value} ${depthUnitLabel.value}` },
-])
+const headerMetrics = computed(() => {
+  const metrics = [
+    { label: 'MMSI', value: vesselMmsi.value },
+    { label: 'Lat', value: vesselLatitude.value },
+    { label: 'Lng', value: vesselLongitude.value },
+    { label: 'AWS', value: `${apparentWind.value} ${speedUnitLabel.value}` },
+    { label: 'SOG', value: `${speedOverGround.value} ${speedUnitLabel.value}` },
+    { label: 'Heading', value: `${heading.value}°` },
+    { label: 'Depth', value: `${depth.value} ${depthUnitLabel.value}` },
+  ]
+
+  if (!isCompactViewport.value) {
+    return metrics
+  }
+
+  return metrics.filter((metric) => ['Lat', 'Lng', 'SOG', 'Depth'].includes(metric.label))
+})
 const statsCards = computed(() => [
   {
     hint: primaryVessel.value?.vesselType || 'Primary launch vessel',
@@ -170,9 +179,9 @@ const sourceTone = computed(() =>
 
 <template>
   <div class="space-y-6">
-    <section class="sticky top-4 z-20">
+    <section class="lg:sticky lg:top-4 lg:z-20">
       <div
-        class="rounded-[1.5rem] border border-default/70 bg-default/92 px-4 py-4 shadow-card backdrop-blur sm:px-5"
+        class="rounded-[1.35rem] border border-default/70 bg-default/92 px-4 py-4 shadow-card backdrop-blur sm:rounded-[1.5rem] sm:px-5"
       >
         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div class="min-w-0">
@@ -187,11 +196,11 @@ const sourceTone = computed(() =>
             </div>
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-3 xl:grid-cols-7">
+          <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-7">
             <div
               v-for="metric in headerMetrics"
               :key="metric.label"
-              class="rounded-[1rem] border border-default bg-elevated/70 px-3 py-2"
+              class="rounded-[1rem] border border-default bg-elevated/70 px-3 py-2.5"
             >
               <p class="text-[0.65rem] uppercase tracking-[0.2em] text-muted">{{ metric.label }}</p>
               <p class="mt-1 text-sm font-medium text-default">{{ metric.value }}</p>
@@ -236,7 +245,7 @@ const sourceTone = computed(() =>
         </div>
       </template>
 
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <MarineMetricCard
           v-for="card in statsCards"
           :key="card.label"

@@ -16,22 +16,24 @@ withDefaults(
 </script>
 
 <template>
-  <UCard class="metric-shell h-full rounded-[1.5rem] shadow-card">
-    <div class="flex items-start justify-between gap-4">
+  <UCard class="metric-shell h-full rounded-[1.25rem] shadow-card sm:rounded-[1.5rem]">
+    <div class="flex items-start justify-between gap-3 sm:gap-4">
       <div>
-        <p class="text-sm text-muted">{{ label }}</p>
-        <p class="mt-3 text-3xl font-display font-semibold text-default">
+        <p class="text-xs text-muted sm:text-sm">{{ label }}</p>
+        <p
+          class="mt-2 break-words text-[1.65rem] leading-none font-display font-semibold text-default sm:mt-3 sm:text-3xl"
+        >
           {{ value }}
-          <span v-if="unit" class="text-base font-sans text-muted">{{ unit }}</span>
+          <span v-if="unit" class="text-sm font-sans text-muted sm:text-base">{{ unit }}</span>
         </p>
         <p v-if="hint" class="mt-2 text-xs text-muted">{{ hint }}</p>
       </div>
 
       <div
         v-if="icon"
-        class="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+        class="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:size-10"
       >
-        <UIcon :name="icon" class="size-5" />
+        <UIcon :name="icon" class="size-4 sm:size-5" />
       </div>
     </div>
   </UCard>

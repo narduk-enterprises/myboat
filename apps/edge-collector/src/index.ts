@@ -1,6 +1,21 @@
 import process from 'node:process'
 import { createServer } from 'node:http'
 import { WebSocketServer, type WebSocket as ServerWebSocket } from 'ws'
+import {
+  TELEMETRY_SOURCE_POLICY_VERSION,
+  buildDeltaFromCandidates,
+  buildStickyWinnerMap,
+  expandDeltaToSourceCandidates,
+  getSelectionPolicySummary,
+  normalizeSourceInventorySnapshot,
+  selectCanonicalTelemetry,
+  type PublisherRole,
+  type DuplicateDropReason,
+  type SourceAwareTelemetryDelta,
+  type SourceInventorySnapshot,
+  type TelemetrySelectionDrop,
+  type TelemetryStickyWinner,
+} from '@myboat/telemetry-source-policy'
 
 type SignalKValue = {
   path: string
@@ -8,18 +23,24 @@ type SignalKValue = {
 }
 
 type SignalKUpdate = {
+  $source?: string
+  dropReason?: DuplicateDropReason | 'sticky_winner_fresh'
+  receivedAt?: string
+  source?: Record<string, unknown> | null
   timestamp?: string
   values: SignalKValue[]
 }
 
 type SignalKDeltaMessage = {
   context?: string
-  updates: SignalKUpdate[]
+  publisherRole?: PublisherRole
   self?: string
+  updates: SignalKUpdate[]
 }
 
 type BatchItem = {
-  timestamp: string
+  debugOnly: boolean
+  receivedAt: string
   delta: SignalKDeltaMessage
 }
 
@@ -44,10 +65,14 @@ type CollectorConfig = {
   signalkHttpUrl: string
   ingestUrl: string
   identityIngestUrl: string
+  sourcesIngestUrl: string
   ingestKey: string
+  publisherRole: PublisherRole
   streamPort: number
   streamPath: string
   batchSize: number
+  maxBufferedItems: number
+  maxPostItems: number
   flushIntervalMs: number
   identityRefreshIntervalMs: number
   minPostIntervalMs: number
@@ -72,6 +97,39 @@ let nextPostNotBefore = 0
 let lastPublishedAt: string | null = null
 let lastPublishedDeltaRaw: string | null = null
 let signalkSelfContext: string | null = null
+let connectedAt: string | null = null
+let lastSocketCloseAt: string | null = null
+let lastIdentitySuccessAt: string | null = null
+let lastIdentityFailureAt: string | null = null
+let lastSourceInventorySuccessAt: string | null = null
+let lastSourceInventoryFailureAt: string | null = null
+let lastPostSucceededAt: string | null = null
+let lastPostFailedAt: string | null = null
+let lastError: string | null = null
+let receivedDeltaMessages = 0
+let publishedDeltaMessages = 0
+let postedBatches = 0
+let postedItems = 0
+let droppedItems = 0
+let ingestFailures = 0
+let rateLimitCount = 0
+let reconnectCount = 0
+let identityRefreshSuccesses = 0
+let identityRefreshFailures = 0
+let sourceInventoryRefreshSuccesses = 0
+let sourceInventoryRefreshFailures = 0
+let sourceCandidatesSeen = 0
+let sourceWinnersKept = 0
+let sourceLosersDropped = 0
+let sourceFallbackToLowerPriority = 0
+let shadowSourceSuppressed = 0
+let droppedItemsSinceLastWarning = 0
+let lastDroppedItemsWarningAt = 0
+let lastSelectionAt: string | null = null
+let lastSourceInventorySnapshot: SourceInventorySnapshot | null = null
+let stickyWinners = new Map<string, TelemetryStickyWinner>()
+
+const BUFFER_OVERFLOW_WARNING_INTERVAL_MS = 5000
 
 const liveClients = new Set<ServerWebSocket>()
 
@@ -130,6 +188,17 @@ function deriveIdentityIngestUrl(rawDeltaUrl: string) {
   return url.toString()
 }
 
+function deriveSourcesIngestUrl(rawDeltaUrl: string) {
+  const url = new URL(rawDeltaUrl)
+  if (url.pathname.endsWith('/delta')) {
+    url.pathname = `${url.pathname.slice(0, -'/delta'.length)}/sources`
+    return url.toString()
+  }
+
+  url.pathname = `${url.pathname.replace(/\/+$/g, '')}/sources`
+  return url.toString()
+}
+
 function normalizeStreamPath(rawPath: string | null | undefined) {
   const normalizedPath = rawPath?.trim()
 
@@ -148,6 +217,8 @@ function loadConfig(): CollectorConfig {
   const ingestUrl = process.env.MYBOAT_INGEST_URL?.trim() || 'https://mybo.at/api/ingest/v1/delta'
   const identityIngestUrl =
     process.env.MYBOAT_IDENTITY_INGEST_URL?.trim() || deriveIdentityIngestUrl(ingestUrl)
+  const sourcesIngestUrl =
+    process.env.MYBOAT_SOURCES_INGEST_URL?.trim() || deriveSourcesIngestUrl(ingestUrl)
   const ingestKey = process.env.MYBOAT_INGEST_KEY?.trim()
 
   if (!ingestKey) {
@@ -159,11 +230,15 @@ function loadConfig(): CollectorConfig {
     signalkHttpUrl,
     ingestUrl,
     identityIngestUrl,
+    sourcesIngestUrl,
     ingestKey,
+    publisherRole: process.env.MYBOAT_PUBLISHER_ROLE?.trim() === 'shadow' ? 'shadow' : 'primary',
     streamPort: parsePositiveInteger('MYBOAT_STREAM_PORT', 4011),
     streamPath: normalizeStreamPath(process.env.MYBOAT_STREAM_PATH),
     // Larger batches + spacing keep ingest POSTs well under authApiKeys (60/min).
     batchSize: parsePositiveInteger('COLLECTOR_BATCH_SIZE', 100),
+    maxBufferedItems: parsePositiveInteger('COLLECTOR_MAX_BUFFER_ITEMS', 5000),
+    maxPostItems: parsePositiveInteger('COLLECTOR_MAX_POST_ITEMS', 250),
     flushIntervalMs: parsePositiveInteger('COLLECTOR_FLUSH_INTERVAL_MS', 3000),
     identityRefreshIntervalMs: parsePositiveInteger(
       'COLLECTOR_IDENTITY_REFRESH_INTERVAL_MS',
@@ -188,12 +263,50 @@ const streamServer = createServer((request, response) => {
     response.end(
       JSON.stringify({
         ok: true,
+        batchSize: config.batchSize,
         connectedClients: liveClients.size,
+        connectedToSignalK: Boolean(socket && socket.readyState === WebSocket.OPEN),
+        connectedAt,
+        droppedItems,
         identityIngestUrl: config.identityIngestUrl,
+        identityRefreshFailures,
+        identityRefreshSuccesses,
+        lastSelectionAt,
+        lastSourceInventoryFailureAt,
+        lastSourceInventorySuccessAt,
         ingestUrl: config.ingestUrl,
+        ingestFailures,
         lastPublishedAt,
+        lastIdentityFailureAt,
+        lastIdentitySuccessAt,
+        lastPostFailedAt,
+        lastPostSucceededAt,
+        lastError,
+        lastSourceInventorySnapshot,
+        lastSocketCloseAt,
+        maxBufferedItems: config.maxBufferedItems,
+        maxPostItems: config.maxPostItems,
+        nextPostNotBefore,
+        pendingBatchItems: batch.length,
+        postedBatches,
+        postedItems,
+        publishedDeltaMessages,
+        rateLimitCount,
+        receivedDeltaMessages,
+        reconnectCount,
+        publisherRole: config.publisherRole,
         signalkHttpUrl: config.signalkHttpUrl,
+        signalkSelfContext,
         signalkWsUrl: config.signalkWsUrl,
+        shadowSourceSuppressed,
+        sourceCandidatesSeen,
+        sourceFallbackToLowerPriority,
+        sourceInventoryRefreshFailures,
+        sourceInventoryRefreshSuccesses,
+        sourceLosersDropped,
+        sourcesIngestUrl: config.sourcesIngestUrl,
+        sourceWinnersKept,
+        stickyWinnerCount: stickyWinners.size,
         streamPath: config.streamPath,
         streamPort: config.streamPort,
       }),
@@ -216,8 +329,29 @@ function log(message: string, detail?: unknown) {
   console.log(prefix, message, detail)
 }
 
+function setLastError(message: string) {
+  lastError = message
+}
+
+function formatLogDetail(detail: unknown) {
+  if (detail instanceof Error) {
+    return detail.message
+  }
+
+  if (typeof detail === 'string') {
+    return detail
+  }
+
+  try {
+    return JSON.stringify(detail)
+  } catch {
+    return String(detail)
+  }
+}
+
 function warn(message: string, detail?: unknown) {
   const prefix = `[edge-collector ${new Date().toISOString()}]`
+  setLastError(detail === undefined ? message : `${message}: ${formatLogDetail(detail)}`)
   if (detail === undefined) {
     console.warn(prefix, message)
     return
@@ -226,9 +360,29 @@ function warn(message: string, detail?: unknown) {
   console.warn(prefix, message, detail)
 }
 
+function maybeWarnAboutDroppedItems(force = false) {
+  if (droppedItemsSinceLastWarning <= 0) {
+    return
+  }
+
+  const now = Date.now()
+  if (!force && now - lastDroppedItemsWarningAt < BUFFER_OVERFLOW_WARNING_INTERVAL_MS) {
+    return
+  }
+
+  warn('Collector buffer exceeded max; dropped oldest buffered delta messages', {
+    droppedSinceLastWarning: droppedItemsSinceLastWarning,
+    maxBufferedItems: config.maxBufferedItems,
+    totalDroppedItems: droppedItems,
+  })
+  droppedItemsSinceLastWarning = 0
+  lastDroppedItemsWarningAt = now
+}
+
 function broadcastToLiveClients(message: string) {
   lastPublishedAt = new Date().toISOString()
   lastPublishedDeltaRaw = message
+  publishedDeltaMessages += 1
 
   for (const client of liveClients) {
     if (client.readyState !== client.OPEN) {
@@ -278,9 +432,164 @@ function normalizeDeltaForIngest(delta: SignalKDeltaMessage): SignalKDeltaMessag
   }
 }
 
+function buildSelectionDelta(
+  delta: SignalKDeltaMessage,
+  receivedAt: string,
+  publisherRole: PublisherRole,
+) {
+  return {
+    ...normalizeDeltaForIngest(delta),
+    publisherRole,
+    updates: delta.updates.map(({ dropReason: _dropReason, ...update }) => ({
+      ...update,
+      receivedAt,
+    })),
+  } satisfies SourceAwareTelemetryDelta
+}
+
+function buildDebugDeltaFromDrops(input: {
+  context?: string
+  drops: TelemetrySelectionDrop[]
+  publisherRole: PublisherRole
+  self?: string
+}) {
+  if (!input.drops.length) {
+    return null
+  }
+
+  const updates = Array.from(
+    input.drops.reduce<Map<string, SignalKUpdate>>((groups, drop) => {
+      const groupKey = [
+        drop.candidate.sourceId,
+        drop.candidate.receivedAt,
+        drop.candidate.updateTimestamp || '',
+        drop.reason,
+        JSON.stringify(drop.candidate.source || null),
+      ].join('\u0000')
+      const existing = groups.get(groupKey)
+
+      if (existing) {
+        existing.values.push({
+          path: drop.candidate.canonicalPath,
+          value: drop.candidate.value,
+        })
+        return groups
+      }
+
+      groups.set(groupKey, {
+        ...(drop.candidate.observedAt ? { timestamp: drop.candidate.observedAt } : {}),
+        $source: drop.candidate.sourceId,
+        ...(drop.candidate.source ? { source: drop.candidate.source } : {}),
+        dropReason: drop.reason === 'sticky_winner_retained' ? 'sticky_winner_fresh' : drop.reason,
+        values: [
+          {
+            path: drop.candidate.canonicalPath,
+            value: drop.candidate.value,
+          },
+        ],
+      })
+      return groups
+    }, new Map()),
+  ).map(([, update]) => update)
+
+  return {
+    ...(input.context ? { context: input.context } : {}),
+    publisherRole: input.publisherRole,
+    ...(input.self ? { self: input.self } : {}),
+    updates,
+  } satisfies SignalKDeltaMessage & { publisherRole: PublisherRole }
+}
+
+function updateStickyWinnerCache(
+  results: ReturnType<typeof selectCanonicalTelemetry>,
+  nextStickyWinners: ReturnType<typeof buildStickyWinnerMap>,
+) {
+  for (const result of results) {
+    if (result.winner) {
+      const nextWinner = nextStickyWinners.get(result.key)
+      if (nextWinner) {
+        stickyWinners.set(result.key, nextWinner)
+      }
+      continue
+    }
+
+    if (result.debugOnly) {
+      stickyWinners.delete(result.key)
+    }
+  }
+}
+
+function enqueueSelectedTelemetry(delta: SignalKDeltaMessage) {
+  const receivedAt = new Date().toISOString()
+  const sourceAwareDelta = buildSelectionDelta(delta, receivedAt, config.publisherRole)
+  const candidates = expandDeltaToSourceCandidates({
+    delta: sourceAwareDelta,
+    publisherRole: config.publisherRole,
+  })
+
+  sourceCandidatesSeen += candidates.length
+  const results = selectCanonicalTelemetry({
+    candidates,
+    now: Date.parse(receivedAt),
+    stickyWinners,
+  })
+  const selectionSummary = getSelectionPolicySummary(results)
+  sourceWinnersKept += selectionSummary.winnersKept
+  sourceLosersDropped += selectionSummary.losersDropped
+  sourceFallbackToLowerPriority += selectionSummary.fallbackToLowerPriority
+  shadowSourceSuppressed += selectionSummary.shadowSourceSuppressed
+  lastSelectionAt = receivedAt
+
+  const nextStickyWinners = buildStickyWinnerMap(results)
+  updateStickyWinnerCache(results, nextStickyWinners)
+
+  const selectedCandidates = results.flatMap((result) => (result.winner ? [result.winner] : []))
+  const selectedDelta = buildDeltaFromCandidates({
+    candidates: selectedCandidates,
+    context: sourceAwareDelta.context,
+    publisherRole: config.publisherRole,
+    self: sourceAwareDelta.self,
+  })
+  const debugDelta = buildDebugDeltaFromDrops({
+    context: sourceAwareDelta.context,
+    drops: results.flatMap((result) => result.dropped),
+    publisherRole: config.publisherRole,
+    self: sourceAwareDelta.self,
+  })
+
+  if (selectedDelta) {
+    batch.push({
+      debugOnly: false,
+      receivedAt,
+      delta: {
+        ...selectedDelta,
+        publisherRole: config.publisherRole,
+      },
+    })
+  }
+
+  if (debugDelta) {
+    batch.push({
+      debugOnly: true,
+      receivedAt,
+      delta: debugDelta,
+    })
+  }
+
+  trimBufferedBatch()
+  if (batch.length >= config.batchSize) {
+    void flushBatch()
+  } else {
+    scheduleFlush()
+  }
+
+  return selectedDelta ? [{ ...selectedDelta, publisherRole: config.publisherRole }] : []
+}
+
 function buildCollectorHelloMessage() {
   return JSON.stringify({
     name: 'myboat-edge-collector',
+    publisherRole: config.publisherRole,
     self: signalkSelfContext || 'vessels.self',
     version: '0.1.0',
   })
@@ -368,6 +677,7 @@ function clearIdentityRefreshTimer() {
 function scheduleReconnect(reason: string) {
   if (isShuttingDown || reconnectTimer) return
 
+  reconnectCount += 1
   warn(`SignalK websocket disconnected; reconnecting in ${config.reconnectDelayMs}ms`, reason)
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
@@ -376,6 +686,7 @@ function scheduleReconnect(reason: string) {
 }
 
 function scheduleFlush(delayMs = config.flushIntervalMs) {
+  if (isShuttingDown) return
   if (flushTimer) return
 
   flushTimer = setTimeout(() => {
@@ -605,6 +916,62 @@ async function postObservedIdentity(payload: ObservedIdentityPayload) {
   }
 }
 
+async function fetchSignalKSourceInventory() {
+  const url = new URL('sources', withTrailingSlash(config.signalkHttpUrl))
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': config.userAgent,
+      'X-Requested-With': config.xRequestedWith,
+    },
+    signal: AbortSignal.timeout(config.requestTimeoutMs),
+  })
+
+  if (!response.ok) {
+    throw new Error(`SignalK sources fetch failed: ${response.status}`)
+  }
+
+  const rawSources = (await response.json()) as unknown
+  return normalizeSourceInventorySnapshot({
+    observedAt: new Date().toISOString(),
+    publisherRole: config.publisherRole,
+    selfContext: signalkSelfContext,
+    sources: rawSources,
+  })
+}
+
+async function postSourceInventory(snapshot: SourceInventorySnapshot) {
+  const response = await fetch(config.sourcesIngestUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.ingestKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': config.userAgent,
+      'X-Requested-With': config.xRequestedWith,
+    },
+    body: JSON.stringify({
+      observedAt: snapshot.observedAt,
+      policyVersion: TELEMETRY_SOURCE_POLICY_VERSION,
+      publisherRole: snapshot.publisherRole,
+      selfContext: snapshot.selfContext,
+      sourceCount: snapshot.sourceCount,
+      sources: snapshot.sources.map((source) => ({
+        family: source.family,
+        label: source.label,
+        metadata: source.metadata,
+        sourceId: source.sourceId,
+      })),
+    }),
+    signal: AbortSignal.timeout(config.requestTimeoutMs),
+  })
+
+  const bodyText = await response.text()
+  if (!response.ok) {
+    throw new Error(`Sources ingest failed: ${response.status} ${bodyText}`.trim())
+  }
+}
+
 async function refreshObservedIdentity(reason: string) {
   if (isRefreshingIdentity || isShuttingDown) {
     return
@@ -617,18 +984,43 @@ async function refreshObservedIdentity(reason: string) {
     const payload = await fetchSignalKObservedIdentity()
     if (!payload) {
       log('No observed vessel identity found in SignalK self model', reason)
-      return
+    } else {
+      await postObservedIdentity(payload)
+      lastIdentitySuccessAt = new Date().toISOString()
+      identityRefreshSuccesses += 1
+      lastError = null
+      log('Forwarded observed vessel identity to MyBoat', {
+        reason,
+        mmsi: payload.mmsi,
+        selfContext: payload.selfContext,
+      })
     }
-
-    await postObservedIdentity(payload)
-    log('Forwarded observed vessel identity to MyBoat', {
-      reason,
-      mmsi: payload.mmsi,
-      selfContext: payload.selfContext,
-    })
   } catch (error) {
+    lastIdentityFailureAt = new Date().toISOString()
+    identityRefreshFailures += 1
     warn(
       'Failed to refresh observed vessel identity',
+      error instanceof Error ? error.message : error,
+    )
+  }
+
+  try {
+    const snapshot = await fetchSignalKSourceInventory()
+    await postSourceInventory(snapshot)
+    lastSourceInventorySnapshot = snapshot
+    lastSourceInventorySuccessAt = new Date().toISOString()
+    sourceInventoryRefreshSuccesses += 1
+    lastError = null
+    log('Forwarded SignalK source inventory to MyBoat', {
+      publisherRole: snapshot.publisherRole,
+      reason,
+      sourceCount: snapshot.sources.length,
+    })
+  } catch (error) {
+    lastSourceInventoryFailureAt = new Date().toISOString()
+    sourceInventoryRefreshFailures += 1
+    warn(
+      'Failed to refresh SignalK source inventory',
       error instanceof Error ? error.message : error,
     )
   } finally {
@@ -645,6 +1037,7 @@ function connect() {
   socket = new WebSocket(config.signalkWsUrl)
 
   socket.addEventListener('open', () => {
+    connectedAt = new Date().toISOString()
     log('Connected to SignalK')
     void refreshObservedIdentity('socket-open')
   })
@@ -659,6 +1052,7 @@ function connect() {
 
   socket.addEventListener('close', (event) => {
     socket = null
+    lastSocketCloseAt = new Date().toISOString()
     if (isShuttingDown) {
       log(`SignalK websocket closed`, `${event.code} ${event.reason || ''}`.trim())
       return
@@ -669,14 +1063,16 @@ function connect() {
 }
 
 async function handleSocketMessage(data: unknown) {
-  const raw = typeof data === 'string' ? data : String(data)
-
   try {
-    const parsed = JSON.parse(raw) as unknown
+    const parsed = JSON.parse(typeof data === 'string' ? data : String(data)) as unknown
 
     if (isSignalKDeltaMessage(parsed)) {
-      broadcastToLiveClients(raw)
-      enqueueDelta(parsed)
+      receivedDeltaMessages += 1
+      maybeUpdateSignalKSelfContext(parsed.self)
+      const selectedDeltas = enqueueSelectedTelemetry(parsed)
+      for (const selectedDelta of selectedDeltas) {
+        broadcastToLiveClients(JSON.stringify(selectedDelta))
+      }
       return
     }
 
@@ -695,59 +1091,19 @@ async function handleSocketMessage(data: unknown) {
   }
 }
 
-function enqueueDelta(delta: SignalKDeltaMessage) {
-  batch.push({
-    timestamp: new Date().toISOString(),
-    delta: normalizeDeltaForIngest(delta),
-  })
-
-  scheduleFlush()
-}
-
-function mergeBatchItems(items: BatchItem[]) {
-  const latestTimestamp = items[items.length - 1]?.timestamp || new Date().toISOString()
-
-  return {
-    timestamp: latestTimestamp,
-    deltas: Array.from(
-      items
-        .reduce<
-          Map<
-            string,
-            {
-              timestamp: string
-              delta: SignalKDeltaMessage
-            }
-          >
-        >((groups, item) => {
-          const context = item.delta.context?.trim() || ''
-          const self = item.delta.self?.trim() || ''
-          const groupKey = `${context}\u0000${self}`
-          const currentGroup = groups.get(groupKey)
-
-          if (!currentGroup) {
-            groups.set(groupKey, {
-              timestamp: item.timestamp,
-              delta: {
-                ...(item.delta.context ? { context: item.delta.context } : {}),
-                ...(item.delta.self ? { self: item.delta.self } : {}),
-                updates: [...item.delta.updates],
-              },
-            })
-            return groups
-          }
-
-          currentGroup.timestamp = item.timestamp
-          currentGroup.delta.updates.push(...item.delta.updates)
-          return groups
-        }, new Map())
-        .values(),
-    ),
+function trimBufferedBatch() {
+  const overflow = batch.length - config.maxBufferedItems
+  if (overflow <= 0) {
+    return
   }
+
+  batch.splice(0, overflow)
+  droppedItems += overflow
+  droppedItemsSinceLastWarning += overflow
+  maybeWarnAboutDroppedItems()
 }
 
 async function postDeltaBatch(items: BatchItem[]) {
-  const payload = mergeBatchItems(items)
   const response = await fetch(config.ingestUrl, {
     method: 'POST',
     headers: {
@@ -757,8 +1113,11 @@ async function postDeltaBatch(items: BatchItem[]) {
       'X-Requested-With': config.xRequestedWith,
     },
     body: JSON.stringify({
-      timestamp: payload.timestamp,
-      deltas: payload.deltas,
+      deltas: items.map((item) => ({
+        debugOnly: item.debugOnly,
+        receivedAt: item.receivedAt,
+        delta: item.delta,
+      })),
     }),
     signal: AbortSignal.timeout(config.requestTimeoutMs),
   })
@@ -775,12 +1134,17 @@ async function postDeltaBatch(items: BatchItem[]) {
   }
 }
 
-async function flushBatch() {
+async function flushBatch(
+  input: {
+    ignoreThrottle?: boolean
+    rescheduleOnFailure?: boolean
+  } = {},
+) {
   if (isFlushing || batch.length === 0) {
     return
   }
 
-  const throttleMs = msUntilPostAllowed()
+  const throttleMs = input.ignoreThrottle ? 0 : msUntilPostAllowed()
   if (throttleMs > 0) {
     scheduleFlush(throttleMs)
     return
@@ -789,31 +1153,44 @@ async function flushBatch() {
   isFlushing = true
   clearFlushTimer()
 
-  const pending = batch
-  batch = []
+  const pending = batch.slice(0, config.maxPostItems)
+  batch = batch.slice(config.maxPostItems)
 
   try {
     lastPostStartedAt = Date.now()
     await postDeltaBatch(pending)
     nextPostNotBefore = 0
+    lastPostSucceededAt = new Date().toISOString()
+    postedBatches += 1
+    postedItems += pending.length
+    lastError = null
+    maybeWarnAboutDroppedItems(true)
     log(`Forwarded ${pending.length} SignalK delta message(s) to MyBoat in one ingest request`)
   } catch (error) {
     batch = [...pending, ...batch]
+    ingestFailures += 1
+    lastPostFailedAt = new Date().toISOString()
 
     if (error instanceof IngestHttpError && error.status === 429) {
       const fromHeader = error.retryAfterMs
       const backoffMs = Math.max(fromHeader ?? 0, config.rateLimitBackoffMs)
       nextPostNotBefore = Date.now() + backoffMs
+      rateLimitCount += 1
       warn(
         `Ingest rate limited (429); backing off before retry`,
         `${backoffMs}ms${fromHeader !== undefined ? ' (includes Retry-After)' : ''}`,
       )
-      scheduleFlush(backoffMs)
+      if (input.rescheduleOnFailure !== false) {
+        scheduleFlush(backoffMs)
+      }
     } else {
       warn('Failed to ingest SignalK delta batch', error instanceof Error ? error.message : error)
-      scheduleFlush(config.reconnectDelayMs)
+      if (input.rescheduleOnFailure !== false) {
+        scheduleFlush(config.reconnectDelayMs)
+      }
     }
   } finally {
+    maybeWarnAboutDroppedItems()
     isFlushing = false
 
     if (batch.length > 0 && !flushTimer) {
@@ -849,7 +1226,13 @@ async function shutdown(signal: string) {
     streamServer.close(() => resolve())
   })
 
-  await flushBatch()
+  while (batch.length > 0) {
+    const before = batch.length
+    await flushBatch({ ignoreThrottle: true, rescheduleOnFailure: false })
+    if (batch.length >= before) {
+      break
+    }
+  }
 }
 
 process.on('SIGINT', () => {

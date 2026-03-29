@@ -14,11 +14,19 @@ only MyBoat APIs and MyBoat-managed live streams. Boats can also run a
 boat-local deployment on `myboat.local` or a similar LAN hostname while keeping
 the same browser-facing contract.
 
+MyBoat now also de-duplicates overlapping SignalK sources before live fanout
+and history writes. The collector and cloud ingest both run the same shared
+source-selection policy, and duplicate losers stay only in short-lived debug
+telemetry instead of inflating the canonical live or history stream.
+
 ## What Lives Here
 
 - `apps/web/`: the shipped Nuxt 4 product
+- `apps/edge-collector/`: the SignalK collector runtime for cloud ingest
 - `layers/narduk-nuxt-layer/`: shared platform layer used by the app
 - `packages/eslint-config/`: repo guardrails and lint plugins
+- `packages/telemetry-source-policy/`: shared canonical source-selection policy
+  for the collector and cloud ingest
 - `tools/` and `scripts/`: workspace automation
 
 ## Product Surfaces
@@ -30,8 +38,15 @@ the same browser-facing contract.
 - `/dashboard/vessels/[vesselSlug]`: live + historical vessel detail
 - `/dashboard/installations/[installationId]`: install and ingest-key management
 - `/:username`: public captain profile
-- `/api/ingest/v1/delta`: collector ingest endpoint for normalized telemetry,
-  observed vessel identity, and installation keys
+- `/:username/:vesselSlug`: public vessel detail
+- `/api/ingest/v1/delta`: collector ingest endpoint for source-aware telemetry
+- `/api/ingest/v1/identity`: collector ingest endpoint for observed vessel
+  identity
+- `/api/ingest/v1/sources`: collector ingest endpoint for normalized SignalK
+  source inventory
+- `/api/app/vessels/[vesselSlug]/history`: owner history API
+- `/api/app/vessels/[vesselSlug]/telemetry/sources`: owner source diagnostics
+- `/api/public/[username]/[vesselSlug]/history`: public history API
 
 ## Local Development
 

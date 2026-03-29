@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "prebuild": "pnpm --filter @myboat/telemetry-source-policy build",
+    "build": "pnpm exec esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.cjs",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "prestart": "pnpm --filter @myboat/telemetry-source-policy build",
+    "start": "node dist/index.cjs",
+    "pretest": "pnpm --filter @myboat/telemetry-source-policy build",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "pretypecheck": "pnpm --filter @myboat/telemetry-source-policy build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format:check": "prettier --check \"src/**/*.ts\" --ignore-path ../../.gitignore"
   },
@@ -17,6 +22,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@myboat/telemetry-source-policy": "workspace:*",
     "ws": "^8.20.0"
   }
 }

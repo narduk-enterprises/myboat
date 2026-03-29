@@ -8,6 +8,9 @@
     "predev": "node tools/check-setup.cjs",
     "dev": "pnpm --filter web dev",
     "dev:collector:tideye": "bash scripts/run-tideye-test-collector.sh",
+    "deploy:narduk:collector": "bash scripts/deploy-narduk-edge-canary.sh",
+    "dev:influx:local": "bash scripts/bootstrap-local-influx.sh",
+    "smoke:telemetry:local": "bash scripts/smoke-local-telemetry.sh",
     "prebuild": "node tools/check-setup.cjs",
     "build": "doppler run -- pnpm -r build",
     "build:plugins": "pnpm --filter @narduk/eslint-config build",
@@ -41,6 +44,7 @@
     "test:e2e:smoke": "pnpm --filter web test:e2e:smoke",
     "test:e2e:ui": "pnpm --filter web test:e2e:ui",
     "test:e2e:ui:analyze": "node tools/playwright/analyze-ui-quality.mjs output/playwright/ui-quality",
+    "photos:seed": "swift run --package-path tools/myboat-photo-seed myboat-photo-seed --",
     "generate:favicons": "pnpm exec tsx tools/generate-favicons.ts",
     "format": "prettier --write \"**/*.{ts,mts,vue,js,mjs,json,yaml,yml,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,mts,vue,js,mjs,json,yaml,yml,css,md}\""

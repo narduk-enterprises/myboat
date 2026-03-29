@@ -15,7 +15,13 @@ const { colorModeIcon, cycleColorMode } = useColorModeToggle()
             </NuxtLink>
 
             <div class="flex items-center gap-2">
-              <UButton to="/explore" color="neutral" variant="ghost" icon="i-lucide-compass">
+              <UButton
+                to="/explore"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-compass"
+                class="hidden sm:inline-flex"
+              >
                 <span class="hidden sm:inline">Explore</span>
               </UButton>
               <UButton

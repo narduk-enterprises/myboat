@@ -13,6 +13,9 @@ const props = withDefaults(
 const route = useRoute()
 const { isAdmin, user, userMenuLinks } = useMyBoatShell()
 const { colorModeIcon, cycleColorMode } = useColorModeToggle()
+const activeVesselSlug = computed(() =>
+  typeof route.params.vesselSlug === 'string' ? route.params.vesselSlug : null,
+)
 
 function isActive(link: MyBoatShellLink) {
   if (link.match === 'prefix') {
@@ -29,7 +32,7 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
         { label: 'Users', to: '/admin/users', icon: 'i-lucide-user-cog' },
         { label: 'Vessels', to: '/admin/vessels', icon: 'i-lucide-ship' },
         { label: 'Installations', to: '/admin/installations', icon: 'i-lucide-cpu' },
-        { label: 'Telemetry', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
+        { label: 'Telemetry', to: '/admin/telemetry', icon: 'i-lucide-radio-tower' },
       ]
     : [
         { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
@@ -50,18 +53,27 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
 const mobileLinks = computed<MyBoatShellLink[]>(() =>
   props.mode === 'admin'
     ? [
-        { label: 'Admin', to: '/admin', icon: 'i-lucide-shield-check' },
+        { label: 'Admin', to: '/admin', icon: 'i-lucide-shield-check', match: 'prefix' },
         { label: 'Users', to: '/admin/users', icon: 'i-lucide-user-cog' },
         { label: 'Vessels', to: '/admin/vessels', icon: 'i-lucide-ship' },
         { label: 'Installs', to: '/admin/installations', icon: 'i-lucide-cpu' },
-        { label: 'Signal', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
+        { label: 'Signal', to: '/admin/telemetry', icon: 'i-lucide-radio-tower' },
       ]
     : [
-        { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Board', to: '/dashboard', icon: 'i-lucide-layout-dashboard', match: 'prefix' },
         { label: 'Map', to: '/dashboard/map', icon: 'i-lucide-map' },
+        ...(activeVesselSlug.value
+          ? [
+              {
+                label: 'Passages',
+                to: `/dashboard/vessels/${activeVesselSlug.value}/passages`,
+                icon: 'i-lucide-route',
+              },
+            ]
+          : []),
         { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         {
-          label: 'Settings',
+          label: 'Prefs',
           to: '/dashboard/settings',
           icon: 'i-lucide-sliders-horizontal',
           match: 'prefix',
@@ -90,7 +102,7 @@ const context = computed(() =>
       <template #header>
         <div role="banner" class="marine-operator-header border-b border-default/70">
           <div
-            class="mx-auto flex max-w-[96rem] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
+            class="mx-auto flex max-w-[96rem] items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8"
           >
             <div class="flex min-w-0 items-center gap-4">
               <NuxtLink :to="shellHomePath" class="shrink-0">
@@ -98,7 +110,7 @@ const context = computed(() =>
               </NuxtLink>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 sm:gap-2">
               <UBadge
                 :color="props.mode === 'admin' ? 'error' : 'primary'"
                 variant="soft"
@@ -111,6 +123,7 @@ const context = computed(() =>
                 variant="ghost"
                 color="neutral"
                 aria-label="Toggle color mode"
+                class="hidden sm:inline-flex"
                 @click="cycleColorMode"
               />
               <AppUserMenu
@@ -124,7 +137,7 @@ const context = computed(() =>
       </template>
 
       <div
-        class="mx-auto grid max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:px-8 lg:py-8"
+        class="mx-auto grid max-w-[96rem] gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6 lg:px-8 lg:py-8"
       >
         <aside class="hidden lg:block">
           <div v-if="context" class="marine-operator-panel rounded-[2rem] p-5">
@@ -179,22 +192,22 @@ const context = computed(() =>
           </div>
         </aside>
 
-        <div class="min-w-0 pb-28 lg:pb-8">
+        <div class="min-w-0 pb-[calc(8.25rem+env(safe-area-inset-bottom))] lg:pb-8">
           <slot />
         </div>
       </div>
 
       <div class="marine-mobile-nav lg:hidden" role="navigation" aria-label="Primary">
-        <div class="mx-auto max-w-2xl px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div class="mx-auto max-w-2xl px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
           <div
-            class="marine-mobile-nav-panel grid gap-2 rounded-[1.5rem] p-2 shadow-overlay"
+            class="marine-mobile-nav-panel grid gap-1.5 rounded-[1.35rem] p-1.5 shadow-card sm:gap-2 sm:rounded-[1.5rem] sm:p-2"
             :style="{ gridTemplateColumns: `repeat(${mobileLinks.length}, minmax(0, 1fr))` }"
           >
             <NuxtLink
               v-for="link in mobileLinks"
               :key="link.to"
               :to="link.to"
-              class="flex min-w-0 flex-col items-center gap-1 rounded-[1rem] px-2 py-2 text-[0.7rem] font-medium transition"
+              class="flex min-w-0 flex-col items-center gap-1 rounded-[0.95rem] px-1.5 py-2 text-[0.68rem] font-medium leading-none transition sm:rounded-[1rem] sm:px-2 sm:text-[0.7rem]"
               :class="
                 isActive(link)
                   ? 'bg-primary/10 text-primary'
@@ -202,7 +215,7 @@ const context = computed(() =>
               "
             >
               <UIcon :name="link.icon" class="size-4 shrink-0" />
-              <span class="truncate">{{ link.label }}</span>
+              <span class="truncate text-center">{{ link.label }}</span>
             </NuxtLink>
           </div>
         </div>

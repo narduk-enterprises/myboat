@@ -45,10 +45,18 @@ const canUseApple = computed(
 )
 const canRegister = computed(() => config.public.authPublicSignup)
 const resolvedRedirectPath = computed(() => props.redirectPath || config.public.authRedirectPath)
+const emailExpanded = shallowRef(!canUseApple.value)
+const emailToggleLabel = computed(() =>
+  emailExpanded.value ? 'Hide email sign in' : 'Use email instead',
+)
 
 watchEffect(() => {
   if (typeof route.query.email === 'string' && !state.email) {
     state.email = route.query.email
+  }
+
+  if (!canUseApple.value || route.query.reset === '1') {
+    emailExpanded.value = true
   }
 
   if (route.query.checkEmail === '1') {
@@ -154,46 +162,30 @@ function toUserFacingError(error: unknown, fallback: string) {
 <template>
   <UCard class="marine-auth-card w-full">
     <template #header>
-      <div class="space-y-5">
-        <div v-if="$slots.logo" class="flex justify-center sm:justify-start">
+      <div class="space-y-4">
+        <div v-if="$slots.logo" class="hidden justify-center sm:justify-start lg:flex">
           <slot name="logo" />
         </div>
 
-        <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-          <div class="marine-auth-chip">Private dashboard access</div>
-          <div class="marine-auth-chip">
-            {{ canUseApple ? 'Apple + email sign-in' : 'Email sign-in' }}
-          </div>
+        <div
+          v-if="canUseApple"
+          class="flex flex-wrap items-center justify-center gap-2 sm:justify-start"
+        >
+          <div class="marine-auth-chip">Apple first</div>
         </div>
 
         <div class="space-y-2 text-center sm:text-left">
-          <h1 class="font-display text-3xl leading-tight text-highlighted sm:text-[2.15rem]">
+          <h1 class="font-display text-[2.1rem] leading-tight text-highlighted sm:text-[2.15rem]">
             {{ title }}
           </h1>
           <p class="text-sm leading-6 text-toned sm:text-base">
             {{ subtitle }}
           </p>
         </div>
-
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div class="marine-auth-note">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-dimmed">
-              Dashboard
-            </p>
-            <p class="mt-2 text-sm font-semibold text-default">Resume installs and sharing.</p>
-          </div>
-
-          <div class="marine-auth-note">
-            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-dimmed">
-              Session
-            </p>
-            <p class="mt-2 text-sm font-semibold text-default">Secure access to live boat data.</p>
-          </div>
-        </div>
       </div>
     </template>
 
-    <div class="space-y-5">
+    <div class="space-y-4">
       <UAlert
         v-if="infoMsg"
         color="success"
@@ -213,96 +205,115 @@ function toUserFacingError(error: unknown, fallback: string) {
         data-testid="auth-login-error"
       />
 
-      <div class="space-y-4">
+      <div class="space-y-3">
         <UButton
           v-if="canUseApple"
           color="neutral"
-          variant="outline"
           size="xl"
-          class="w-full justify-center border-default/70 bg-elevated/84 font-semibold shadow-[0_16px_36px_-32px_rgb(15_23_42_/_0.6)]"
+          class="w-full justify-center font-semibold shadow-[0_22px_48px_-34px_rgb(15_23_42_/_0.52)]"
           :loading="appleLoading"
           @click="onAppleSignIn"
         >
           Continue with Apple
         </UButton>
 
-        <div
+        <p v-if="canUseApple" class="text-center text-sm leading-6 text-toned">
+          Fastest path back into your boat dashboard.
+        </p>
+
+        <UButton
           v-if="canUseApple"
-          class="flex items-center gap-3 text-xs uppercase tracking-[0.18em] text-dimmed"
+          type="button"
+          color="neutral"
+          variant="ghost"
+          size="lg"
+          class="w-full justify-center"
+          :icon="emailExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          @click="emailExpanded = !emailExpanded"
         >
-          <span class="h-px flex-1 bg-default" />
-          <span>Or continue with email</span>
-          <span class="h-px flex-1 bg-default" />
-        </div>
+          {{ emailToggleLabel }}
+        </UButton>
 
-        <UForm :schema="schema" :state="state" class="space-y-4" @submit.prevent="onSubmit">
-          <UFormField name="email" label="Email" required>
-            <UInput
-              v-model="state.email"
-              type="email"
-              icon="i-lucide-mail"
+        <div
+          v-if="!canUseApple || emailExpanded"
+          class="rounded-[1.4rem] border border-default/70 bg-default/70 p-4 sm:p-5"
+        >
+          <p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-dimmed">
+            {{ canUseApple ? 'Email fallback' : 'Email sign in' }}
+          </p>
+          <p class="mt-2 text-sm leading-6 text-toned">
+            Use email only when you prefer not to sign in with Apple for this session.
+          </p>
+
+          <UForm :schema="schema" :state="state" class="mt-4 space-y-4" @submit.prevent="onSubmit">
+            <UFormField name="email" label="Email" required>
+              <UInput
+                v-model="state.email"
+                type="email"
+                icon="i-lucide-mail"
+                size="xl"
+                autocomplete="email"
+                placeholder="you@example.com"
+                class="w-full"
+                data-testid="auth-login-email"
+              />
+            </UFormField>
+
+            <UFormField name="password" label="Password" required>
+              <UInput
+                v-model="state.password"
+                type="password"
+                icon="i-lucide-lock"
+                size="xl"
+                autocomplete="current-password"
+                placeholder="••••••••"
+                class="w-full"
+                data-testid="auth-login-password"
+              />
+            </UFormField>
+
+            <div class="flex items-center justify-between gap-3 text-sm">
+              <p class="text-toned">Use the same login you use for your captain page.</p>
+              <ULink
+                :to="config.public.authResetPath"
+                class="shrink-0 font-medium text-muted hover:text-primary"
+              >
+                Forgot password?
+              </ULink>
+            </div>
+
+            <UButton
+              type="submit"
+              color="primary"
               size="xl"
-              autocomplete="email"
-              placeholder="you@example.com"
-              class="w-full"
-              data-testid="auth-login-email"
-            />
-          </UFormField>
-
-          <UFormField name="password" label="Password" required>
-            <UInput
-              v-model="state.password"
-              type="password"
-              icon="i-lucide-lock"
-              size="xl"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              class="w-full"
-              data-testid="auth-login-password"
-            />
-          </UFormField>
-
-          <div class="flex items-center justify-between gap-3 text-sm">
-            <p class="text-toned">Use the same login you use for your captain page.</p>
-            <ULink
-              :to="config.public.authResetPath"
-              class="shrink-0 font-medium text-muted hover:text-primary"
+              class="w-full justify-center font-semibold shadow-[0_28px_72px_-42px_rgb(14_165_233_/_0.68)]"
+              :loading="loading"
+              data-testid="auth-login-submit"
             >
-              Forgot password?
-            </ULink>
-          </div>
+              Sign in with email
+            </UButton>
 
-          <UButton
-            type="submit"
-            color="primary"
-            size="xl"
-            class="w-full justify-center font-semibold shadow-[0_28px_72px_-42px_rgb(14_165_233_/_0.68)]"
-            :loading="loading"
-            data-testid="auth-login-submit"
-          >
-            Sign In
-          </UButton>
-
-          <UButton
-            v-if="showDemoLogin"
-            type="button"
-            color="neutral"
-            variant="soft"
-            size="xl"
-            class="w-full justify-center font-semibold"
-            icon="i-lucide-zap"
-            :loading="demoLoading"
-            data-testid="auth-login-demo"
-            @click="onDemoLogin"
-          >
-            Sign In as Demo User
-          </UButton>
-        </UForm>
+            <UButton
+              v-if="showDemoLogin"
+              type="button"
+              color="neutral"
+              variant="soft"
+              size="xl"
+              class="w-full justify-center font-semibold"
+              icon="i-lucide-zap"
+              :loading="demoLoading"
+              data-testid="auth-login-demo"
+              @click="onDemoLogin"
+            >
+              Sign In as Demo User
+            </UButton>
+          </UForm>
+        </div>
       </div>
     </div>
 
     <template #footer>
-      <div class="space-y-3">
+      <div class="space-y-2">
         <p class="text-center text-sm text-toned">
           <template v-if="canRegister">
             Don&apos;t have an account?
@@ -316,7 +327,7 @@ function toUserFacingError(error: unknown, fallback: string) {
           <template v-else> Need access? Contact an administrator for an invite. </template>
         </p>
 
-        <p class="text-center text-xs uppercase tracking-[0.18em] text-dimmed">
+        <p class="text-center text-[0.68rem] uppercase tracking-[0.18em] text-dimmed">
           Protected with encrypted auth sessions
         </p>
       </div>

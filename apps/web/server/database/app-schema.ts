@@ -158,6 +158,34 @@ export const vesselLiveSnapshots = sqliteTable('vessel_live_snapshots', {
   updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
 })
 
+export const vesselInstallationSourceStates = sqliteTable(
+  'vessel_installation_source_states',
+  {
+    installationId: text('installation_id')
+      .primaryKey()
+      .references(() => vesselInstallations.id, { onDelete: 'cascade' }),
+    vesselId: text('vessel_id')
+      .notNull()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    publisherRole: text('publisher_role').notNull().default('primary'),
+    policyVersion: text('policy_version').notNull(),
+    sourceInventoryJson: text('source_inventory_json').notNull().default('[]'),
+    currentWinnersJson: text('current_winners_json').notNull().default('[]'),
+    duplicateHotspotsJson: text('duplicate_hotspots_json').notNull().default('[]'),
+    shadowPublisherSeen: integer('shadow_publisher_seen', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    lastInventoryObservedAt: text('last_inventory_observed_at'),
+    lastSelectionObservedAt: text('last_selection_observed_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+    updatedAt: text('updated_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    vesselIdx: index('vessel_installation_source_states_vessel_idx').on(table.vesselId),
+    roleIdx: index('vessel_installation_source_states_role_idx').on(table.publisherRole),
+  }),
+)
+
 export const passages = sqliteTable('passages', {
   id: text('id').primaryKey(),
   vesselId: text('vessel_id')
@@ -190,20 +218,37 @@ export const waypoints = sqliteTable('waypoints', {
   createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
 })
 
-export const mediaItems = sqliteTable('media_items', {
-  id: text('id').primaryKey(),
-  vesselId: text('vessel_id')
-    .notNull()
-    .references(() => vessels.id, { onDelete: 'cascade' }),
-  passageId: text('passage_id').references(() => passages.id, { onDelete: 'set null' }),
-  title: text('title').notNull(),
-  caption: text('caption'),
-  imageUrl: text('image_url').notNull(),
-  lat: real('lat'),
-  lng: real('lng'),
-  capturedAt: text('captured_at'),
-  createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
-})
+export const mediaItems = sqliteTable(
+  'media_items',
+  {
+    id: text('id').primaryKey(),
+    vesselId: text('vessel_id')
+      .notNull()
+      .references(() => vessels.id, { onDelete: 'cascade' }),
+    passageId: text('passage_id').references(() => passages.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    caption: text('caption'),
+    imageUrl: text('image_url').notNull(),
+    sharePublic: integer('share_public', { mode: 'boolean' }).notNull().default(false),
+    sourceKind: text('source_kind').notNull().default('manual'),
+    sourceAssetId: text('source_asset_id'),
+    sourceFingerprint: text('source_fingerprint'),
+    matchStatus: text('match_status').notNull().default('attached'),
+    matchScore: real('match_score'),
+    matchReason: text('match_reason'),
+    isCover: integer('is_cover', { mode: 'boolean' }).notNull().default(false),
+    lat: real('lat'),
+    lng: real('lng'),
+    capturedAt: text('captured_at'),
+    createdAt: text('created_at').notNull().$defaultFn(isoTimestamp),
+  },
+  (table) => ({
+    vesselFingerprintIdx: uniqueIndex('media_items_vessel_fingerprint_idx').on(
+      table.vesselId,
+      table.sourceFingerprint,
+    ),
+  }),
+)
 
 export const followedVessels = sqliteTable(
   'followed_vessels',

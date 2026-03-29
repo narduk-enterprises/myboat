@@ -15,26 +15,22 @@ useWebPageSchema({
 definePageMeta({ layout: 'auth', middleware: ['guest'] })
 
 const dockChecklist = [
-  'Claim the public handle for your captain page.',
-  'Add your boat and first install in one setup flow.',
-  'Connect a live feed when the hardware is ready.',
+  'Start with Apple so the first step feels obvious.',
+  'Create the captain account before boat setup.',
+  'Keep email sign up tucked away as fallback.',
 ]
 </script>
 
 <template>
   <AuthDock
     eyebrow="New boat setup"
-    title="Set up your boat workspace"
-    description="Create the account that owns your dashboard, public page, and first live feed."
+    title="Create the account that owns the boat"
+    description="Make the first decision clean. Apple takes the lead, and email only shows up when you intentionally choose it."
     :checklist="dockChecklist"
   >
     <AuthRegisterCard
-      title="Create your account"
-      subtitle="Start with your captain login. Boat setup comes next."
-    >
-      <template #logo>
-        <AppBrandMark />
-      </template>
-    </AuthRegisterCard>
+      title="Create your MyBoat account"
+      subtitle="Start with Apple. Bring out email only if you want the manual path."
+    />
   </AuthDock>
 </template>
