@@ -6,6 +6,7 @@ const props = defineProps<{
   detail: VesselDetailResponse
 }>()
 
+const isCompactViewport = useCompactViewport()
 const latestPassage = computed(
   () => props.detail.passages[0] || props.detail.vessel.latestPassage || null,
 )
@@ -15,25 +16,28 @@ const totalDistanceNm = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
-      <div data-testid="vessel-detail-passages-map">
+  <div class="space-y-5 sm:space-y-6">
+    <div class="grid gap-5 xl:grid-cols-[1.18fr_0.82fr] xl:gap-6">
+      <div
+        data-testid="vessel-detail-passages-map"
+        :class="isCompactViewport ? 'order-2' : 'order-1'"
+      >
         <MyBoatSurfaceMap
           :vessels="[detail.vessel]"
           :passages="detail.passages"
           :waypoints="detail.waypoints"
-          height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
+          height-class="h-[16rem] sm:h-[24rem] lg:h-[32rem]"
           :show-pin-labels="false"
         />
       </div>
 
-      <UCard class="border-default/80 bg-default/90 shadow-card">
+      <UCard class="order-1 border-default/80 bg-default/90 shadow-card xl:order-2">
         <template #header>
           <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 class="font-display text-2xl text-default">Passage overview</h2>
+              <h2 class="font-display text-xl text-default sm:text-2xl">Passage overview</h2>
               <p class="mt-1 text-sm text-muted">
-                Historical track memory, saved route geometry, and the media that belongs with it.
+                Route memory, saved geometry, and the linked context that belongs with each run.
               </p>
             </div>
 
@@ -42,13 +46,14 @@ const totalDistanceNm = computed(() =>
               color="neutral"
               variant="soft"
               icon="i-lucide-radar"
+              class="w-full justify-center sm:w-auto"
             >
               Back to live view
             </UButton>
           </div>
         </template>
 
-        <div class="space-y-4 text-sm text-muted">
+        <div class="grid gap-3 text-sm text-muted sm:grid-cols-2">
           <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
             <p class="text-xs uppercase tracking-wide text-muted">Recorded passages</p>
             <p class="mt-2 font-medium text-default">
@@ -57,6 +62,13 @@ const totalDistanceNm = computed(() =>
           </div>
 
           <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Distance logged</p>
+            <p class="mt-2 font-medium text-default">
+              {{ totalDistanceNm ? `${totalDistanceNm.toFixed(0)} nm` : 'Awaiting full tracks' }}
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4 sm:col-span-2">
             <p class="text-xs uppercase tracking-wide text-muted">Latest passage</p>
             <p class="mt-2 font-medium text-default">
               {{ latestPassage?.title || 'No tracked passage yet' }}
@@ -70,14 +82,7 @@ const totalDistanceNm = computed(() =>
             </p>
           </div>
 
-          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-            <p class="text-xs uppercase tracking-wide text-muted">Distance logged</p>
-            <p class="mt-2 font-medium text-default">
-              {{ totalDistanceNm ? `${totalDistanceNm.toFixed(0)} nm` : 'Awaiting full tracks' }}
-            </p>
-          </div>
-
-          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4 sm:col-span-2">
             <p class="text-xs uppercase tracking-wide text-muted">Linked context</p>
             <p class="mt-2 font-medium text-default">
               {{ detail.waypoints.length }} waypoints · {{ detail.media.length }} media items

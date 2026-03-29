@@ -11,23 +11,26 @@ defineProps<{
   <UCard class="chart-surface rounded-[1.75rem] shadow-card">
     <template #header>
       <div>
-        <h3 class="font-display text-xl text-default">Media & notes</h3>
+        <h3 class="font-display text-lg text-default sm:text-xl">Media & notes</h3>
         <p class="mt-1 text-sm text-muted">
           Photos, observations, and place-linked memory from the boat.
         </p>
       </div>
     </template>
 
-    <div v-if="media.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      v-if="media.length"
+      class="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible xl:grid-cols-3"
+    >
       <article
         v-for="item in media"
         :key="item.id"
-        class="overflow-hidden rounded-2xl border border-default bg-elevated/70"
+        class="min-w-[16.5rem] shrink-0 overflow-hidden rounded-2xl border border-default bg-elevated/70 md:min-w-0"
       >
         <NuxtImg
           :src="item.imageUrl"
           :alt="item.title"
-          class="h-40 w-full object-cover"
+          class="h-36 w-full object-cover md:h-40"
           width="640"
           height="400"
         />
