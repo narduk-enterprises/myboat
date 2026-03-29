@@ -5,6 +5,7 @@ import type {
   DashboardOverview,
   FollowedVesselImportItem,
   FollowedVesselImportResponse,
+  FollowedVesselRefreshResponse,
   FollowedVesselSummary,
   InstallationDetailResponse,
   InstallationKeySummary,
@@ -241,6 +242,28 @@ export function useRemoveFollowedVessel() {
 
   return {
     removeFollowedVessel,
+    pending: readonly(pending),
+  }
+}
+
+export function useRefreshFollowedVessels() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function refreshFollowedVessels() {
+    pending.value = true
+
+    try {
+      return await appFetch<FollowedVesselRefreshResponse>('/api/app/fleet-friends/refresh', {
+        method: 'POST',
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    refreshFollowedVessels,
     pending: readonly(pending),
   }
 }

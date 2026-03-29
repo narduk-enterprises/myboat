@@ -179,6 +179,17 @@ export interface FollowedVesselImportResponse {
   imported: FollowedVesselSummary[]
 }
 
+export interface FollowedVesselRefreshResponse {
+  ok: true
+  source: 'upstream' | 'cooldown' | 'local'
+  cachedAt: string | null
+  retryAfterMs: number | null
+  requestedCount: number
+  resolvedCount: number
+  missingCount: number
+  followedVessels: FollowedVesselSummary[]
+}
+
 export interface AisHubSyncStatus {
   catalogSize: number
   lastRequestAt: string | null

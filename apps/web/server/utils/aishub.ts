@@ -216,6 +216,16 @@ export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: strin
   return new Map(rows.map((row) => [row.mmsi, serializeStoredResult(row, row.mmsi)]))
 }
 
+function normalizeRequestedMmsis(mmsis: string[]) {
+  return [
+    ...new Set(
+      mmsis
+        .map((mmsi) => mmsi.trim())
+        .filter((mmsi): mmsi is string => /^\d{9}$/.test(mmsi)),
+    ),
+  ]
+}
+
 async function searchStoredAisHubVessels(event: H3Event, rawQuery: string) {
   const normalizedQuery = normalizeStoredSearchQuery(rawQuery)
   if (!normalizedQuery) {
@@ -339,7 +349,7 @@ async function setCachedSearch(event: H3Event, response: Omit<AisHubSearchRespon
     })
 }
 
-async function assertAisHubCooldownAvailable(event: H3Event) {
+async function getAisHubCooldownRemainingMs(event: H3Event) {
   const db = useAppDatabase(event)
   const row = await db
     .select({ lastRequestAt: aishubRequestState.lastRequestAt })
@@ -348,25 +358,32 @@ async function assertAisHubCooldownAvailable(event: H3Event) {
     .get()
 
   if (!row) {
-    return
+    return 0
   }
 
   const lastRequestMs = Date.parse(row.lastRequestAt)
   if (!Number.isFinite(lastRequestMs)) {
-    return
+    return 0
   }
 
   const remainingMs = AISHUB_SEARCH_COOLDOWN_MS - (Date.now() - lastRequestMs)
-  if (remainingMs <= 0) {
-    return
-  }
+  return remainingMs > 0 ? remainingMs : 0
+}
 
+function throwAisHubCooldownError(event: H3Event, remainingMs: number) {
   setResponseHeader(event, 'Retry-After', Math.ceil(remainingMs / 1000))
   throw createError({
     statusCode: 429,
     statusMessage: `AIS Hub only allows one upstream lookup per minute. Try again in ${Math.ceil(remainingMs / 1000)}s.`,
     data: { retryAfterMs: remainingMs },
   })
+}
+
+async function assertAisHubCooldownAvailable(event: H3Event) {
+  const remainingMs = await getAisHubCooldownRemainingMs(event)
+  if (remainingMs > 0) {
+    throwAisHubCooldownError(event, remainingMs)
+  }
 }
 
 async function recordAisHubRequest(event: H3Event, requestedAt: string) {
@@ -388,9 +405,10 @@ async function recordAisHubRequest(event: H3Event, requestedAt: string) {
     })
 }
 
-async function fetchAisHubApiByMmsi(mmsi: string) {
+async function fetchAisHubApiByMmsis(mmsis: string[], intervalMinutes?: number | null) {
   const apiKey = useRuntimeConfig().aisHubKey?.trim() || ''
-  if (!apiKey) {
+  const normalizedMmsis = normalizeRequestedMmsis(mmsis)
+  if (!apiKey || !normalizedMmsis.length) {
     return null
   }
 
@@ -399,7 +417,11 @@ async function fetchAisHubApiByMmsi(mmsi: string) {
   url.searchParams.set('format', '1')
   url.searchParams.set('output', 'json')
   url.searchParams.set('compress', '0')
-  url.searchParams.set('mmsi', mmsi)
+  url.searchParams.set('mmsi', normalizedMmsis.join(','))
+
+  if (typeof intervalMinutes === 'number' && Number.isFinite(intervalMinutes) && intervalMinutes > 0) {
+    url.searchParams.set('interval', String(Math.trunc(intervalMinutes)))
+  }
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -420,6 +442,84 @@ async function fetchAisHubApiByMmsi(mmsi: string) {
   }
 
   return parseAisHubApiSearchResponse(payload)
+}
+
+async function fetchAisHubApiByMmsi(mmsi: string) {
+  return await fetchAisHubApiByMmsis([mmsi])
+}
+
+export async function refreshAisHubResultsByMmsis(
+  event: H3Event,
+  mmsis: string[],
+  options: {
+    bestEffort?: boolean
+    intervalMinutes?: number | null
+  } = {},
+) {
+  const uniqueMmsis = normalizeRequestedMmsis(mmsis)
+  if (!uniqueMmsis.length) {
+    return {
+      cachedAt: null,
+      missingMmsis: [] as string[],
+      results: [] as AisHubSearchResult[],
+      retryAfterMs: null as number | null,
+      source: 'local' as const,
+    }
+  }
+
+  const storedResults = await getStoredAisHubResultsByMmsis(event, uniqueMmsis)
+  const cooldownRemainingMs = await getAisHubCooldownRemainingMs(event)
+
+  if (cooldownRemainingMs > 0) {
+    if (!options.bestEffort) {
+      throwAisHubCooldownError(event, cooldownRemainingMs)
+    }
+
+    return {
+      cachedAt: null,
+      missingMmsis: uniqueMmsis.filter((mmsi) => !storedResults.has(mmsi)),
+      results: uniqueMmsis
+        .map((mmsi) => storedResults.get(mmsi))
+        .filter((result): result is AisHubSearchResult => Boolean(result)),
+      retryAfterMs: cooldownRemainingMs,
+      source: 'cooldown' as const,
+    }
+  }
+
+  const fetchedAt = new Date().toISOString()
+  const upstreamResults = await fetchAisHubApiByMmsis(uniqueMmsis, options.intervalMinutes)
+
+  if (!upstreamResults) {
+    return {
+      cachedAt: null,
+      missingMmsis: uniqueMmsis.filter((mmsi) => !storedResults.has(mmsi)),
+      results: uniqueMmsis
+        .map((mmsi) => storedResults.get(mmsi))
+        .filter((result): result is AisHubSearchResult => Boolean(result)),
+      retryAfterMs: null,
+      source: 'local' as const,
+    }
+  }
+
+  await recordAisHubRequest(event, fetchedAt)
+
+  if (upstreamResults.length) {
+    await rememberAisHubResults(event, upstreamResults, fetchedAt)
+  }
+
+  const upstreamResultsByMmsi = new Map(upstreamResults.map((result) => [result.mmsi, result]))
+
+  return {
+    cachedAt: fetchedAt,
+    missingMmsis: uniqueMmsis.filter(
+      (mmsi) => !upstreamResultsByMmsi.has(mmsi) && !storedResults.has(mmsi),
+    ),
+    results: uniqueMmsis
+      .map((mmsi) => upstreamResultsByMmsi.get(mmsi) || storedResults.get(mmsi))
+      .filter((result): result is AisHubSearchResult => Boolean(result)),
+    retryAfterMs: null,
+    source: 'upstream' as const,
+  }
 }
 
 async function fetchAisHubVesselsPage(query: string, matchMode: AisHubSearchMode) {

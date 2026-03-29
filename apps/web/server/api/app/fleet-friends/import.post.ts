@@ -2,7 +2,7 @@ import type { AisHubSearchResult } from '~/types/myboat'
 import { z } from 'zod'
 import { defineUserMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
-import { getStoredAisHubResultsByMmsis, rememberAisHubResults } from '#server/utils/aishub'
+import { rememberAisHubResults, refreshAisHubResultsByMmsis } from '#server/utils/aishub'
 import { upsertFollowedVesselsForUser } from '#server/utils/myboat'
 
 const importItemSchema = z.object({
@@ -31,13 +31,17 @@ export default defineUserMutation(
       (item, index, collection) =>
         collection.findIndex((candidate) => candidate.mmsi === item.mmsi) === index,
     )
-    const storedResults = await getStoredAisHubResultsByMmsis(
+    const refreshedLookup = await refreshAisHubResultsByMmsis(
       event,
       uniqueItems.map((item) => item.mmsi),
+      { bestEffort: true },
+    )
+    const refreshedResults = new Map(
+      refreshedLookup.results.map((result) => [result.mmsi, result]),
     )
 
     const importResults: AisHubSearchResult[] = uniqueItems.map((item) => {
-      const stored = storedResults.get(item.mmsi)
+      const stored = refreshedResults.get(item.mmsi)
 
       if (stored) {
         return stored

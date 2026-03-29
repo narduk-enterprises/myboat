@@ -305,6 +305,24 @@ export async function getFollowedVesselsForUser(event: H3Event, userId: string) 
   )
 }
 
+export async function getFollowedVesselMmsisForUser(event: H3Event, userId: string) {
+  const db = useAppDatabase(event)
+  const rows = await db
+    .select({ mmsi: followedVessels.mmsi })
+    .from(followedVessels)
+    .where(eq(followedVessels.ownerUserId, userId))
+    .all()
+
+  return [...new Set(rows.map((row) => row.mmsi.trim()).filter(Boolean))]
+}
+
+export async function getTrackedFollowedVesselMmsis(event: H3Event) {
+  const db = useAppDatabase(event)
+  const rows = await db.select({ mmsi: followedVessels.mmsi }).from(followedVessels).all()
+
+  return [...new Set(rows.map((row) => row.mmsi.trim()).filter(Boolean))]
+}
+
 export function serializeFollowedVessel(row: FollowedVessel) {
   return {
     id: row.id,

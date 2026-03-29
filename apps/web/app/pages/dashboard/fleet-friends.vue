@@ -100,6 +100,7 @@ watch(
           <BuddyBoatTableManager
             :items="followedVessels"
             @imported="upsertFollowedVessels"
+            @refreshed="setFollowedVessels"
             @removed="removeFollowedVessel"
             @saved="upsertFollowedVessel"
           />

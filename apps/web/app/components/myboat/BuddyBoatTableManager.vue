@@ -2,6 +2,7 @@
 import type {
   AisHubSearchResponse,
   AisHubSearchResult,
+  FollowedVesselRefreshResponse,
   FollowedVesselSummary,
 } from '~/types/myboat'
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
@@ -13,11 +14,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   imported: [vessels: FollowedVesselSummary[]]
   removed: [id: string]
+  refreshed: [vessels: FollowedVesselSummary[]]
   saved: [vessel: FollowedVesselSummary]
 }>()
 
 const toast = useToast()
 const { followVessel, pending: followPending } = useFollowVessel()
+const { refreshFollowedVessels, pending: refreshPending } = useRefreshFollowedVessels()
 const { removeFollowedVessel, pending: removePending } = useRemoveFollowedVessel()
 const { search, pending: searchPending } = useSearchAisHubVessels()
 
@@ -112,6 +115,38 @@ function canQueryUpstream(value: string) {
   return /^\d{9}$/.test(compactDigits) || value.length >= 3
 }
 
+function countMappedVessels(items: FollowedVesselSummary[]) {
+  return items.filter(
+    (item) => item.positionLat !== null && item.positionLng !== null,
+  ).length
+}
+
+function describeRefresh(response: FollowedVesselRefreshResponse) {
+  if (response.source === 'cooldown') {
+    const retryAfterSeconds = Math.max(1, Math.ceil((response.retryAfterMs || 0) / 1000))
+    return {
+      color: 'warning' as const,
+      description: `AIS Hub only allows one lookup per minute. Try again in ${retryAfterSeconds}s.`,
+      title: 'Refresh cooling down',
+    }
+  }
+
+  if (response.source === 'local') {
+    return {
+      color: 'neutral' as const,
+      description: 'Stored AIS data is still in use. No fresh upstream lookup ran this time.',
+      title: 'No new AIS data yet',
+    }
+  }
+
+  const mappedCount = countMappedVessels(response.followedVessels)
+  return {
+    color: 'success' as const,
+    description: `${mappedCount} saved buddy boats currently have positions after the refresh.`,
+    title: `Refreshed ${response.resolvedCount} of ${response.requestedCount} saved boats`,
+  }
+}
+
 function buildEmptyMessage(value: string, source: AisHubSearchResponse['source']) {
   if (source === 'local' && !canQueryUpstream(value)) {
     return 'No local matches yet. Keep typing until you have at least 3 characters, or enter an exact 9-digit MMSI to pull from AIS Hub.'
@@ -189,6 +224,22 @@ async function onRemove(id: string) {
     })
   } finally {
     activeRemoveId.value = null
+  }
+}
+
+async function onRefresh() {
+  try {
+    const response = await refreshFollowedVessels()
+    emit('refreshed', response.followedVessels)
+
+    const toastConfig = describeRefresh(response)
+    toast.add(toastConfig)
+  } catch (error) {
+    toast.add({
+      title: 'Unable to refresh AIS data',
+      description: getErrorMessage(error),
+      color: 'error',
+    })
   }
 }
 </script>
@@ -358,7 +409,19 @@ async function onRemove(id: string) {
             </p>
           </div>
 
-          <UBadge color="primary" variant="soft">{{ props.items.length }} saved</UBadge>
+          <div class="flex flex-wrap items-center gap-2">
+            <UButton
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-refresh-cw"
+              :disabled="!props.items.length"
+              :loading="refreshPending"
+              @click="onRefresh"
+            >
+              Refresh AIS data
+            </UButton>
+            <UBadge color="primary" variant="soft">{{ props.items.length }} saved</UBadge>
+          </div>
         </div>
       </template>
 

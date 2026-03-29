@@ -2,7 +2,7 @@ import type { AisHubSearchResult } from '~/types/myboat'
 import { z } from 'zod'
 import { defineUserMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
-import { rememberAisHubResults } from '#server/utils/aishub'
+import { rememberAisHubResults, refreshAisHubResultsByMmsis } from '#server/utils/aishub'
 import { upsertFollowedVesselForUser } from '#server/utils/myboat'
 
 const bodySchema = z.object({
@@ -30,7 +30,7 @@ export default defineUserMutation(
   },
   async ({ event, user, body }) => {
     const now = new Date().toISOString()
-    const result: AisHubSearchResult = {
+    const submittedResult: AisHubSearchResult = {
       source: body.source,
       matchMode: body.matchMode,
       mmsi: body.mmsi,
@@ -44,6 +44,16 @@ export default defineUserMutation(
       shipType: body.shipType ?? null,
       sourceStations: body.sourceStations,
     }
+
+    const needsAuthoritativeLookup =
+      submittedResult.lastReportAt === null ||
+      submittedResult.positionLat === null ||
+      submittedResult.positionLng === null
+
+    const refreshedLookup = needsAuthoritativeLookup
+      ? await refreshAisHubResultsByMmsis(event, [submittedResult.mmsi], { bestEffort: true })
+      : null
+    const result = refreshedLookup?.results[0] || submittedResult
 
     await rememberAisHubResults(event, [result], now)
 
