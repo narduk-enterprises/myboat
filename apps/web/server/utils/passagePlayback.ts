@@ -45,9 +45,7 @@ function calculateBearingDegrees(lat1: number, lon1: number, lat2: number, lon2:
   const y = Math.sin((lon2 - lon1) * toRadians) * Math.cos(lat2 * toRadians)
   const x =
     Math.cos(lat1 * toRadians) * Math.sin(lat2 * toRadians) -
-    Math.sin(lat1 * toRadians) *
-      Math.cos(lat2 * toRadians) *
-      Math.cos((lon2 - lon1) * toRadians)
+    Math.sin(lat1 * toRadians) * Math.cos(lat2 * toRadians) * Math.cos((lon2 - lon1) * toRadians)
 
   return (Math.atan2(y, x) * toDegrees + 360) % 360
 }

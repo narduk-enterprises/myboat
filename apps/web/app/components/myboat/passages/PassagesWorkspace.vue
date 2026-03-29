@@ -106,7 +106,9 @@ function buildPassageWindow(passage: PassageSummary | null) {
 
 const metricCards = computed(() => [
   {
-    hint: latestPassage.value ? buildPassageTitle(latestPassage.value) : 'The latest recorded route appears here.',
+    hint: latestPassage.value
+      ? buildPassageTitle(latestPassage.value)
+      : 'The latest recorded route appears here.',
     icon: 'i-lucide-route',
     label: 'Recorded passages',
     value: String(props.passages.length),
@@ -128,7 +130,9 @@ const metricCards = computed(() => [
     value: String(playbackReadyCount.value),
   },
   {
-    hint: focusedPassage.value ? buildPassageTitle(focusedPassage.value) : 'Distance rolls up as passages are logged.',
+    hint: focusedPassage.value
+      ? buildPassageTitle(focusedPassage.value)
+      : 'Distance rolls up as passages are logged.',
     icon: 'i-lucide-gauge',
     label: 'Distance logged',
     unit: 'nm',
@@ -253,7 +257,9 @@ const metricCards = computed(() => [
         </div>
       </div>
 
-      <UCard class="chart-surface rounded-[1.75rem] shadow-card xl:order-1 xl:sticky xl:top-24 h-fit">
+      <UCard
+        class="chart-surface rounded-[1.75rem] shadow-card xl:order-1 xl:sticky xl:top-24 h-fit"
+      >
         <template #header>
           <div class="space-y-4">
             <div>
@@ -360,9 +366,7 @@ const metricCards = computed(() => [
           v-else
           :title="searchQuery ? 'No passages match this search' : emptyTitle"
           :description="
-            searchQuery
-              ? 'Try a broader route name or clear the search field.'
-              : emptyDescription
+            searchQuery ? 'Try a broader route name or clear the search field.' : emptyDescription
           "
           icon="i-lucide-route"
           compact

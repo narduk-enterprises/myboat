@@ -222,8 +222,8 @@ export function buildNearbyAisPins(options: {
       const matchesCallSign =
         Boolean(
           focusCallSign &&
-            contact.callSign &&
-            contact.callSign.trim().toLowerCase() === focusCallSign,
+          contact.callSign &&
+          contact.callSign.trim().toLowerCase() === focusCallSign,
         ) && distanceNm <= AIS_DUPLICATE_RADIUS_NM
 
       return !(matchesName || matchesMmsi || matchesCallSign)

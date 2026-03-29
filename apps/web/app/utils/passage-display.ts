@@ -42,22 +42,20 @@ function parseTrackEndpoints(trackGeojson: string | null | undefined) {
   }
 
   try {
-    const parsed = JSON.parse(trackGeojson) as
-      | {
+    const parsed = JSON.parse(trackGeojson) as {
+      type?: string
+      coordinates?: unknown
+      geometry?: {
+        type?: string
+        coordinates?: unknown
+      }
+      features?: Array<{
+        geometry?: {
           type?: string
           coordinates?: unknown
-          geometry?: {
-            type?: string
-            coordinates?: unknown
-          }
-          features?: Array<{
-            geometry?: {
-              type?: string
-              coordinates?: unknown
-            }
-          }>
         }
-      | null
+      }>
+    } | null
 
     const geometry =
       parsed?.type === 'FeatureCollection'
@@ -95,9 +93,8 @@ function withinRange(value: number, range: [number, number]) {
 
 function lookupCruisingStop(lat: number, lng: number) {
   return (
-    CRUISING_STOPS.find(
-      (stop) => withinRange(lat, stop.lat) && withinRange(lng, stop.lng),
-    )?.name || null
+    CRUISING_STOPS.find((stop) => withinRange(lat, stop.lat) && withinRange(lng, stop.lng))?.name ||
+    null
   )
 }
 
@@ -115,10 +112,7 @@ function getPassageEndpoint(passage: PassageSummary, edge: 'start' | 'end') {
   return parseTrackEndpoints(passage.trackGeojson)?.[edge] || null
 }
 
-export function resolvePassageStopLabel(
-  passage: PassageSummary,
-  edge: 'start' | 'end',
-) {
+export function resolvePassageStopLabel(passage: PassageSummary, edge: 'start' | 'end') {
   const explicit =
     edge === 'start'
       ? passage.startPlaceLabel || passage.departureName

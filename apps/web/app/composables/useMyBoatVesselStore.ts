@@ -761,10 +761,13 @@ export function useMyBoatVesselStore() {
     contacts: AisContactSummary[],
   ) {
     updateEntry(namespace, entryKey, (currentEntry) => {
-      const nextContacts = contacts.reduce<Record<string, AisContactSummary>>((accumulator, contact) => {
-        accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
-        return accumulator
-      }, {})
+      const nextContacts = contacts.reduce<Record<string, AisContactSummary>>(
+        (accumulator, contact) => {
+          accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
+          return accumulator
+        },
+        {},
+      )
 
       return {
         ...currentEntry,
