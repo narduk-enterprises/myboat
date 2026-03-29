@@ -283,7 +283,10 @@ async function refreshTrackedFollowedVesselsFromAisHub(
 
   for (const batch of batches) {
     const refreshQuery = buildFollowedVesselRefreshStatement(batch, refreshedAt)
-    await d1.prepare(refreshQuery.statement).bind(...refreshQuery.bindings).run()
+    await d1
+      .prepare(refreshQuery.statement)
+      .bind(...refreshQuery.bindings)
+      .run()
   }
 
   return matchingMmsis.length
