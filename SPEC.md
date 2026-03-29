@@ -169,7 +169,8 @@ credentials, and internal telemetry views.
   redirect to `/dashboard`
 - `/login`: branded auth entry
 - `/register`: branded account creation
-- `/dashboard`: calm live-data board for the active captain and primary vessel
+- `/dashboard`: sticky live-header dashboard with one full-width chart and one
+  fixed boat-stats panel for the active vessel
 - `/dashboard/map`: dedicated live-ops chart with AIS traffic and diagnostics
 - `/dashboard/fleet-friends`: buddy-boat monitoring and search/save workflow
 - `/dashboard/settings`: canonical long-form captain settings surface
@@ -220,11 +221,25 @@ authenticated IA:
 ### Dashboard operations
 
 1. Land on `/dashboard`.
-2. Read the current vessel state and compact location map.
-3. Open `/dashboard/map` for full AIS traffic and issue context.
-4. Open `Buddy Boats` when tracking other vessels matters.
-5. Use `/dashboard/settings` for captain profile, vessel defaults, live-source
+2. Read the sticky live header for:
+   - vessel name
+   - MMSI
+   - latitude
+   - longitude
+   - apparent wind speed
+   - SOG
+   - heading
+   - depth
+3. Read the full-width chart sitting directly under the header.
+4. Use the fixed boat-stats panel under the chart for the same core vessel
+   readings.
+5. Open `/dashboard/map` for full AIS traffic and issue context.
+6. Open `Buddy Boats` when tracking other vessels matters.
+7. Use `/dashboard/settings` for captain profile, vessel defaults, live-source
    setup, sharing, security, and local preferences.
+
+The dashboard stats panel is fixed at launch. Per-user panel configurability is
+explicitly deferred.
 
 ## Domain model
 

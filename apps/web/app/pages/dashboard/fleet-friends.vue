@@ -15,19 +15,15 @@ useWebPageSchema({
 const { data, pending, refresh } = await useDashboardOverview('myboat-fleet-friends')
 
 const overview = computed(() => data.value)
+const isCompactViewport = useCompactViewport()
+const isManageBuddiesOpen = shallowRef(false)
 </script>
 
 <template>
   <div class="space-y-6">
     <template v-if="pending">
       <USkeleton class="h-16 rounded-[1.5rem]" />
-      <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(22rem,28rem)]">
-        <USkeleton class="h-[38rem] rounded-[1.75rem]" />
-        <div class="space-y-6">
-          <USkeleton class="h-[22rem] rounded-[1.75rem]" />
-          <USkeleton class="h-[20rem] rounded-[1.75rem]" />
-        </div>
-      </div>
+      <USkeleton class="h-[40rem] rounded-[1.75rem]" />
     </template>
 
     <template v-else-if="overview">
@@ -37,29 +33,20 @@ const overview = computed(() => data.value)
         <div>
           <h1 class="font-display text-3xl text-default">Buddy Boats</h1>
           <p class="mt-1 text-sm text-muted">
-            Search the local AIS library, pull from AIS Hub only when needed, and save the boats you want on this captain page.
+            Keep the fleet chart front and center, then open the manager when you need to search,
+            save, or remove buddy boats for this captain page.
           </p>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <UButton to="/dashboard" color="neutral" variant="soft" icon="i-lucide-arrow-left">
-            Dashboard
-          </UButton>
+        <div class="flex items-center gap-2">
           <UButton
-            to="/dashboard/settings/profile"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-id-card"
+            color="primary"
+            icon="i-lucide-users-round"
+            size="lg"
+            @click="isManageBuddiesOpen = true"
           >
-            Profile
+            Manage Buddies
           </UButton>
-          <UBadge
-            :color="overview.profile ? 'primary' : 'warning'"
-            variant="soft"
-            class="self-start sm:self-center"
-          >
-            {{ overview.profile ? `@${overview.profile.username}` : 'Profile pending' }}
-          </UBadge>
         </div>
       </div>
 
@@ -71,11 +58,26 @@ const overview = computed(() => data.value)
         description="You can save buddy boats now. They will publish on the captain page after the captain profile is finished."
       />
 
-      <FleetFriendsManager
-        :items="overview.followedVessels"
-        :captain-username="overview.profile?.username ?? null"
-        @changed="refresh"
+      <BuddyBoatsMap
+        :vessels="overview.followedVessels"
+        title="Buddy boats chart"
+        description="Saved buddy boats with current AIS positions render here. Open the manager to search AIS Hub, add new boats, or prune the list."
+        height-class="h-[30rem] sm:h-[38rem] lg:h-[46rem] xl:h-[54rem]"
+        empty-description="Open Manage Buddies to search AIS Hub, save the boats you care about, and bring them onto this chart once current coordinates are available."
       />
+
+      <UModal
+        v-model:open="isManageBuddiesOpen"
+        title="Manage buddies"
+        description="Search AIS Hub, save buddy boats to this captain page, and remove boats you no longer want to track."
+        :fullscreen="isCompactViewport"
+        class="max-w-7xl overflow-hidden"
+        scrollable
+      >
+        <template #body>
+          <BuddyBoatTableManager :items="overview.followedVessels" @changed="refresh" />
+        </template>
+      </UModal>
     </template>
 
     <UAlert

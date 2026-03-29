@@ -18,12 +18,12 @@ const totalDistanceNm = computed(() =>
   <div class="space-y-6">
     <div class="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
       <div data-testid="vessel-detail-passages-map">
-        <MarineTrackMap
+        <MyBoatSurfaceMap
           :vessels="[detail.vessel]"
           :passages="detail.passages"
           :waypoints="detail.waypoints"
           height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
-          traffic-mode="off"
+          :show-pin-labels="false"
         />
       </div>
 

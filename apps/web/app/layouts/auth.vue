@@ -1,17 +1,5 @@
 <script setup lang="ts">
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Color Mode types depend on build-time module resolution
-const colorMode = useColorMode() as any
-
-const colorModeIcon = computed(() => {
-  if (colorMode.preference === 'system') return 'i-lucide-monitor'
-  return colorMode.value === 'dark' ? 'i-lucide-moon' : 'i-lucide-sun'
-})
-
-function cycleColorMode() {
-  const modes = ['system', 'light', 'dark'] as const
-  const index = modes.indexOf(colorMode.preference as (typeof modes)[number])
-  colorMode.preference = modes[(index + 1) % modes.length]!
-}
+const { colorModeIcon, cycleColorMode } = useColorModeToggle()
 </script>
 
 <template>

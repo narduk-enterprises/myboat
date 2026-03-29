@@ -44,10 +44,28 @@ Status: UNLOCKED
 
 ### `/dashboard`
 
-- hero/status summary
-- compact current-location map card
-- live vessel data cards
-- compact operational context cards
+- sticky live header
+- full-width half-height map
+- fixed boat-stats panel
+- header fields:
+  - vessel name
+  - MMSI
+  - latitude
+  - longitude
+  - apparent wind speed
+  - SOG
+  - heading
+  - depth
+- stats-panel fields:
+  - vessel name
+  - MMSI
+  - latitude
+  - longitude
+  - apparent wind speed
+  - SOG
+  - heading
+  - depth
+- no per-user dashboard-panel configurability yet
 
 ### `/dashboard/map`
 

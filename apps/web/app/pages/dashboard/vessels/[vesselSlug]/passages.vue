@@ -5,8 +5,27 @@ const route = useRoute()
 const vesselSlug = computed(() => String(route.params.vesselSlug || ''))
 
 const { data, pending } = await useVesselDetail(vesselSlug.value)
+const store = useMyBoatVesselStore()
 
-const detail = computed(() => data.value ?? null)
+if (data.value) {
+  store.hydrateAuthVesselDetail(data.value)
+  store.setActiveAuthVessel(data.value.vessel.id)
+}
+
+watch(
+  data,
+  (value) => {
+    if (!value) {
+      return
+    }
+
+    store.hydrateAuthVesselDetail(value)
+    store.setActiveAuthVessel(value.vessel.id)
+  },
+  { immediate: false },
+)
+
+const detail = computed(() => store.getAuthDetailBySlug(vesselSlug.value))
 
 useSeo({
   title: detail.value?.vessel.name ? `${detail.value.vessel.name} passages` : 'Vessel passages',

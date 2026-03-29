@@ -12,22 +12,14 @@ const props = withDefaults(
 
 const route = useRoute()
 const { isAdmin, user, userMenuLinks } = useMyBoatShell()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Color Mode types depend on build-time module resolution
-const colorMode = useColorMode() as any
+const { colorModeIcon, cycleColorMode } = useColorModeToggle()
 
-const colorModeIcon = computed(() => {
-  if (colorMode.preference === 'system') return 'i-lucide-monitor'
-  return colorMode.value === 'dark' ? 'i-lucide-moon' : 'i-lucide-sun'
-})
+function isActive(link: MyBoatShellLink) {
+  if (link.match === 'prefix') {
+    return route.path === link.to || route.path.startsWith(`${link.to}/`)
+  }
 
-function cycleColorMode() {
-  const modes = ['system', 'light', 'dark'] as const
-  const index = modes.indexOf(colorMode.preference as (typeof modes)[number])
-  colorMode.preference = modes[(index + 1) % modes.length]!
-}
-
-function isActive(to: string) {
-  return route.path === to || route.path.startsWith(`${to}/`)
+  return route.path === link.to
 }
 
 const railLinks = computed<MyBoatShellLink[]>(() =>
@@ -40,10 +32,15 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
         { label: 'Telemetry', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
       ]
     : [
-        { label: 'Overview', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Live Map', to: '/dashboard/map', icon: 'i-lucide-map' },
         { label: 'Buddy Boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-        { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
+        {
+          label: 'Settings',
+          to: '/dashboard/settings',
+          icon: 'i-lucide-sliders-horizontal',
+          match: 'prefix',
+        },
         ...(isAdmin.value
           ? [{ label: 'Admin console', to: '/admin', icon: 'i-lucide-shield-check' }]
           : []),
@@ -60,10 +57,15 @@ const mobileLinks = computed<MyBoatShellLink[]>(() =>
         { label: 'Signal', to: '/admin/telemetry', icon: 'i-lucide-broadcast' },
       ]
     : [
-        { label: 'Overview', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Map', to: '/dashboard/map', icon: 'i-lucide-map' },
         { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
-        { label: 'Settings', to: '/dashboard/settings', icon: 'i-lucide-sliders-horizontal' },
+        {
+          label: 'Settings',
+          to: '/dashboard/settings',
+          icon: 'i-lucide-sliders-horizontal',
+          match: 'prefix',
+        },
       ],
 )
 
@@ -78,13 +80,7 @@ const context = computed(() =>
         eyebrow: 'Internal ops',
         title: 'Keep the fleet calm and explicit',
       }
-    : {
-        chip: 'Captain workspace',
-        description:
-          'Run the primary vessel, open the live map when traffic matters, and keep settings as the canonical place for captain and source decisions.',
-        eyebrow: 'Owner board',
-        title: 'Operate the boat, not the shell',
-      },
+    : null,
 )
 </script>
 
@@ -108,7 +104,7 @@ const context = computed(() =>
                 variant="soft"
                 class="hidden sm:inline-flex"
               >
-                {{ context.chip }}
+                {{ context?.chip || 'Captain workspace' }}
               </UBadge>
               <UButton
                 :icon="colorModeIcon"
@@ -131,7 +127,7 @@ const context = computed(() =>
         class="mx-auto grid max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:px-8 lg:py-8"
       >
         <aside class="hidden lg:block">
-          <div class="marine-operator-panel rounded-[2rem] p-5">
+          <div v-if="context" class="marine-operator-panel rounded-[2rem] p-5">
             <div class="marine-kicker w-fit">{{ context.eyebrow }}</div>
             <h1 class="mt-4 font-display text-3xl leading-tight text-default">
               {{ context.title }}
@@ -141,21 +137,26 @@ const context = computed(() =>
             </p>
           </div>
 
-          <div class="mt-4 space-y-2" role="navigation" aria-label="Section navigation">
+          <div
+            class="space-y-2"
+            :class="context ? 'mt-4' : ''"
+            role="navigation"
+            aria-label="Section navigation"
+          >
             <NuxtLink
               v-for="link in railLinks"
               :key="link.to"
               :to="link.to"
               class="flex items-center gap-3 rounded-[1.35rem] border px-4 py-3 text-sm font-medium transition"
               :class="
-                isActive(link.to)
+                isActive(link)
                   ? 'border-primary/20 bg-primary/10 text-primary shadow-card'
                   : 'border-default/70 bg-default/72 text-muted hover:border-primary/15 hover:bg-default hover:text-default'
               "
             >
               <span
                 class="flex size-9 items-center justify-center rounded-2xl"
-                :class="isActive(link.to) ? 'bg-primary/12' : 'bg-elevated/80'"
+                :class="isActive(link) ? 'bg-primary/12' : 'bg-elevated/80'"
               >
                 <UIcon :name="link.icon" class="size-4" />
               </span>
@@ -163,7 +164,7 @@ const context = computed(() =>
             </NuxtLink>
           </div>
 
-          <div class="marine-operator-panel mt-4 rounded-[1.75rem] p-4">
+          <div v-if="context" class="marine-operator-panel mt-4 rounded-[1.75rem] p-4">
             <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted">Signed in</p>
             <p class="mt-3 font-display text-xl text-default">
               {{ user?.name || user?.email || 'Captain account' }}
@@ -195,7 +196,7 @@ const context = computed(() =>
               :to="link.to"
               class="flex min-w-0 flex-col items-center gap-1 rounded-[1rem] px-2 py-2 text-[0.7rem] font-medium transition"
               :class="
-                isActive(link.to)
+                isActive(link)
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted hover:bg-default/80 hover:text-default'
               "

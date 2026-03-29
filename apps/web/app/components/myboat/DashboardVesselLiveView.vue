@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import type {
-  InstallationSummary,
-  VesselDetailResponse,
-  VesselSnapshotSummary,
-} from '~/types/myboat'
+import type { InstallationSummary, VesselDetailResponse, VesselSnapshotSummary } from '~/types/myboat'
 import { formatCoordinate, formatRelativeTime, formatTimestamp } from '~/utils/marine'
 
 const props = defineProps<{
   detail: VesselDetailResponse
 }>()
+const store = useMyBoatVesselStore()
+const entry = computed(() => store.getAuthEntryBySlug(props.detail.vessel.slug))
 
 const primaryInstallation = computed<InstallationSummary | null>(
   () =>
@@ -16,92 +14,34 @@ const primaryInstallation = computed<InstallationSummary | null>(
     props.detail.installations[0] ||
     null,
 )
-const signalKUrlCandidates = computed(() => {
-  const candidates = new Set<string>()
-
-  for (const installation of props.detail.installations) {
-    for (const rawUrl of [
-      installation.collectorSignalKUrl,
-      installation.relaySignalKUrl,
-      installation.signalKUrl,
-    ]) {
-      const normalizedUrl = rawUrl?.trim()
-      if (normalizedUrl) {
-        candidates.add(normalizedUrl)
-      }
-    }
-  }
-
-  return Array.from(candidates)
-})
-const liveFeedEnabled = computed(() => import.meta.client && signalKUrlCandidates.value.length > 0)
-const {
-  activeUrl: liveFeedActiveUrl,
-  connectionState: liveFeedConnectionState,
-  lastDeltaAt: liveFeedLastDeltaAt,
-  selfSnapshot,
-} = useSignalKAisFeed({
-  enabled: liveFeedEnabled,
-  urls: signalKUrlCandidates,
-})
 const recentPassages = computed(() => props.detail.passages.slice(0, 3))
 const publicPath = computed(() => `/${props.detail.profile.username}/${props.detail.vessel.slug}`)
-
-function mergeSnapshots(
-  fallback: VesselSnapshotSummary | null,
-  live: VesselSnapshotSummary | null,
-): VesselSnapshotSummary | null {
-  if (!fallback && !live) {
-    return null
-  }
-
-  return {
-    observedAt: live?.observedAt || fallback?.observedAt || null,
-    positionLat: live?.positionLat ?? fallback?.positionLat ?? null,
-    positionLng: live?.positionLng ?? fallback?.positionLng ?? null,
-    headingMagnetic: live?.headingMagnetic ?? fallback?.headingMagnetic ?? null,
-    speedOverGround: live?.speedOverGround ?? fallback?.speedOverGround ?? null,
-    speedThroughWater: live?.speedThroughWater ?? fallback?.speedThroughWater ?? null,
-    windSpeedApparent: live?.windSpeedApparent ?? fallback?.windSpeedApparent ?? null,
-    windAngleApparent: live?.windAngleApparent ?? fallback?.windAngleApparent ?? null,
-    depthBelowTransducer: live?.depthBelowTransducer ?? fallback?.depthBelowTransducer ?? null,
-    waterTemperatureKelvin:
-      live?.waterTemperatureKelvin ?? fallback?.waterTemperatureKelvin ?? null,
-    batteryVoltage: live?.batteryVoltage ?? fallback?.batteryVoltage ?? null,
-    engineRpm: live?.engineRpm ?? fallback?.engineRpm ?? null,
-    statusNote: live?.statusNote || fallback?.statusNote || null,
-  }
-}
-
-const liveSnapshot = computed(() =>
-  mergeSnapshots(props.detail.vessel.liveSnapshot, selfSnapshot.value),
+const liveSnapshot = computed<VesselSnapshotSummary | null>(
+  () => entry.value?.mergedSnapshot || props.detail.vessel.liveSnapshot || null,
 )
-const liveVessel = computed(() => ({
-  ...props.detail.vessel,
-  liveSnapshot: liveSnapshot.value,
-}))
+const liveVessel = computed(() => entry.value?.vessel || props.detail.vessel)
 const liveFeedSourceUrl = computed(
   () =>
-    liveFeedActiveUrl.value ||
+    entry.value?.live.activeUrl ||
     primaryInstallation.value?.collectorSignalKUrl ||
     primaryInstallation.value?.relaySignalKUrl ||
     primaryInstallation.value?.signalKUrl ||
     null,
 )
 const liveFeedStatus = computed(() => {
-  switch (liveFeedConnectionState.value) {
+  switch (entry.value?.live.connectionState) {
     case 'connected':
-      return liveFeedLastDeltaAt.value
-        ? `Live feed connected · updated ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
+      return entry.value?.live.lastDeltaAt
+        ? `Live feed connected · updated ${formatRelativeTime(new Date(entry.value.live.lastDeltaAt).toISOString())}`
         : 'Live feed connected'
     case 'connecting':
-      return 'Connecting to Tideye Signal K'
+      return 'Connecting to the MyBoat collector feed'
     case 'error':
       return 'Live feed unavailable'
     default:
-      return signalKUrlCandidates.value.length
+      return entry.value?.live.hasSignalKSource
         ? 'Live feed standing by'
-        : 'No live Signal K endpoint linked'
+        : 'No live collector feed linked'
   }
 })
 </script>
@@ -111,13 +51,12 @@ const liveFeedStatus = computed(() => {
     <div class="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
       <div class="space-y-6">
         <div data-testid="vessel-detail-live-map">
-          <MarineTrackMap
-            :vessels="[liveVessel]"
-            :passages="detail.passages"
-            :waypoints="detail.waypoints"
+          <MyBoatCurrentLocationMap
+            :vessel="liveVessel"
             :installations="detail.installations"
+            :ais-contacts="store.serializeAisContacts(entry)"
+            :has-signal-k-source="entry?.live.hasSignalKSource"
             height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
-            traffic-mode="auto"
           />
         </div>
 

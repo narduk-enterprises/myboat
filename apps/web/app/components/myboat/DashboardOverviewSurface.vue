@@ -1,21 +1,6 @@
 <script setup lang="ts">
-import type {
-  DashboardOverview,
-  InstallationSummary,
-  PassageSummary,
-  VesselCardSummary,
-  VesselSnapshotSummary,
-} from '~/types/myboat'
-import {
-  formatCoordinate,
-  formatRelativeTime,
-  formatTimestamp,
-  getConnectionTone,
-} from '~/utils/marine'
-
-const props = defineProps<{
-  overview: DashboardOverview
-}>()
+import type { InstallationSummary, PassageSummary, VesselSnapshotSummary } from '~/types/myboat'
+import { formatCoordinate, formatRelativeTime, getConnectionTone } from '~/utils/marine'
 
 const {
   convertAngle,
@@ -27,448 +12,218 @@ const {
 
 function toRoundedText(value: number | null | undefined, digits = 1) {
   if (value === null || value === undefined) {
-    return null
+    return '—'
   }
 
   return value.toFixed(digits)
 }
 
-const primaryVessel = computed<VesselCardSummary | null>(
-  () =>
-    props.overview.vessels.find((vessel) => vessel.isPrimary) || props.overview.vessels[0] || null,
-)
+function extractMmsi(source: string | null | undefined) {
+  const match = source?.match(/\b(\d{9})\b/)
+  return match?.[1] || 'Pending'
+}
+
+const store = useMyBoatVesselStore()
+
+const primaryEntry = computed(() => store.authActiveEntry.value)
+const primaryVessel = computed(() => primaryEntry.value?.vessel || null)
 const primaryInstallation = computed<InstallationSummary | null>(
   () =>
-    props.overview.installations.find(
-      (installation) => installation.vesselId === primaryVessel.value?.id && installation.isPrimary,
-    ) ||
-    props.overview.installations.find(
-      (installation) => installation.vesselId === primaryVessel.value?.id,
-    ) ||
-    props.overview.installations[0] ||
-    null,
+    (primaryEntry.value?.installations.find((installation) => installation.isPrimary) ||
+      primaryEntry.value?.installations[0] ||
+      null) as InstallationSummary | null,
 )
-const primarySnapshot = computed<VesselSnapshotSummary | null>(
-  () => primaryVessel.value?.liveSnapshot ?? null,
-)
+const primarySnapshot = computed<VesselSnapshotSummary | null>(() => primaryVessel.value?.liveSnapshot ?? null)
 const latestPassage = computed<PassageSummary | null>(
-  () => primaryVessel.value?.latestPassage || props.overview.recentPassages[0] || null,
+  () => primaryEntry.value?.passages[0] || primaryVessel.value?.latestPassage || null,
 )
-const hasMapFix = computed(
-  () =>
-    primarySnapshot.value?.positionLat !== null &&
-    primarySnapshot.value?.positionLat !== undefined &&
-    primarySnapshot.value?.positionLng !== null &&
-    primarySnapshot.value?.positionLng !== undefined,
+const vesselMmsi = computed(() => extractMmsi(primarySnapshot.value?.source))
+const vesselLatitude = computed(() =>
+  formatCoordinate(primarySnapshot.value?.positionLat ?? null, true),
 )
-const publicProfilePath = computed(() =>
-  props.overview.profile ? `/${props.overview.profile.username}` : null,
+const vesselLongitude = computed(() =>
+  formatCoordinate(primarySnapshot.value?.positionLng ?? null, false),
 )
-const vesselDetailPath = computed(() =>
-  primaryVessel.value ? `/dashboard/vessels/${primaryVessel.value.slug}` : null,
-)
-const installationDetailPath = computed(() =>
-  primaryInstallation.value ? `/dashboard/installations/${primaryInstallation.value.id}` : null,
-)
-const sourceBadgeTone = computed(() =>
-  getConnectionTone(
-    primaryInstallation.value?.connectionState || 'idle',
-    primaryInstallation.value?.lastSeenAt,
-  ),
-)
-const currentFixLatitude = computed(() =>
-  hasMapFix.value ? formatCoordinate(primarySnapshot.value?.positionLat ?? null, true) : 'No live fix yet',
-)
-const currentFixLongitude = computed(() =>
-  hasMapFix.value ? formatCoordinate(primarySnapshot.value?.positionLng ?? null, false) : null,
-)
-const currentFixObservedLabel = computed(() =>
-  primarySnapshot.value?.observedAt
-    ? `Observed ${formatRelativeTime(primarySnapshot.value.observedAt)}`
-    : 'Waiting for the first position update.',
-)
-const nextAction = computed(() => {
-  if (!props.overview.profile) {
+const apparentWind = computed(() => toRoundedText(convertSpeed(primarySnapshot.value?.windSpeedApparent)))
+const speedOverGround = computed(() => toRoundedText(convertSpeed(primarySnapshot.value?.speedOverGround)))
+const heading = computed(() => toRoundedText(convertAngle(primarySnapshot.value?.headingMagnetic), 0))
+const depth = computed(() => toRoundedText(convertDepth(primarySnapshot.value?.depthBelowTransducer)))
+const headerMetrics = computed(() => [
+  { label: 'MMSI', value: vesselMmsi.value },
+  { label: 'Lat', value: vesselLatitude.value },
+  { label: 'Lng', value: vesselLongitude.value },
+  { label: 'AWS', value: `${apparentWind.value} ${speedUnitLabel.value}` },
+  { label: 'SOG', value: `${speedOverGround.value} ${speedUnitLabel.value}` },
+  { label: 'Heading', value: `${heading.value}°` },
+  { label: 'Depth', value: `${depth.value} ${depthUnitLabel.value}` },
+])
+const statsCards = computed(() => [
+  {
+    hint: primaryVessel.value?.vesselType || 'Primary launch vessel',
+    label: 'Vessel name',
+    value: primaryVessel.value?.name || 'Pending',
+  },
+  {
+    hint: 'Reserved until a vessel MMSI is linked into the app record.',
+    label: 'MMSI',
+    value: vesselMmsi.value,
+  },
+  {
+    hint: primarySnapshot.value?.observedAt
+      ? `Observed ${formatRelativeTime(primarySnapshot.value.observedAt)}`
+      : 'No live fix yet',
+    label: 'Latitude',
+    value: vesselLatitude.value,
+  },
+  {
+    hint: latestPassage.value?.title || 'No passage pinned yet',
+    label: 'Longitude',
+    value: vesselLongitude.value,
+  },
+  {
+    hint: 'Apparent wind speed from the active feed.',
+    label: 'Apparent wind',
+    unit: speedUnitLabel.value,
+    value: apparentWind.value,
+  },
+  {
+    hint: 'Speed over ground from the active feed.',
+    label: 'SOG',
+    unit: speedUnitLabel.value,
+    value: speedOverGround.value,
+  },
+  {
+    hint: 'Magnetic heading from the current snapshot.',
+    label: 'Heading',
+    unit: '°',
+    value: heading.value,
+  },
+  {
+    hint: 'Current sounding at the transducer.',
+    label: 'Depth',
+    unit: depthUnitLabel.value,
+    value: depth.value,
+  },
+])
+const setupAlert = computed(() => {
+  if (!store.authState.value.profile) {
     return {
-      description:
-        'Finish captain identity, vessel setup, and the first live-data source so the dashboard can anchor to one real boat.',
-      label: 'Finish setup',
-      title: 'Captain setup is still incomplete',
+      description: 'Finish onboarding to attach the captain identity, primary vessel, and first live-data source.',
       to: '/dashboard/onboarding',
-      tone: 'warning' as const,
+      title: 'Captain setup is still incomplete',
     }
   }
 
   if (!primaryVessel.value) {
     return {
-      description: 'Add the first vessel so live telemetry, sharing, and buddy-boat context have a clear home.',
-      label: 'Add vessel',
-      title: 'The dashboard still needs a vessel',
+      description: 'Add the primary vessel so the dashboard has a real boat to anchor the map and bridge stats.',
       to: '/dashboard/onboarding',
-      tone: 'warning' as const,
+      title: 'No primary vessel yet',
     }
   }
 
   if (!primaryInstallation.value) {
     return {
-      description: 'Link a live-data source so the vessel can publish position, AIS context, and bridge metrics.',
-      label: 'Open settings',
-      title: 'No live-data source is linked yet',
+      description: 'Link one live-data source for the vessel so the dashboard can fill in the bridge stats.',
       to: '/dashboard/settings',
-      tone: 'warning' as const,
+      title: 'No live-data source linked',
     }
   }
 
   if (!primarySnapshot.value?.observedAt) {
     return {
-      description: 'The vessel and source are saved, but telemetry has not landed yet. Check the source and start sending data.',
-      label: installationDetailPath.value ? 'Open live source' : 'Open settings',
+      description: 'The source is saved, but telemetry has not landed yet. Open the source detail and start sending data.',
+      to: primaryInstallation.value ? `/dashboard/installations/${primaryInstallation.value.id}` : '/dashboard/settings',
       title: 'Waiting for the first live fix',
-      to: installationDetailPath.value || '/dashboard/settings',
-      tone: 'warning' as const,
     }
   }
 
-  return {
-    description: 'The primary vessel is reporting. Use the live map for AIS traffic, selected-contact detail, and issue context.',
-    label: 'Open live map',
-    title: 'The operator board is live',
-    to: '/dashboard/map',
-    tone: 'success' as const,
-  }
+  return null
 })
-
-const summaryCards = computed(() => [
-  {
-    hint:
-      [primaryVessel.value?.vesselType, primaryVessel.value?.homePort].filter(Boolean).join(' · ') ||
-      'Add the vessel type and home port when ready.',
-    icon: 'i-lucide-ship',
-    label: 'Primary vessel',
-    value: primaryVessel.value?.name || 'Pending',
-  },
-  {
-    hint:
-      primaryInstallation.value?.lastSeenAt
-        ? `Last seen ${formatRelativeTime(primaryInstallation.value.lastSeenAt)}`
-        : 'No live source reporting yet.',
-    icon: 'i-lucide-radio',
-    label: 'Live source',
-    value: primaryInstallation.value?.label || 'Pending',
-  },
-  {
-    hint: props.overview.profile?.headline || 'Claim the public handle when you are ready to share.',
-    icon: 'i-lucide-share-2',
-    label: 'Public profile',
-    value: props.overview.profile ? `@${props.overview.profile.username}` : 'Pending',
-  },
-  {
-    hint: props.overview.followedVessels.length ? 'Saved buddy boats for the captain surface.' : 'No buddy boats saved yet.',
-    icon: 'i-lucide-users',
-    label: 'Buddy Boats',
-    value: String(props.overview.followedVessels.length),
-  },
-])
-
-const liveMetrics = computed(() => {
-  const snapshot = primarySnapshot.value
-
-  if (!snapshot) {
-    return []
-  }
-
-  return [
-    {
-      hint: formatTimestamp(snapshot.observedAt),
-      icon: 'i-lucide-clock-3',
-      label: 'Observed',
-      unit: '',
-      value: snapshot.observedAt ? formatRelativeTime(snapshot.observedAt) : null,
-    },
-    {
-      hint: 'Speed over ground from the active feed.',
-      icon: 'i-lucide-gauge',
-      label: 'Speed over ground',
-      unit: speedUnitLabel.value,
-      value: toRoundedText(convertSpeed(snapshot.speedOverGround)),
-    },
-    {
-      hint: 'Magnetic heading from the latest snapshot.',
-      icon: 'i-lucide-compass',
-      label: 'Heading',
-      unit: '°',
-      value: toRoundedText(convertAngle(snapshot.headingMagnetic), 0),
-    },
-    {
-      hint: 'Apparent wind speed from the current feed.',
-      icon: 'i-lucide-wind',
-      label: 'Apparent wind',
-      unit: speedUnitLabel.value,
-      value: toRoundedText(convertSpeed(snapshot.windSpeedApparent)),
-    },
-    {
-      hint: 'Current sounding at the transducer.',
-      icon: 'i-lucide-waves',
-      label: 'Depth',
-      unit: depthUnitLabel.value,
-      value: toRoundedText(convertDepth(snapshot.depthBelowTransducer)),
-    },
-    {
-      hint: 'House or starter battery from the latest snapshot.',
-      icon: 'i-lucide-battery-medium',
-      label: 'Battery',
-      unit: 'V',
-      value: toRoundedText(snapshot.batteryVoltage),
-    },
-  ].map((metric) => ({
-    ...metric,
-    value: metric.value || '--',
-  }))
-})
+const sourceTone = computed(() =>
+  getConnectionTone(
+    primaryInstallation.value?.connectionState || 'idle',
+    primaryInstallation.value?.lastSeenAt,
+  ),
+)
 </script>
 
 <template>
-  <div class="space-y-8">
-    <section class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8">
-      <div class="relative z-10 grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <div class="space-y-5">
-          <div class="marine-kicker w-fit">Captain workspace</div>
-
-          <div>
-            <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
-              {{
-                props.overview.profile
-                  ? `Ready watch for ${props.overview.profile.captainName}`
-                  : 'Bring the first vessel online'
-              }}
-            </h1>
-            <p class="mt-3 max-w-3xl text-base text-muted sm:text-lg">
-              {{
-                props.overview.profile
-                  ? 'One captain, one primary vessel, and one calm operational board for the live data that matters right now.'
-                  : 'MyBoat launches around a single captain and vessel pair. Finish setup once, then run the boat from the dashboard.'
-              }}
-            </p>
+  <div class="space-y-6">
+    <section class="sticky top-4 z-20">
+      <div
+        class="rounded-[1.5rem] border border-default/70 bg-default/92 px-4 py-4 shadow-card backdrop-blur sm:px-5"
+      >
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div class="min-w-0">
+            <p class="text-xs uppercase tracking-[0.24em] text-muted">Live details</p>
+            <div class="mt-2 flex flex-wrap items-center gap-3">
+              <h1 class="truncate font-display text-2xl text-default sm:text-3xl">
+                {{ primaryVessel?.name || 'Primary vessel pending' }}
+              </h1>
+              <UBadge :color="sourceTone" variant="soft">
+                {{ primaryInstallation?.connectionState || 'setup pending' }}
+              </UBadge>
+            </div>
           </div>
 
-          <div class="flex flex-wrap gap-2">
-            <UBadge v-if="props.overview.profile" color="primary" variant="soft">
-              @{{ props.overview.profile.username }}
-            </UBadge>
-            <UBadge :color="sourceBadgeTone" variant="soft">
-              {{ primaryInstallation?.connectionState || 'setup pending' }}
-            </UBadge>
-            <UBadge v-if="primaryVessel" color="neutral" variant="soft">
-              {{ primaryVessel.name }}
-            </UBadge>
-          </div>
-
-          <div class="flex flex-wrap gap-3">
-            <UButton :to="nextAction.to" :color="nextAction.tone === 'success' ? 'primary' : 'warning'">
-              {{ nextAction.label }}
-            </UButton>
-            <UButton to="/dashboard/settings" color="neutral" variant="soft" icon="i-lucide-sliders-horizontal">
-              Settings
-            </UButton>
-            <UButton
-              v-if="publicProfilePath"
-              :to="publicProfilePath"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-share-2"
+          <div class="grid gap-2 sm:grid-cols-3 xl:grid-cols-7">
+            <div
+              v-for="metric in headerMetrics"
+              :key="metric.label"
+              class="rounded-[1rem] border border-default bg-elevated/70 px-3 py-2"
             >
-              Public profile
-            </UButton>
-          </div>
-        </div>
-
-        <div class="grid self-start gap-3 sm:grid-cols-2">
-          <div
-            v-for="card in summaryCards"
-            :key="card.label"
-            class="metric-shell rounded-[1.5rem] p-4 shadow-card"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">{{ card.label }}</p>
-                <p class="mt-2 font-display text-2xl text-default">{{ card.value }}</p>
-                <p class="mt-2 text-xs text-muted">{{ card.hint }}</p>
-              </div>
-              <div class="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <UIcon :name="card.icon" class="size-5" />
-              </div>
+              <p class="text-[0.65rem] uppercase tracking-[0.2em] text-muted">{{ metric.label }}</p>
+              <p class="mt-1 text-sm font-medium text-default">{{ metric.value }}</p>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(19rem,0.82fr)]">
-      <UCard class="border-default/80 bg-default/90 shadow-card">
-        <template #header>
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 class="font-display text-2xl text-default">Current location</h2>
-              <p class="mt-1 text-sm text-muted">
-                A compact chart for the active vessel. Use the live map for full AIS traffic and diagnostic depth.
-              </p>
-            </div>
+    <UAlert
+      v-if="setupAlert"
+      color="warning"
+      variant="soft"
+      :title="setupAlert.title"
+      :description="setupAlert.description"
+    >
+      <template #actions>
+        <UButton :to="setupAlert.to" color="warning" variant="soft" icon="i-lucide-anchor">
+          Resolve
+        </UButton>
+      </template>
+    </UAlert>
 
-            <UButton to="/dashboard/map" color="neutral" variant="soft" icon="i-lucide-expand">
-              Open live map
-            </UButton>
-          </div>
-        </template>
-
-        <div v-if="primaryVessel && hasMapFix" data-testid="dashboard-current-location-map">
-          <MarineTrackMap
-            :vessels="[primaryVessel]"
-            :passages="latestPassage ? [latestPassage] : []"
-            :installations="primaryInstallation ? [primaryInstallation] : []"
-            height-class="h-[17rem] sm:h-[20rem] lg:h-[22rem]"
-            traffic-mode="off"
-          />
-        </div>
-
-        <MarineEmptyState
-          v-else
-          icon="i-lucide-navigation"
-          title="Current location is still quiet"
-          description="Once the primary vessel reports a live fix, this compact chart becomes the fast read on position and route context."
-          compact
-        >
-          <UButton :to="nextAction.to" :color="nextAction.tone === 'success' ? 'primary' : 'warning'">
-            {{ nextAction.label }}
-          </UButton>
-        </MarineEmptyState>
-      </UCard>
-
-      <div class="space-y-6">
-        <UCard class="border-default/80 bg-default/90 shadow-card">
-          <template #header>
-            <div>
-              <h2 class="font-display text-2xl text-default">Current status</h2>
-              <p class="mt-1 text-sm text-muted">The next operational move without the extra dashboard noise.</p>
-            </div>
-          </template>
-
-          <div class="space-y-4 text-sm text-muted">
-            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-              <p class="text-xs uppercase tracking-wide text-muted">Next action</p>
-              <p class="mt-2 font-medium text-default">{{ nextAction.title }}</p>
-              <p class="mt-2">{{ nextAction.description }}</p>
-            </div>
-
-            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-              <p class="text-xs uppercase tracking-wide text-muted">Current fix</p>
-              <p class="mt-2 font-medium text-default">{{ currentFixLatitude }}</p>
-              <p v-if="currentFixLongitude" class="mt-1 font-medium text-default">
-                {{ currentFixLongitude }}
-              </p>
-              <p class="mt-2 text-xs text-muted">{{ currentFixObservedLabel }}</p>
-            </div>
-
-            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-              <p class="text-xs uppercase tracking-wide text-muted">Source posture</p>
-              <p class="mt-2 font-medium text-default">
-                {{ primaryInstallation?.label || 'Source pending' }}
-              </p>
-              <p class="mt-1 text-xs text-muted">
-                {{
-                  primaryInstallation?.lastSeenAt
-                    ? `Last seen ${formatRelativeTime(primaryInstallation.lastSeenAt)}`
-                    : 'No live-data source heartbeat yet.'
-                }}
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
-              <p class="text-xs uppercase tracking-wide text-muted">Route memory</p>
-              <p class="mt-2 font-medium text-default">
-                {{ latestPassage?.title || 'No passage logged yet' }}
-              </p>
-              <p class="mt-1 text-xs text-muted">
-                {{
-                  latestPassage
-                    ? `${latestPassage.departureName || 'Departure'} → ${latestPassage.arrivalName || 'Arrival pending'}`
-                    : 'The live board stays sparse until the vessel starts building passage history.'
-                }}
-              </p>
-            </div>
-          </div>
-        </UCard>
-
-        <UCard v-if="vesselDetailPath" class="border-default/80 bg-default/90 shadow-card">
-          <template #header>
-            <div>
-              <h2 class="font-display text-2xl text-default">Context links</h2>
-              <p class="mt-1 text-sm text-muted">Legacy detail pages stay reachable without competing for primary navigation.</p>
-            </div>
-          </template>
-
-          <div class="flex flex-wrap gap-3">
-            <UButton :to="vesselDetailPath" color="neutral" variant="soft" icon="i-lucide-ship">
-              Vessel detail
-            </UButton>
-            <UButton
-              v-if="installationDetailPath"
-              :to="installationDetailPath"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-cpu"
-            >
-              Live source
-            </UButton>
-            <UButton to="/dashboard/fleet-friends" color="neutral" variant="soft" icon="i-lucide-users">
-              Buddy Boats
-            </UButton>
-          </div>
-        </UCard>
-      </div>
-    </section>
-
-    <section>
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 class="font-display text-3xl text-default">Live data board</h2>
-          <p class="mt-1 text-sm text-muted">
-            Core bridge signals only. The deeper chart and AIS workload stay on the dedicated live map route.
-          </p>
-        </div>
-      </div>
-
-      <div v-if="liveMetrics.length" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <MarineMetricCard
-          v-for="metric in liveMetrics"
-          :key="metric.label"
-          :label="metric.label"
-          :value="metric.value"
-          :unit="metric.unit"
-          :hint="metric.hint"
-          :icon="metric.icon"
+    <section class="overflow-hidden rounded-[1.75rem] border border-default/80 bg-default/90 shadow-card">
+      <div data-testid="dashboard-current-location-map">
+        <MyBoatCurrentLocationMiniMap
+          :vessel="primaryVessel"
+          height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
         />
       </div>
-
-      <MarineEmptyState
-        v-else
-        class="mt-5"
-        icon="i-lucide-radio"
-        title="No live data yet"
-        description="Finish setup and start the live-data source to turn this board into the captain's fast operational read."
-      >
-        <UButton :to="nextAction.to" :color="nextAction.tone === 'success' ? 'primary' : 'warning'">
-          {{ nextAction.label }}
-        </UButton>
-      </MarineEmptyState>
-
-      <UAlert
-        v-if="primarySnapshot?.statusNote"
-        class="mt-5 rounded-[1.5rem]"
-        color="primary"
-        variant="soft"
-        icon="i-lucide-message-square-text"
-        :description="primarySnapshot.statusNote"
-      />
     </section>
+
+    <UCard class="border-default/80 bg-default/90 shadow-card">
+      <template #header>
+        <div>
+          <h2 class="font-display text-2xl text-default">Boat stats</h2>
+          <p class="mt-1 text-sm text-muted">
+            Fixed launch layout for the operator board. This panel is not configurable yet.
+          </p>
+        </div>
+      </template>
+
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MarineMetricCard
+          v-for="card in statsCards"
+          :key="card.label"
+          :label="card.label"
+          :value="card.value"
+          :unit="card.unit || ''"
+          :hint="card.hint"
+        />
+      </div>
+    </UCard>
   </div>
 </template>

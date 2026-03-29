@@ -4,11 +4,33 @@ definePageMeta({ layout: 'landing' })
 const route = useRoute()
 const username = computed(() => String(route.params.username || ''))
 const vesselSlug = computed(() => String(route.params.vesselSlug || ''))
+const store = useMyBoatVesselStore()
 
 const { data, error, pending, refreshDetail, lastRefreshCompletedAt, refreshIntervalMs } =
   await useLivePublicVesselDetail(username.value, vesselSlug.value)
 
-const detail = computed(() => data.value ?? null)
+watch([username, vesselSlug], () => {
+  store.setActivePublicVessel(null)
+}, { immediate: true })
+
+watch(
+  () => data.value,
+  (nextDetail) => {
+    if (!nextDetail) {
+      return
+    }
+
+    store.hydratePublicVesselDetail(nextDetail)
+    store.setActivePublicVessel(`${nextDetail.profile.username}/${nextDetail.vessel.slug}`)
+  },
+  { immediate: true },
+)
+
+const detail = computed(() => store.getPublicDetail(username.value, vesselSlug.value))
+
+onBeforeUnmount(() => {
+  store.setActivePublicVessel(null)
+})
 
 useSeo({
   title: detail.value
@@ -31,7 +53,6 @@ useWebPageSchema({
   <div class="space-y-8">
     <PublicVesselLiveDashboard
       v-if="detail"
-      :detail="detail"
       :refreshing="pending"
       :last-refresh-completed-at="lastRefreshCompletedAt"
       :refresh-interval-ms="refreshIntervalMs"

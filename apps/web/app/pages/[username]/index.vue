@@ -6,13 +6,29 @@ definePageMeta({ layout: 'landing' })
 
 const route = useRoute()
 const username = computed(() => String(route.params.username || ''))
+const store = useMyBoatVesselStore()
 
 const { data, error } = await usePublicProfile(username.value)
 
+watch(
+  () => data.value,
+  (nextProfile) => {
+    store.setActivePublicVessel(null)
+
+    if (!nextProfile) {
+      return
+    }
+
+    store.hydratePublicProfile(nextProfile)
+  },
+  { immediate: true },
+)
+
 const profile = computed(() => data.value ?? null)
+const publicVessels = computed(() => store.getPublicProfileEntries(username.value))
 const publicPassages = computed<PassageSummary[]>(() => {
   return (
-    profile.value?.vessels
+    publicVessels.value
       .map((vessel) => vessel.latestPassage)
       .filter((passage): passage is PassageSummary => passage !== null) ?? []
   )
@@ -89,16 +105,19 @@ useWebPageSchema({
         </div>
       </section>
 
-      <MarineTrackMap
-        :vessels="profile.vessels"
+      <MyBoatSurfaceMap
+        :vessels="publicVessels"
         :passages="publicPassages"
         height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
-        traffic-mode="off"
+        :show-focus-panel="false"
+        :show-layer-toggles="false"
+        :show-stats-rail="false"
+        :show-pin-labels="false"
       />
 
       <section data-testid="public-vessel-grid" class="grid gap-5 lg:grid-cols-2">
         <VesselSummaryCard
-          v-for="vessel in profile.vessels"
+          v-for="vessel in publicVessels"
           :key="vessel.id"
           :vessel="vessel"
           :to="`/${profile.profile.username}/${vessel.slug}`"

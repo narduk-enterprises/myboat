@@ -13,8 +13,25 @@ useWebPageSchema({
 })
 
 const { data, pending } = await useDashboardOverview()
+const store = useMyBoatVesselStore()
 
-const overview = computed(() => data.value)
+if (data.value) {
+  store.hydrateAuthOverview(data.value)
+}
+
+watch(
+  data,
+  (value) => {
+    if (value) {
+      store.hydrateAuthOverview(value)
+    }
+  },
+  { immediate: false },
+)
+
+const hasDashboardState = computed(
+  () => Boolean(store.authActiveEntry.value || store.authState.value.profile),
+)
 </script>
 
 <template>
@@ -33,7 +50,7 @@ const overview = computed(() => data.value)
       </div>
     </template>
 
-    <DashboardOverviewSurface v-else-if="overview" :overview="overview" />
+    <DashboardOverviewSurface v-else-if="hasDashboardState" />
 
     <UAlert
       v-else

@@ -15,6 +15,7 @@ useWebPageSchema({
 })
 
 const { data: overviewData, pending: overviewPending } = await useDashboardOverview('myboat-dashboard-map')
+const store = useMyBoatVesselStore()
 
 const overview = computed(() => overviewData.value)
 const primaryVesselSlug = computed(
@@ -38,10 +39,39 @@ const { data: detailData, pending: detailPending } = await useAsyncData(
   },
 )
 
-const detail = computed(() => detailData.value)
 const pending = computed(
   () => overviewPending.value || (Boolean(primaryVesselSlug.value) && detailPending.value),
 )
+
+if (overviewData.value) {
+  store.hydrateAuthOverview(overviewData.value)
+}
+
+if (detailData.value) {
+  store.hydrateAuthVesselDetail(detailData.value)
+}
+
+watch(
+  overviewData,
+  (value) => {
+    if (value) {
+      store.hydrateAuthOverview(value)
+    }
+  },
+  { immediate: false },
+)
+
+watch(
+  detailData,
+  (value) => {
+    if (value) {
+      store.hydrateAuthVesselDetail(value)
+    }
+  },
+  { immediate: false },
+)
+
+const hasMapState = computed(() => Boolean(store.authActiveEntry.value?.vessel))
 </script>
 
 <template>
@@ -61,7 +91,7 @@ const pending = computed(
       </div>
     </template>
 
-    <DashboardMapSurface v-else-if="detail" :detail="detail" />
+    <DashboardMapSurface v-else-if="hasMapState" />
 
     <MarineEmptyState
       v-else

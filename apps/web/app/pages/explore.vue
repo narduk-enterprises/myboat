@@ -7,12 +7,43 @@ definePageMeta({ layout: 'landing' })
 const liveFilter = ref<'all' | 'live' | 'recent' | 'stale'>('all')
 const vesselTypeFilter = ref<string>('All vessel types')
 const regionFilter = ref<string>('All regions')
+const store = useMyBoatVesselStore()
 
 const { data, error } = await usePublicExplore()
 
 const explore = computed(() => data.value)
-const items = computed<PublicExploreItem[]>(() => explore.value?.items ?? [])
-const featuredItems = computed<PublicExploreItem[]>(() => explore.value?.featuredItems ?? [])
+watch(
+  () => data.value,
+  (nextExplore) => {
+    store.setActivePublicVessel(null)
+
+    if (!nextExplore) {
+      return
+    }
+
+    store.hydratePublicExplore(nextExplore)
+  },
+  { immediate: true },
+)
+
+const items = computed<PublicExploreItem[]>(() => store.getPublicExploreItems())
+const featuredItems = computed<PublicExploreItem[]>(() => {
+  return (
+    explore.value?.featuredItems.map((item) => {
+      const entry = store.getPublicEntry(item.profile.username, item.vessel.slug)
+      if (!entry?.profile || !entry.vessel || !entry.freshnessState) {
+        return item
+      }
+
+      return {
+        profile: entry.profile,
+        vessel: entry.vessel,
+        freshnessState: entry.freshnessState,
+        lastObservedAt: entry.mergedSnapshot?.observedAt || entry.storedSnapshot?.observedAt || null,
+      } satisfies PublicExploreItem
+    }) ?? []
+  )
+})
 
 const vesselTypeOptions = computed(() => [
   'All vessel types',
@@ -140,12 +171,15 @@ const discoveryRules = [
           </div>
         </template>
 
-        <MarineTrackMap
+        <MyBoatSurfaceMap
           v-if="filteredItems.length"
           :vessels="mapVessels"
           :passages="mapPassages"
           height-class="h-[22rem] sm:h-[28rem] lg:h-[34rem]"
-          traffic-mode="off"
+          :show-focus-panel="false"
+          :show-layer-toggles="false"
+          :show-stats-rail="false"
+          :show-pin-labels="false"
         />
 
         <MarineEmptyState

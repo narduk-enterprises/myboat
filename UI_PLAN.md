@@ -64,7 +64,7 @@ Status: UNLOCKED
   - logged in: brand plus a reduced public nav; dashboard destinations live in
     the account menu instead of the public header
 - Dashboard nav:
-  - `Overview`
+  - `Dashboard`
   - `Live Map`
   - `Buddy Boats`
   - `Settings`
@@ -176,16 +176,31 @@ Status: UNLOCKED
 - Purpose:
   - captain home for the single-vessel launch product
 - Primary sections:
-  - calm hero/status summary
-  - compact current-location map card
-  - live vessel data cards for the primary vessel
-  - compact operational context cards
-- Primary CTA:
-  - open live map
-- Secondary CTA:
-  - finish setup when captain, vessel, or live source is missing
-  - open settings
-  - open contextual vessel detail
+  - compact sticky live header
+  - full-width map at roughly half-height
+  - one fixed boat-stats panel under the map
+- Sticky header fields:
+  - vessel name
+  - MMSI
+  - latitude
+  - longitude
+  - apparent wind speed
+  - SOG
+  - heading
+  - depth
+- Stats panel fields:
+  - vessel name
+  - MMSI
+  - latitude
+  - longitude
+  - apparent wind speed
+  - SOG
+  - heading
+  - depth
+- Behavior:
+  - the route-level captain hero is removed
+  - the left sidebar keeps only nav links; the old owner-board promo panel is removed
+  - the stats panel is fixed at launch and not user-configurable yet
 - Empty:
   - no captain setup yet
   - no vessel yet

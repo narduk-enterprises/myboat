@@ -197,6 +197,10 @@ function createPinElement(item: BuddyBoatPin, isSelected: boolean) {
   return { element: shell }
 }
 
+function createMapPinElement(item: unknown, isSelected: boolean) {
+  return createPinElement(item as BuddyBoatPin, isSelected)
+}
+
 function fitFleet() {
   selectedId.value = null
   mapRef.value?.zoomToFit(0)
@@ -240,23 +244,20 @@ function handleMapReady() {
 
     <div v-if="pins.length" class="space-y-4">
       <div class="overflow-hidden rounded-[1.5rem] border border-default/70">
-        <div :class="heightClass">
-          <ClientOnly>
-            <AppMapKit
-              ref="mapSurface"
-              v-model:selected-id="selectedId"
-              class="h-full"
-              :items="pins"
-              :create-pin-element="createPinElement"
-              :annotation-size="{ width: 110, height: 74 }"
-              :zoom-span="{ lat: 0.08, lng: 0.1 }"
-              :bounding-padding="0.3"
-              :min-span-delta="0.16"
-              :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
-              @map-ready="handleMapReady"
-            />
-          </ClientOnly>
-        </div>
+        <MyBoatMap
+          ref="mapSurface"
+          v-model:selected-id="selectedId"
+          :items="pins"
+          :create-pin-element="createMapPinElement"
+          :annotation-size="{ width: 110, height: 74 }"
+          :zoom-span="{ lat: 0.08, lng: 0.1 }"
+          :bounding-padding="0.3"
+          :min-span-delta="0.16"
+          :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
+          :height-class="heightClass"
+          :shows-points-of-interest="false"
+          @map-ready="handleMapReady"
+        />
       </div>
 
       <div v-if="selectedPin" class="grid gap-3 sm:hidden">

@@ -2,6 +2,7 @@ export interface MyBoatShellLink {
   label: string
   to: string
   icon: string
+  match?: 'exact' | 'prefix'
 }
 
 interface FooterGroup {

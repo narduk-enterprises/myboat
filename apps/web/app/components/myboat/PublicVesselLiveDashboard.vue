@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type {
   PublicInstallationSummary,
-  PublicVesselDetailResponse,
-  VesselSnapshotSummary,
 } from '~/types/myboat'
 import {
   formatCoordinate,
@@ -11,11 +9,8 @@ import {
   getConnectionTone,
 } from '~/utils/marine'
 
-const SELF_OVERLAY_MAX_DISTANCE_NM = 30
-
 const props = withDefaults(
   defineProps<{
-    detail: PublicVesselDetailResponse
     refreshing?: boolean
     lastRefreshCompletedAt?: string | null
     refreshIntervalMs?: number
@@ -31,176 +26,52 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
+const route = useRoute()
+const username = computed(() => String(route.params.username || ''))
+const vesselSlug = computed(() => String(route.params.vesselSlug || ''))
+const store = useMyBoatVesselStore()
 const { convertSpeed, speedUnitLabel } = useMarineUnits()
-const isClientMounted = shallowRef(false)
-
-onMounted(() => {
-  isClientMounted.value = true
-})
-
-function toRoundedText(value: number | null | undefined, digits = 1) {
-  if (value === null || value === undefined) {
-    return '--'
-  }
-
-  return value.toFixed(digits)
-}
-
-function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const earthRadiusMeters = 6_371_000
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const lat1Rad = (lat1 * Math.PI) / 180
-  const lat2Rad = (lat2 * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
-
-  const meters = 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return meters / 1852
-}
-
-function canUseSelfOverlay(
-  fallback: VesselSnapshotSummary | null,
-  live: VesselSnapshotSummary | null,
-) {
-  if (!fallback || !live) {
-    return false
-  }
-
-  if (
-    fallback.positionLat === null ||
-    fallback.positionLat === undefined ||
-    fallback.positionLng === null ||
-    fallback.positionLng === undefined ||
-    live.positionLat === null ||
-    live.positionLat === undefined ||
-    live.positionLng === null ||
-    live.positionLng === undefined
-  ) {
-    return false
-  }
-
-  return (
-    haversineNm(fallback.positionLat, fallback.positionLng, live.positionLat, live.positionLng) <=
-    SELF_OVERLAY_MAX_DISTANCE_NM
-  )
-}
-
-function mergeSnapshots(
-  fallback: VesselSnapshotSummary | null,
-  live: VesselSnapshotSummary | null,
-): VesselSnapshotSummary | null {
-  if (!fallback && !live) {
-    return null
-  }
-
-  return {
-    vesselId: live?.vesselId || fallback?.vesselId,
-    source: live?.source || fallback?.source || null,
-    observedAt: live?.observedAt || fallback?.observedAt || null,
-    positionLat: live?.positionLat ?? fallback?.positionLat ?? null,
-    positionLng: live?.positionLng ?? fallback?.positionLng ?? null,
-    headingMagnetic: live?.headingMagnetic ?? fallback?.headingMagnetic ?? null,
-    speedOverGround: live?.speedOverGround ?? fallback?.speedOverGround ?? null,
-    speedThroughWater: live?.speedThroughWater ?? fallback?.speedThroughWater ?? null,
-    windSpeedApparent: live?.windSpeedApparent ?? fallback?.windSpeedApparent ?? null,
-    windAngleApparent: live?.windAngleApparent ?? fallback?.windAngleApparent ?? null,
-    depthBelowTransducer: live?.depthBelowTransducer ?? fallback?.depthBelowTransducer ?? null,
-    waterTemperatureKelvin:
-      live?.waterTemperatureKelvin ?? fallback?.waterTemperatureKelvin ?? null,
-    batteryVoltage: live?.batteryVoltage ?? fallback?.batteryVoltage ?? null,
-    engineRpm: live?.engineRpm ?? fallback?.engineRpm ?? null,
-    statusNote: live?.statusNote || fallback?.statusNote || null,
-    updatedAt: live?.updatedAt || fallback?.updatedAt || null,
-  }
-}
+const detail = computed(() => store.getPublicDetail(username.value, vesselSlug.value))
+const entry = computed(() => store.getPublicEntry(username.value, vesselSlug.value))
+const aisContacts = computed(() => store.serializeAisContacts(entry.value))
+const liveState = computed(() => entry.value?.live ?? null)
 
 const primaryInstallation = computed<PublicInstallationSummary | null>(
   () =>
-    props.detail.installations.find((installation) => installation.isPrimary) ||
-    props.detail.installations[0] ||
+    detail.value?.installations.find((installation) => installation.isPrimary) ||
+    detail.value?.installations[0] ||
     null,
 )
-
-const signalKUrlCandidates = computed(() => {
-  const candidates = new Set<string>()
-
-  for (const installation of props.detail.installations) {
-    for (const rawUrl of [
-      installation.collectorSignalKUrl,
-      installation.relaySignalKUrl,
-      installation.signalKUrl,
-    ]) {
-      const normalizedUrl = rawUrl?.trim()
-      if (normalizedUrl) {
-        candidates.add(normalizedUrl)
-      }
-    }
-  }
-
-  return Array.from(candidates)
-})
-
-const publicLiveFeedAvailable = computed(() => signalKUrlCandidates.value.length > 0)
-const liveFeedEnabled = computed(() => isClientMounted.value && publicLiveFeedAvailable.value)
-
-const {
-  activeUrl: liveFeedActiveUrl,
-  connectionState: liveFeedConnectionState,
-  lastDeltaAt: liveFeedLastDeltaAt,
-  selfSnapshot,
-} = useSignalKAisFeed({
-  enabled: liveFeedEnabled,
-  urls: signalKUrlCandidates,
-})
-
-const liveOverlayCompatible = computed(() =>
-  canUseSelfOverlay(props.detail.vessel.liveSnapshot, selfSnapshot.value),
-)
-const liveSnapshot = computed(() =>
-  liveOverlayCompatible.value
-    ? mergeSnapshots(props.detail.vessel.liveSnapshot, selfSnapshot.value)
-    : props.detail.vessel.liveSnapshot,
-)
-const liveVessel = computed(() => ({
-  ...props.detail.vessel,
-  liveSnapshot: liveSnapshot.value,
-}))
-const recentPassages = computed(() => props.detail.passages.slice(0, 3))
+const liveSnapshot = computed(() => detail.value?.vessel.liveSnapshot ?? null)
+const recentPassages = computed(() => detail.value?.passages.slice(0, 3) ?? [])
 const latestPassage = computed(
-  () => props.detail.vessel.latestPassage || props.detail.passages[0] || null,
+  () => detail.value?.vessel.latestPassage || detail.value?.passages[0] || null,
 )
-const publicPath = computed(() => `/${props.detail.profile.username}/${props.detail.vessel.slug}`)
-const trafficMode = computed(() =>
-  isClientMounted.value && publicLiveFeedAvailable.value ? 'auto' : 'off',
+const publicPath = computed(() =>
+  detail.value ? `/${detail.value.profile.username}/${detail.value.vessel.slug}` : null,
 )
-const mapSurfaceKey = computed(() => `${props.detail.vessel.id}:${trafficMode.value}`)
+const publicLiveFeedAvailable = computed(() => Boolean(liveState.value?.hasSignalKSource))
 
 const liveFeedLabel = computed(() => {
   if (!publicLiveFeedAvailable.value) {
     return 'Public API refresh'
   }
 
-  if (liveFeedActiveUrl.value || primaryInstallation.value?.signalKAccessMode === 'relay') {
+  if (primaryInstallation.value?.signalKAccessMode === 'relay') {
     return 'Public Signal K relay'
   }
 
-  return 'Public live feed'
+  return 'MyBoat live feed'
 })
 
 const liveFeedStatus = computed(() => {
-  switch (liveFeedConnectionState.value) {
+  switch (liveState.value?.connectionState) {
     case 'connected':
-      return liveOverlayCompatible.value
-        ? liveFeedLastDeltaAt.value
-          ? `Signal K live and merged into this vessel view · delta ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
-          : 'Signal K live and merged into this vessel view.'
-        : liveFeedLastDeltaAt.value
-          ? `Nearby traffic live · delta ${formatRelativeTime(new Date(liveFeedLastDeltaAt.value).toISOString())}`
-          : 'Nearby traffic live through the public feed.'
+      return liveState.value?.lastDeltaAt
+        ? `MyBoat live feed connected · delta ${formatRelativeTime(new Date(liveState.value.lastDeltaAt).toISOString())}`
+        : 'MyBoat live feed connected.'
     case 'connecting':
-      return 'Connecting to the public Signal K stream.'
+      return 'Connecting to the public live feed.'
     case 'error':
       return 'Public live feed unavailable. Showing the freshest stored vessel snapshot.'
     default:
@@ -258,22 +129,22 @@ const heroMetrics = computed(() => [
 const opsMetrics = computed(() => [
   {
     label: 'Passages logged',
-    value: String(props.detail.passages.length),
+    value: String(detail.value?.passages.length ?? 0),
     hint: latestPassage.value?.title || 'No public passage yet.',
     icon: 'i-lucide-route',
   },
   {
     label: 'Waypoints saved',
-    value: String(props.detail.waypoints.length),
-    hint: props.detail.waypoints.length
+    value: String(detail.value?.waypoints.length ?? 0),
+    hint: detail.value?.waypoints.length
       ? 'Saved route markers remain visible.'
       : 'No route markers yet.',
     icon: 'i-lucide-map-pinned',
   },
   {
     label: 'Media log',
-    value: String(props.detail.media.length),
-    hint: props.detail.media.length
+    value: String(detail.value?.media.length ?? 0),
+    hint: detail.value?.media.length
       ? 'Recent captured moments are attached below.'
       : 'No public media yet.',
     icon: 'i-lucide-camera',
@@ -285,10 +156,18 @@ const opsMetrics = computed(() => [
     icon: 'i-lucide-waypoints',
   },
 ])
+
+function toRoundedText(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined) {
+    return '--'
+  }
+
+  return value.toFixed(digits)
+}
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div v-if="detail" class="space-y-8">
     <section class="public-hero px-6 py-10 shadow-overlay sm:px-10">
       <div class="relative z-10 grid gap-8 lg:grid-cols-[1.04fr_0.96fr]">
         <div class="space-y-5">
@@ -375,14 +254,18 @@ const opsMetrics = computed(() => [
     </section>
 
     <div data-testid="public-vessel-live-map">
-      <MarineTrackMap
-        :key="mapSurfaceKey"
-        :vessels="[liveVessel]"
+      <MyBoatDetailedMap
+        :vessel="detail.vessel"
         :passages="detail.passages"
         :waypoints="detail.waypoints"
         :installations="detail.installations"
+        :ais-contacts="aisContacts"
+        :live-connection-state="liveState?.connectionState"
+        :live-last-delta-at="liveState?.lastDeltaAt"
+        :has-signal-k-source="liveState?.hasSignalKSource"
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
-        :traffic-mode="trafficMode"
+        :persist-key="`public-vessel:${detail.profile.username}/${detail.vessel.slug}`"
+        :show-pin-labels="false"
       />
     </div>
 
