@@ -348,6 +348,18 @@ body {
   backdrop-filter: blur(20px);
 }
 
+.marine-auth-card > [data-slot='header'] {
+  padding: 1rem 1rem 0.8rem;
+}
+
+.marine-auth-card > [data-slot='body'] {
+  padding: 0.9rem 1rem;
+}
+
+.marine-auth-card > [data-slot='footer'] {
+  padding: 0.9rem 1rem 1rem;
+}
+
 .marine-auth-card::before {
   content: '';
   position: absolute;
@@ -392,6 +404,16 @@ body {
   text-transform: uppercase;
   color: rgb(3 105 161);
   backdrop-filter: blur(12px);
+}
+
+@media (max-width: 640px) {
+  .marine-auth-chip,
+  .marine-kicker {
+    padding-block: 0.32rem;
+    padding-inline: 0.72rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+  }
 }
 
 .dark .marine-auth-chip {

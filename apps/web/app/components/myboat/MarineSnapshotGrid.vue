@@ -141,7 +141,7 @@ const metrics = computed(() => {
 
 <template>
   <div>
-    <div v-if="metrics.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div v-if="metrics.length" class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <MarineMetricCard
         v-for="metric in metrics"
         :key="metric.label"

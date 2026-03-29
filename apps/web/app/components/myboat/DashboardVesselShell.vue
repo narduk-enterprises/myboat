@@ -12,6 +12,7 @@ const props = withDefaults(
     pending: false,
   },
 )
+const isCompactViewport = useCompactViewport()
 
 const navigationItems = computed(() => {
   const slug = props.detail?.vessel.slug
@@ -49,6 +50,23 @@ const postureLabel = computed(() => {
     ? 'Live telemetry available'
     : 'Awaiting live telemetry'
 })
+const publicVesselPath = computed(() =>
+  props.detail?.profile.username
+    ? `/${props.detail.profile.username}/${props.detail.vessel.slug}`
+    : null,
+)
+const vesselDescription = computed(() => props.detail?.vessel.summary || props.fallbackDescription)
+const vesselMetaBadges = computed(() => {
+  if (!props.detail) {
+    return []
+  }
+
+  return [
+    `${props.detail.installations.length} installs`,
+    `${props.detail.waypoints.length} waypoints`,
+    `${props.detail.media.length} media`,
+  ]
+})
 </script>
 
 <template>
@@ -65,28 +83,39 @@ const postureLabel = computed(() => {
     </template>
 
     <template v-else-if="detail">
-      <UPageHero
-        :title="detail.vessel.name"
-        :description="detail.vessel.summary || fallbackDescription"
+      <section
+        v-if="isCompactViewport"
+        class="rounded-[1.5rem] border border-default/80 bg-default/88 px-4 py-5 shadow-card"
       >
-        <template #links>
+        <div class="space-y-4">
+          <div class="flex flex-wrap gap-2 text-sm">
+            <UBadge color="primary" variant="soft">{{ postureLabel }}</UBadge>
+            <UBadge v-for="badge in vesselMetaBadges" :key="badge" color="neutral" variant="soft">
+              {{ badge }}
+            </UBadge>
+          </div>
+
+          <div class="space-y-3">
+            <h1 class="font-display text-4xl leading-none text-default">
+              {{ detail.vessel.name }}
+            </h1>
+            <p class="text-sm leading-6 text-muted">
+              {{ vesselDescription }}
+            </p>
+          </div>
+
           <UButton
-            v-if="detail.profile.username"
-            :to="`/${detail.profile.username}/${detail.vessel.slug}`"
+            v-if="publicVesselPath"
+            :to="publicVesselPath"
             color="neutral"
             variant="soft"
             icon="i-lucide-share-2"
+            class="w-full justify-center"
           >
             Public vessel page
           </UButton>
-        </template>
-      </UPageHero>
 
-      <section
-        class="rounded-[1.75rem] border border-default/80 bg-default/85 px-4 py-4 shadow-card sm:px-5"
-      >
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex flex-wrap gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <UButton
               v-for="item in navigationItems"
               :key="item.label"
@@ -94,23 +123,55 @@ const postureLabel = computed(() => {
               :icon="item.icon"
               :color="item.active ? 'primary' : 'neutral'"
               :variant="item.active ? 'soft' : 'outline'"
+              class="justify-center"
             >
               {{ item.label }}
             </UButton>
           </div>
-
-          <div class="flex flex-wrap gap-2 text-sm">
-            <UBadge color="primary" variant="soft">{{ postureLabel }}</UBadge>
-            <UBadge color="neutral" variant="soft">
-              {{ detail.installations.length }} installs
-            </UBadge>
-            <UBadge color="neutral" variant="soft">
-              {{ detail.waypoints.length }} waypoints
-            </UBadge>
-            <UBadge color="neutral" variant="soft"> {{ detail.media.length }} media </UBadge>
-          </div>
         </div>
       </section>
+
+      <template v-else>
+        <UPageHero :title="detail.vessel.name" :description="vesselDescription">
+          <template #links>
+            <UButton
+              v-if="publicVesselPath"
+              :to="publicVesselPath"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-share-2"
+            >
+              Public vessel page
+            </UButton>
+          </template>
+        </UPageHero>
+
+        <section
+          class="rounded-[1.75rem] border border-default/80 bg-default/85 px-4 py-4 shadow-card sm:px-5"
+        >
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="item in navigationItems"
+                :key="item.label"
+                :to="item.to"
+                :icon="item.icon"
+                :color="item.active ? 'primary' : 'neutral'"
+                :variant="item.active ? 'soft' : 'outline'"
+              >
+                {{ item.label }}
+              </UButton>
+            </div>
+
+            <div class="flex flex-wrap gap-2 text-sm">
+              <UBadge color="primary" variant="soft">{{ postureLabel }}</UBadge>
+              <UBadge v-for="badge in vesselMetaBadges" :key="badge" color="neutral" variant="soft">
+                {{ badge }}
+              </UBadge>
+            </div>
+          </div>
+        </section>
+      </template>
 
       <slot />
     </template>

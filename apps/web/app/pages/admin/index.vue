@@ -170,7 +170,7 @@ async function onRunAisHubSync() {
               to="/admin/telemetry"
               color="neutral"
               variant="soft"
-              icon="i-lucide-broadcast"
+              icon="i-lucide-radio-tower"
               class="w-full"
             >
               Telemetry

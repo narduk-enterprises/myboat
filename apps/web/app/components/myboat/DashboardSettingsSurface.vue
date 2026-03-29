@@ -377,7 +377,7 @@ const setupIncomplete = computed(
           </div>
 
           <div class="flex flex-wrap gap-3">
-            <UButton to="/dashboard/settings/sharing" color="primary" icon="i-lucide-broadcast">
+            <UButton to="/dashboard/settings/sharing" color="primary" icon="i-lucide-radio-tower">
               Open sharing
             </UButton>
             <UButton

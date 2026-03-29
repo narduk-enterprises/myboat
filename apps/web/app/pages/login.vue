@@ -17,27 +17,23 @@ definePageMeta({ layout: 'auth', middleware: ['guest'] })
 const showDemoLogin = import.meta.dev
 
 const dockChecklist = [
-  'Open the dashboard and current boat status.',
-  'Manage installs, keys, and collector feeds.',
-  'Update the public page when you want to share.',
+  'Get back to the live boat dashboard fast.',
+  'Open installs, keys, and collector controls.',
+  'Keep email available only as a fallback.',
 ]
 </script>
 
 <template>
   <AuthDock
     eyebrow="Captain access"
-    title="Back to your boat"
-    description="Sign in to open your dashboard, manage collector installs, and update the public page."
+    title="Sign in and get back underway"
+    description="Apple is the fastest path into your boat workspace. Email stays available as a fallback, not the first thing you have to fight through."
     :checklist="dockChecklist"
   >
     <AuthLoginCard
-      title="Welcome back aboard"
-      subtitle="Open your dashboard and install controls."
+      title="Sign in to MyBoat"
+      subtitle="Use Apple first. Reveal email only if that is really how you want to sign in."
       :show-demo-login="showDemoLogin"
-    >
-      <template #logo>
-        <AppBrandMark />
-      </template>
-    </AuthLoginCard>
+    />
   </AuthDock>
 </template>
