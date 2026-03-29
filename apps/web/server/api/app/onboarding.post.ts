@@ -24,12 +24,7 @@ const onboardingSchema = z.object({
   summary: z.string().trim().max(280).optional().or(z.literal('')),
   installationLabel: z.string().trim().min(2).max(80),
   edgeHostname: z.string().trim().max(120).optional().or(z.literal('')),
-  signalKUrl: z.string().trim().url().optional().or(z.literal('')),
 })
-
-function inferInstallationType(signalKUrl: string | undefined) {
-  return signalKUrl ? 'direct_signalk' : 'edge_agent'
-}
 
 export default defineUserMutation(
   {
@@ -148,9 +143,9 @@ export default defineUserMutation(
         .update(vesselInstallations)
         .set({
           label: body.installationLabel,
-          installationType: inferInstallationType(body.signalKUrl),
+          installationType: 'collector_ingest',
           edgeHostname: body.edgeHostname || null,
-          signalKUrl: body.signalKUrl || null,
+          signalKUrl: null,
           isPrimary: true,
           updatedAt: now,
         })
@@ -160,9 +155,9 @@ export default defineUserMutation(
         id: crypto.randomUUID(),
         vesselId: currentVesselId,
         label: body.installationLabel,
-        installationType: inferInstallationType(body.signalKUrl),
+        installationType: 'collector_ingest',
         edgeHostname: body.edgeHostname || null,
-        signalKUrl: body.signalKUrl || null,
+        signalKUrl: null,
         isPrimary: true,
         connectionState: 'pending',
         eventCount: 0,

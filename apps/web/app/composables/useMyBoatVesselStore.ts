@@ -17,32 +17,17 @@ import type {
   VesselSnapshotSummary,
   WaypointSummary,
 } from '~/types/myboat'
-
-type SignalKSubscriptionPath = {
-  path: string
-  policy: 'instant'
-}
-
-type SignalKSubscriptionCommand = {
-  context: string
-  subscribe: SignalKSubscriptionPath[]
-}
-
-type SignalKDeltaValue = {
-  path?: string
-  value?: unknown
-}
-
-type SignalKDeltaUpdate = {
-  timestamp?: string
-  values?: SignalKDeltaValue[]
-}
-
-type SignalKDelta = {
-  context?: string
-  updates?: SignalKDeltaUpdate[]
-  self?: string
-}
+import type {
+  LiveDemand,
+  VesselLiveConnectionState,
+  VesselLiveServerMessage,
+} from '../../shared/myboatLive'
+import {
+  createMyBoatLiveWebSocketUrl,
+  isLiveDemandEmpty,
+  mergeLiveDemands,
+  normalizeLiveDemand,
+} from '../../shared/myboatLive'
 
 type VesselStoreRouteStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -52,6 +37,7 @@ export interface VesselStoreLiveState {
   activeUrl: string | null
   connectionState: 'idle' | 'connecting' | 'connected' | 'error'
   hasSignalKSource: boolean
+  sourceState: VesselLiveConnectionState
   lastDeltaAt: number | null
   lastError: string | null
 }
@@ -81,6 +67,7 @@ export interface VesselStoreEntry {
 export interface VesselStoreNamespaceState {
   activeEntryKey: string | null
   entriesByKey: Record<string, VesselStoreEntry>
+  liveDemandByConsumer: Record<string, LiveDemand>
   orderedKeys: string[]
   profile: PublicProfileSummary | null
   routeStatus: VesselStoreRouteStatus
@@ -92,50 +79,13 @@ const AIS_STALE_TIMEOUT_MS = 15 * 60 * 1000
 const AIS_STALE_SWEEP_MS = 60_000
 const RECONNECT_DELAY_MS = 4_000
 
-const SIGNALK_AIS_SUBSCRIPTION_COMMAND: SignalKSubscriptionCommand = {
-  context: 'vessels.*',
-  subscribe: [
-    { path: 'navigation.position', policy: 'instant' },
-    { path: 'navigation.courseOverGroundTrue', policy: 'instant' },
-    { path: 'navigation.speedOverGround', policy: 'instant' },
-    { path: 'navigation.headingTrue', policy: 'instant' },
-    { path: 'navigation.headingMagnetic', policy: 'instant' },
-    { path: 'name', policy: 'instant' },
-    { path: 'design.aisShipType', policy: 'instant' },
-    { path: 'navigation.destination.commonName', policy: 'instant' },
-    { path: 'communication.callsignVhf', policy: 'instant' },
-    { path: 'design.length.overall', policy: 'instant' },
-    { path: 'design.beam', policy: 'instant' },
-    { path: 'design.draft.current', policy: 'instant' },
-    { path: 'navigation.state', policy: 'instant' },
-  ],
-}
-
-const SIGNALK_SELF_SUBSCRIPTION_PATHS: SignalKSubscriptionPath[] = [
-  { path: 'navigation.position', policy: 'instant' },
-  { path: 'navigation.position.latitude', policy: 'instant' },
-  { path: 'navigation.position.longitude', policy: 'instant' },
-  { path: 'navigation.headingMagnetic', policy: 'instant' },
-  { path: 'navigation.speedOverGround', policy: 'instant' },
-  { path: 'navigation.speedThroughWater', policy: 'instant' },
-  { path: 'environment.wind.speedApparent', policy: 'instant' },
-  { path: 'environment.wind.angleApparent', policy: 'instant' },
-  { path: 'environment.depth.belowTransducer', policy: 'instant' },
-  { path: 'environment.water.temperature', policy: 'instant' },
-  { path: 'electrical.batteries.*.voltage', policy: 'instant' },
-  { path: 'propulsion.*.revolutions', policy: 'instant' },
-]
-
 interface LiveController {
   activeEntryKey: string | null
-  nextUrlIndex: number
+  activeUrl: string | null
   reconnectTimer: ReturnType<typeof setTimeout> | null
-  resolvedSelfContext: string | null
-  resolvedSelfMmsi: string | null
   scope: EffectScope
   socket: WebSocket | null
   staleSweepTimer: ReturnType<typeof setInterval> | null
-  subscribedSelfContext: string | null
 }
 
 const liveControllers = new Map<VesselStoreNamespace, LiveController>()
@@ -145,6 +95,7 @@ function createEmptyLiveState(): VesselStoreLiveState {
     activeUrl: null,
     connectionState: 'idle',
     hasSignalKSource: false,
+    sourceState: 'idle',
     lastDeltaAt: null,
     lastError: null,
   }
@@ -154,6 +105,7 @@ function createNamespaceState(): VesselStoreNamespaceState {
   return {
     activeEntryKey: null,
     entriesByKey: {},
+    liveDemandByConsumer: {},
     orderedKeys: [],
     profile: null,
     routeStatus: 'idle',
@@ -185,72 +137,24 @@ function createEmptyEntry(key: string, namespace: VesselStoreNamespace): VesselS
   }
 }
 
-function normalizeSignalKSocketUrl(rawUrl: string | null | undefined) {
-  const normalized = rawUrl?.trim()
-  if (!normalized) {
-    return null
-  }
-
-  try {
-    const baseOrigin = import.meta.client ? window.location.origin : 'http://localhost:3000'
-    const url = new URL(normalized, baseOrigin)
-
-    if (url.protocol === 'http:') {
-      url.protocol = 'ws:'
-    } else if (url.protocol === 'https:') {
-      url.protocol = 'wss:'
-    }
-
-    return url.toString()
-  } catch {
-    return normalized.startsWith('ws://') || normalized.startsWith('wss://') ? normalized : null
-  }
-}
-
-function buildCollectorOnlyUrls(
-  installations: Array<InstallationSummary | PublicInstallationSummary>,
-) {
-  const urls = new Set<string>()
-
-  for (const installation of installations) {
-    const normalized = normalizeSignalKSocketUrl(installation.collectorSignalKUrl)
-    if (normalized) {
-      urls.add(normalized)
-    }
-  }
-
-  return Array.from(urls)
-}
-
-function buildPublicLiveUrls(
-  installations: Array<InstallationSummary | PublicInstallationSummary>,
-) {
-  const urls = new Set<string>()
-
-  for (const installation of installations) {
-    for (const rawUrl of [
-      installation.collectorSignalKUrl,
-      installation.relaySignalKUrl,
-      installation.signalKUrl,
-    ]) {
-      const normalized = normalizeSignalKSocketUrl(rawUrl)
-      if (normalized) {
-        urls.add(normalized)
-      }
-    }
-  }
-
-  return Array.from(urls)
-}
-
 function buildLiveUrlsForEntry(entry: VesselStoreEntry | null) {
-  if (!entry) {
+  if (!entry || !entry.installations.length) {
     return []
   }
 
-  return entry.namespace === 'auth'
-    ? buildCollectorOnlyUrls(entry.installations)
-    : buildPublicLiveUrls(entry.installations)
+  if (entry.namespace === 'auth' && entry.vessel?.slug) {
+    return [createMyBoatLiveWebSocketUrl(`/api/app/vessels/${entry.vessel.slug}/live`)]
+  }
+
+  if (entry.namespace === 'public' && entry.publicUsername && entry.publicVesselSlug) {
+    return [
+      createMyBoatLiveWebSocketUrl(
+        `/api/public/${entry.publicUsername}/${entry.publicVesselSlug}/live`,
+      ),
+    ]
+  }
+
+  return []
 }
 
 function withMergedSnapshot(
@@ -346,122 +250,6 @@ function mergeSnapshots(
   } satisfies VesselSnapshotSummary
 }
 
-function createSelfSubscriptionCommand(context: string): SignalKSubscriptionCommand {
-  return {
-    context,
-    subscribe: SIGNALK_SELF_SUBSCRIPTION_PATHS,
-  }
-}
-
-function extractMmsi(contextId: string) {
-  const match = contextId.match(/mmsi[:-]?(\d{6,})/i)
-  return match?.[1] ?? null
-}
-
-function normalizeSelfContext(value: unknown) {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim()
-  return normalized || null
-}
-
-function asNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value === 'string') {
-    const numericValue = Number(value)
-    return Number.isFinite(numericValue) ? numericValue : null
-  }
-
-  return null
-}
-
-function asText(value: unknown) {
-  if (typeof value === 'string') {
-    const normalized = value.trim()
-    return normalized ? normalized : null
-  }
-
-  return null
-}
-
-function asDegrees(value: unknown) {
-  const numericValue = asNumber(value)
-  if (numericValue === null) {
-    return null
-  }
-
-  return Math.abs(numericValue) > Math.PI * 2 ? numericValue : (numericValue * 180) / Math.PI
-}
-
-function extractNumberField(value: unknown, fields: string[]): number | null {
-  if (!value || typeof value !== 'object') {
-    return asNumber(value)
-  }
-
-  let cursor: unknown = value
-  for (const field of fields) {
-    if (!cursor || typeof cursor !== 'object' || !(field in cursor)) {
-      return null
-    }
-
-    cursor = (cursor as Record<string, unknown>)[field]
-  }
-
-  return asNumber(cursor)
-}
-
-function extractTextField(value: unknown, fields: string[]): string | null {
-  if (!value || typeof value !== 'object') {
-    return asText(value)
-  }
-
-  let cursor: unknown = value
-  for (const field of fields) {
-    if (!cursor || typeof cursor !== 'object' || !(field in cursor)) {
-      return null
-    }
-
-    cursor = (cursor as Record<string, unknown>)[field]
-  }
-
-  return asText(cursor)
-}
-
-function asIsoTimestamp(value: unknown) {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
-}
-
-function createEmptySelfSnapshot(vesselId: string | null | undefined): VesselSnapshotSummary {
-  return {
-    vesselId: vesselId || undefined,
-    observedAt: null,
-    positionLat: null,
-    positionLng: null,
-    headingMagnetic: null,
-    speedOverGround: null,
-    speedThroughWater: null,
-    windSpeedApparent: null,
-    windAngleApparent: null,
-    depthBelowTransducer: null,
-    waterTemperatureKelvin: null,
-    batteryVoltage: null,
-    engineRpm: null,
-    statusNote: null,
-    source: null,
-    updatedAt: null,
-  }
-}
-
 async function decodeMessageData(data: string | ArrayBuffer | Blob) {
   if (typeof data === 'string') {
     return data
@@ -473,15 +261,6 @@ async function decodeMessageData(data: string | ArrayBuffer | Blob) {
 
   return await data.text()
 }
-
-function resolveSelfContextFromMessage(payload: unknown) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return null
-  }
-
-  return normalizeSelfContext((payload as { self?: unknown }).self)
-}
-
 function pruneStaleAisContacts(contacts: Record<string, AisContactSummary>) {
   const now = Date.now()
   let removedAny = false
@@ -575,6 +354,33 @@ export function useMyBoatVesselStore() {
     }))
   }
 
+  function setLiveDemand(
+    namespace: VesselStoreNamespace,
+    consumerId: string,
+    demand: Partial<LiveDemand> | null | undefined,
+  ) {
+    const normalizedDemand = normalizeLiveDemand(demand)
+
+    updateNamespace(namespace, (currentState) => ({
+      ...currentState,
+      liveDemandByConsumer: {
+        ...currentState.liveDemandByConsumer,
+        [consumerId]: normalizedDemand,
+      },
+    }))
+  }
+
+  function clearLiveDemand(namespace: VesselStoreNamespace, consumerId: string) {
+    updateNamespace(namespace, (currentState) => {
+      const { [consumerId]: _removed, ...nextDemandByConsumer } = currentState.liveDemandByConsumer
+
+      return {
+        ...currentState,
+        liveDemandByConsumer: nextDemandByConsumer,
+      }
+    })
+  }
+
   function upsertOrderedKey(orderedKeys: string[], key: string) {
     return orderedKeys.includes(key) ? orderedKeys : [...orderedKeys, key]
   }
@@ -641,7 +447,7 @@ export function useMyBoatVesselStore() {
         waypoints: currentEntry.waypoints,
         live: {
           ...currentEntry.live,
-          hasSignalKSource: buildCollectorOnlyUrls(installations).length > 0,
+          hasSignalKSource: installations.length > 0,
         },
       }
     }
@@ -695,7 +501,7 @@ export function useMyBoatVesselStore() {
           waypoints: detail.waypoints,
           live: {
             ...currentEntry.live,
-            hasSignalKSource: buildCollectorOnlyUrls(detail.installations).length > 0,
+            hasSignalKSource: detail.installations.length > 0,
           },
         },
       },
@@ -834,7 +640,7 @@ export function useMyBoatVesselStore() {
           waypoints: detail.waypoints,
           live: {
             ...currentEntry.live,
-            hasSignalKSource: buildPublicLiveUrls(detail.installations).length > 0,
+            hasSignalKSource: detail.installations.length > 0,
           },
         },
       },
@@ -1005,47 +811,28 @@ export function useMyBoatVesselStore() {
     return buildLiveUrlsForEntry(getActiveEntry(namespace))
   }
 
-  function isSelfContext(controller: LiveController, context: string | null | undefined) {
-    if (!context) {
-      return false
-    }
-
-    if (context === 'vessels.self') {
-      return true
-    }
-
-    if (controller.resolvedSelfContext && context === controller.resolvedSelfContext) {
-      return true
-    }
-
-    return Boolean(controller.resolvedSelfMmsi && context.includes(controller.resolvedSelfMmsi))
+  function getNamespaceEffectiveLiveDemand(namespace: VesselStoreNamespace) {
+    return mergeLiveDemands(Object.values(getNamespaceState(namespace).value.liveDemandByConsumer))
   }
 
-  function subscribeToResolvedSelfContext(
-    controller: LiveController,
-    target: WebSocket,
-    context: string,
-  ) {
-    if (!context || context === 'vessels.self' || controller.subscribedSelfContext === context) {
-      return
+  function getFreshnessState(observedAt: string | null | undefined): PublicFreshnessState {
+    if (!observedAt) {
+      return 'offline'
     }
 
-    target.send(JSON.stringify(createSelfSubscriptionCommand(context)))
-    controller.subscribedSelfContext = context
-  }
-
-  function updateResolvedSelfContext(
-    controller: LiveController,
-    target: WebSocket,
-    context: string | null,
-  ) {
-    if (!context) {
-      return
+    const observedMs = new Date(observedAt).getTime()
+    if (Number.isNaN(observedMs)) {
+      return 'offline'
     }
 
-    controller.resolvedSelfContext = context
-    controller.resolvedSelfMmsi = extractMmsi(context)
-    subscribeToResolvedSelfContext(controller, target, context)
+    const ageMinutes = (Date.now() - observedMs) / 60_000
+    if (ageMinutes <= 15) {
+      return 'live'
+    }
+    if (ageMinutes <= 120) {
+      return 'recent'
+    }
+    return 'stale'
   }
 
   function clearReconnectTimer(controller: LiveController) {
@@ -1093,12 +880,6 @@ export function useMyBoatVesselStore() {
     }, AIS_STALE_SWEEP_MS)
   }
 
-  function resetControllerContext(controller: LiveController) {
-    controller.resolvedSelfContext = null
-    controller.resolvedSelfMmsi = null
-    controller.subscribedSelfContext = null
-  }
-
   function disconnectNamespace(namespace: VesselStoreNamespace, controller: LiveController) {
     clearReconnectTimer(controller)
     clearStaleSweepTimer(controller)
@@ -1109,11 +890,14 @@ export function useMyBoatVesselStore() {
       currentSocket.close()
     }
 
+    controller.activeUrl = null
+
     const previousKey = controller.activeEntryKey
     if (previousKey) {
       setEntryLiveState(namespace, previousKey, {
         activeUrl: null,
         connectionState: 'idle',
+        sourceState: 'idle',
       })
     }
   }
@@ -1121,7 +905,11 @@ export function useMyBoatVesselStore() {
   function scheduleReconnect(namespace: VesselStoreNamespace, controller: LiveController) {
     clearReconnectTimer(controller)
 
-    if (!import.meta.client || !getNamespaceLiveUrls(namespace).length) {
+    if (
+      !import.meta.client ||
+      !getNamespaceLiveUrls(namespace).length ||
+      isLiveDemandEmpty(getNamespaceEffectiveLiveDemand(namespace))
+    ) {
       return
     }
 
@@ -1131,259 +919,24 @@ export function useMyBoatVesselStore() {
     }, RECONNECT_DELAY_MS)
   }
 
-  function updateContactFromDelta(
+  function applyLiveSnapshot(
     namespace: VesselStoreNamespace,
-    controller: LiveController,
-    delta: SignalKDelta,
+    entryKey: string,
+    snapshot: VesselSnapshotSummary | null,
+    sourceState?: VesselLiveConnectionState,
   ) {
-    const context = delta.context?.trim()
-    if (!context || !context.startsWith('vessels.') || isSelfContext(controller, context)) {
-      return
-    }
-
-    const activeEntry = getActiveEntry(namespace)
-    if (!activeEntry) {
-      return
-    }
-
-    const contactId = context.slice('vessels.'.length)
-    if (!contactId) {
-      return
-    }
-
-    const nextContact = {
-      ...(activeEntry.aisContacts[contactId] || {
-        id: contactId,
-        name: null,
-        mmsi: extractMmsi(contactId),
-        shipType: null,
-        lat: null,
-        lng: null,
-        cog: null,
-        sog: null,
-        heading: null,
-        destination: null,
-        callSign: null,
-        length: null,
-        beam: null,
-        draft: null,
-        navState: null,
-        lastUpdateAt: Date.now(),
-      }),
-    } satisfies AisContactSummary
-
-    for (const update of delta.updates ?? []) {
-      for (const entry of update.values ?? []) {
-        const path = entry.path ?? ''
-
-        switch (path) {
-          case 'navigation.position': {
-            const latitude = extractNumberField(entry.value, ['latitude'])
-            const longitude = extractNumberField(entry.value, ['longitude'])
-
-            if (latitude !== null && longitude !== null) {
-              nextContact.lat = latitude
-              nextContact.lng = longitude
-            }
-            break
+    updateEntry(namespace, entryKey, (currentEntry) => {
+      const nextSnapshot = snapshot
+        ? {
+            ...snapshot,
+            statusNote:
+              snapshot.statusNote ||
+              (namespace === 'auth'
+                ? 'Live MyBoat collector telemetry'
+                : 'Live public vessel telemetry'),
+            updatedAt: snapshot.updatedAt || new Date().toISOString(),
           }
-          case 'navigation.courseOverGroundTrue':
-            nextContact.cog = asDegrees(entry.value)
-            break
-          case 'navigation.speedOverGround':
-            nextContact.sog = asNumber(entry.value)
-            break
-          case 'navigation.headingTrue':
-          case 'navigation.headingMagnetic':
-            nextContact.heading = asDegrees(entry.value)
-            break
-          case 'name':
-            nextContact.name = asText(entry.value)
-            break
-          case 'design.aisShipType':
-            nextContact.shipType = extractNumberField(entry.value, ['id']) ?? asNumber(entry.value)
-            break
-          case 'navigation.destination.commonName':
-            nextContact.destination = asText(entry.value)
-            break
-          case 'communication.callsignVhf':
-            nextContact.callSign = asText(entry.value)
-            break
-          case 'design.length.overall':
-            nextContact.length = asNumber(entry.value)
-            break
-          case 'design.beam':
-            nextContact.beam = asNumber(entry.value)
-            break
-          case 'design.draft.current':
-            nextContact.draft = asNumber(entry.value)
-            break
-          case 'navigation.state':
-            nextContact.navState =
-              asText(entry.value) ||
-              extractTextField(entry.value, ['value']) ||
-              extractTextField(entry.value, ['name']) ||
-              extractTextField(entry.value, ['description'])
-            break
-        }
-      }
-    }
-
-    nextContact.mmsi = nextContact.mmsi ?? extractMmsi(contactId)
-    nextContact.lastUpdateAt = Date.now()
-
-    updateEntry(namespace, activeEntry.key, (currentEntry) => ({
-      ...currentEntry,
-      aisContacts: {
-        ...currentEntry.aisContacts,
-        [contactId]: nextContact,
-      },
-      live: {
-        ...currentEntry.live,
-        lastDeltaAt: nextContact.lastUpdateAt,
-      },
-    }))
-  }
-
-  function updateSelfSnapshotFromDelta(
-    namespace: VesselStoreNamespace,
-    controller: LiveController,
-    delta: SignalKDelta,
-  ) {
-    const context = delta.context?.trim()
-    if (!isSelfContext(controller, context)) {
-      return
-    }
-
-    const activeEntry = getActiveEntry(namespace)
-    if (!activeEntry) {
-      return
-    }
-
-    const nextSnapshot = {
-      ...(activeEntry.liveSnapshot || createEmptySelfSnapshot(activeEntry.vessel?.id)),
-      vesselId: activeEntry.vessel?.id,
-    } satisfies VesselSnapshotSummary
-
-    let observedAt = nextSnapshot.observedAt
-    let sawValue = false
-
-    for (const update of delta.updates ?? []) {
-      observedAt = asIsoTimestamp(update.timestamp) ?? observedAt
-
-      for (const entry of update.values ?? []) {
-        sawValue = true
-
-        switch (entry.path ?? '') {
-          case 'navigation.position': {
-            const latitude = extractNumberField(entry.value, ['latitude'])
-            const longitude = extractNumberField(entry.value, ['longitude'])
-
-            if (latitude !== null) {
-              nextSnapshot.positionLat = latitude
-            }
-
-            if (longitude !== null) {
-              nextSnapshot.positionLng = longitude
-            }
-            break
-          }
-          case 'navigation.position.latitude': {
-            const latitude = asNumber(entry.value)
-            if (latitude !== null) {
-              nextSnapshot.positionLat = latitude
-            }
-            break
-          }
-          case 'navigation.position.longitude': {
-            const longitude = asNumber(entry.value)
-            if (longitude !== null) {
-              nextSnapshot.positionLng = longitude
-            }
-            break
-          }
-          case 'navigation.headingMagnetic': {
-            const headingMagnetic = asDegrees(entry.value)
-            if (headingMagnetic !== null) {
-              nextSnapshot.headingMagnetic = headingMagnetic
-            }
-            break
-          }
-          case 'navigation.speedOverGround': {
-            const speedOverGround = asNumber(entry.value)
-            if (speedOverGround !== null) {
-              nextSnapshot.speedOverGround = speedOverGround
-            }
-            break
-          }
-          case 'navigation.speedThroughWater': {
-            const speedThroughWater = asNumber(entry.value)
-            if (speedThroughWater !== null) {
-              nextSnapshot.speedThroughWater = speedThroughWater
-            }
-            break
-          }
-          case 'environment.wind.speedApparent': {
-            const windSpeedApparent = asNumber(entry.value)
-            if (windSpeedApparent !== null) {
-              nextSnapshot.windSpeedApparent = windSpeedApparent
-            }
-            break
-          }
-          case 'environment.wind.angleApparent': {
-            const windAngleApparent = asDegrees(entry.value)
-            if (windAngleApparent !== null) {
-              nextSnapshot.windAngleApparent = windAngleApparent
-            }
-            break
-          }
-          case 'environment.depth.belowTransducer': {
-            const depthBelowTransducer = asNumber(entry.value)
-            if (depthBelowTransducer !== null) {
-              nextSnapshot.depthBelowTransducer = depthBelowTransducer
-            }
-            break
-          }
-          case 'environment.water.temperature': {
-            const waterTemperatureKelvin = asNumber(entry.value)
-            if (waterTemperatureKelvin !== null) {
-              nextSnapshot.waterTemperatureKelvin = waterTemperatureKelvin
-            }
-            break
-          }
-          default: {
-            const path = entry.path ?? ''
-            if (path.startsWith('electrical.batteries.') && path.endsWith('.voltage')) {
-              const batteryVoltage = asNumber(entry.value)
-              if (batteryVoltage !== null) {
-                nextSnapshot.batteryVoltage = batteryVoltage
-              }
-              break
-            }
-
-            if (path.startsWith('propulsion.') && path.endsWith('.revolutions')) {
-              const revolutionsPerSecond = asNumber(entry.value)
-              if (revolutionsPerSecond !== null) {
-                nextSnapshot.engineRpm = revolutionsPerSecond * 60
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (!sawValue) {
-      return
-    }
-
-    nextSnapshot.observedAt = observedAt ?? new Date().toISOString()
-    nextSnapshot.source =
-      activeEntry.storedSnapshot?.source || activeEntry.vessel?.liveSnapshot?.source || 'live_feed'
-    nextSnapshot.statusNote =
-      namespace === 'auth' ? 'Live MyBoat collector telemetry' : 'Live public vessel telemetry'
-    nextSnapshot.updatedAt = new Date().toISOString()
-
-    updateEntry(namespace, activeEntry.key, (currentEntry) => {
+        : null
       const mergedSnapshot = mergeSnapshots(currentEntry.storedSnapshot, nextSnapshot)
 
       return {
@@ -1391,91 +944,164 @@ export function useMyBoatVesselStore() {
         liveSnapshot: nextSnapshot,
         mergedSnapshot,
         vessel: withMergedSnapshot(currentEntry.vessel, mergedSnapshot),
+        freshnessState: getFreshnessState(nextSnapshot?.observedAt || mergedSnapshot?.observedAt),
         live: {
           ...currentEntry.live,
-          lastDeltaAt: Date.now(),
+          lastDeltaAt: nextSnapshot ? Date.now() : currentEntry.live.lastDeltaAt,
+          sourceState: sourceState || currentEntry.live.sourceState,
         },
       }
     })
   }
 
-  function applyPayload(
+  function applyAisUpsert(
     namespace: VesselStoreNamespace,
-    controller: LiveController,
-    payload: unknown,
+    entryKey: string,
+    contact: AisContactSummary,
   ) {
-    if (Array.isArray(payload)) {
-      for (const item of payload) {
-        applyPayload(namespace, controller, item)
+    updateEntry(namespace, entryKey, (currentEntry) => ({
+      ...currentEntry,
+      aisContacts: {
+        ...currentEntry.aisContacts,
+        [contact.id]: contact,
+      },
+      live: {
+        ...currentEntry.live,
+        lastDeltaAt: Date.now(),
+      },
+    }))
+  }
+
+  function applyAisRemove(namespace: VesselStoreNamespace, entryKey: string, contactId: string) {
+    updateEntry(namespace, entryKey, (currentEntry) => {
+      if (!(contactId in currentEntry.aisContacts)) {
+        return currentEntry
       }
-      return
-    }
 
-    if (!payload || typeof payload !== 'object') {
-      return
-    }
+      const { [contactId]: _removed, ...nextContacts } = currentEntry.aisContacts
 
-    const delta = payload as SignalKDelta
-    if (!delta.context || !Array.isArray(delta.updates)) {
-      return
-    }
+      return {
+        ...currentEntry,
+        aisContacts: nextContacts,
+      }
+    })
+  }
 
-    updateContactFromDelta(namespace, controller, delta)
-    updateSelfSnapshotFromDelta(namespace, controller, delta)
+  function applyLiveMessage(
+    namespace: VesselStoreNamespace,
+    entryKey: string,
+    message: VesselLiveServerMessage,
+  ) {
+    switch (message.type) {
+      case 'sync':
+        applyLiveSnapshot(namespace, entryKey, message.snapshot, message.connectionState)
+        updateEntry(namespace, entryKey, (currentEntry) => {
+          const nextContacts = message.aisContacts.reduce<Record<string, AisContactSummary>>(
+            (accumulator, contact) => {
+              accumulator[contact.id] = contact
+              return accumulator
+            },
+            {},
+          )
+
+          return {
+            ...currentEntry,
+            aisContacts: nextContacts,
+            freshnessState: getFreshnessState(message.lastObservedAt),
+            live: {
+              ...currentEntry.live,
+              lastDeltaAt: Date.now(),
+              sourceState: message.connectionState,
+            },
+          }
+        })
+        return
+      case 'snapshot':
+        applyLiveSnapshot(namespace, entryKey, message.snapshot)
+        return
+      case 'ais_upsert':
+        applyAisUpsert(namespace, entryKey, message.contact)
+        return
+      case 'ais_remove':
+        applyAisRemove(namespace, entryKey, message.contactId)
+        return
+      case 'status':
+        updateEntry(namespace, entryKey, (currentEntry) => ({
+          ...currentEntry,
+          freshnessState: getFreshnessState(message.lastObservedAt),
+          live: {
+            ...currentEntry.live,
+            lastDeltaAt: Date.now(),
+            sourceState: message.connectionState,
+          },
+        }))
+        return
+    }
   }
 
   async function handleMessage(
     namespace: VesselStoreNamespace,
-    controller: LiveController,
+    entryKey: string,
     data: string | ArrayBuffer | Blob,
-    target: WebSocket,
   ) {
     try {
       const raw = await decodeMessageData(data)
-      const payload = JSON.parse(raw) as unknown
-      updateResolvedSelfContext(controller, target, resolveSelfContextFromMessage(payload))
-      applyPayload(namespace, controller, payload)
+      const payload = JSON.parse(raw) as VesselLiveServerMessage
+      applyLiveMessage(namespace, entryKey, payload)
     } catch {
-      // Ignore malformed upstream frames.
+      // Ignore malformed live frames.
     }
   }
 
-  function sendSubscriptions(controller: LiveController, target: WebSocket) {
-    for (const command of [
-      SIGNALK_AIS_SUBSCRIPTION_COMMAND,
-      createSelfSubscriptionCommand('vessels.self'),
-    ]) {
-      target.send(JSON.stringify(command))
+  function sendLiveDemand(namespace: VesselStoreNamespace, target: WebSocket) {
+    if (target.readyState !== WebSocket.OPEN) {
+      return
     }
 
-    if (controller.resolvedSelfContext) {
-      subscribeToResolvedSelfContext(controller, target, controller.resolvedSelfContext)
-    }
+    target.send(
+      JSON.stringify({
+        type: 'set_demand',
+        demand: getNamespaceEffectiveLiveDemand(namespace),
+      }),
+    )
   }
 
   async function connectNamespace(namespace: VesselStoreNamespace, controller: LiveController) {
     const urls = getNamespaceLiveUrls(namespace)
     const activeEntry = getActiveEntry(namespace)
+    const effectiveDemand = getNamespaceEffectiveLiveDemand(namespace)
 
-    if (!import.meta.client || !activeEntry || !urls.length) {
+    if (!import.meta.client || !activeEntry || !urls.length || isLiveDemandEmpty(effectiveDemand)) {
       disconnectNamespace(namespace, controller)
+      return
+    }
+
+    const targetUrl = urls[0]!
+
+    if (
+      controller.socket &&
+      controller.activeEntryKey === activeEntry.key &&
+      controller.activeUrl === targetUrl &&
+      controller.socket.readyState === WebSocket.OPEN
+    ) {
+      sendLiveDemand(namespace, controller.socket)
       return
     }
 
     clearReconnectTimer(controller)
     disconnectNamespace(namespace, controller)
     ensureStaleSweepTimer(namespace, controller)
-    resetControllerContext(controller)
 
     controller.activeEntryKey = activeEntry.key
+    controller.activeUrl = targetUrl
     setEntryLiveState(namespace, activeEntry.key, {
-      activeUrl: urls[controller.nextUrlIndex % urls.length] || null,
+      activeUrl: targetUrl,
       connectionState: 'connecting',
       hasSignalKSource: true,
+      sourceState: activeEntry.live.sourceState,
       lastError: null,
     })
 
-    const targetUrl = urls[controller.nextUrlIndex % urls.length]!
     const nextSocket = new WebSocket(targetUrl)
     controller.socket = nextSocket
 
@@ -1489,9 +1115,10 @@ export function useMyBoatVesselStore() {
         activeUrl: targetUrl,
         connectionState: 'connected',
         hasSignalKSource: true,
+        sourceState: activeEntry.live.sourceState,
         lastError: null,
       })
-      sendSubscriptions(controller, nextSocket)
+      sendLiveDemand(namespace, nextSocket)
     })
 
     nextSocket.addEventListener('message', (event) => {
@@ -1499,7 +1126,7 @@ export function useMyBoatVesselStore() {
         return
       }
 
-      void handleMessage(namespace, controller, event.data, nextSocket)
+      void handleMessage(namespace, activeEntry.key, event.data)
     })
 
     nextSocket.addEventListener('error', () => {
@@ -1509,7 +1136,7 @@ export function useMyBoatVesselStore() {
 
       setEntryLiveState(namespace, activeEntry.key, {
         connectionState: 'error',
-        lastError: 'Signal K feed unavailable',
+        lastError: 'MyBoat live feed unavailable',
       })
     })
 
@@ -1521,10 +1148,9 @@ export function useMyBoatVesselStore() {
       controller.socket = null
       setEntryLiveState(namespace, activeEntry.key, {
         connectionState: 'error',
-        lastError: 'Signal K feed disconnected',
+        lastError: 'MyBoat live feed disconnected',
       })
 
-      controller.nextUrlIndex = urls.length > 1 ? (controller.nextUrlIndex + 1) % urls.length : 0
       scheduleReconnect(namespace, controller)
     })
   }
@@ -1536,14 +1162,11 @@ export function useMyBoatVesselStore() {
 
     const controller: LiveController = {
       activeEntryKey: null,
-      nextUrlIndex: 0,
+      activeUrl: null,
       reconnectTimer: null,
-      resolvedSelfContext: null,
-      resolvedSelfMmsi: null,
       scope: effectScope(true),
       socket: null,
       staleSweepTimer: null,
-      subscribedSelfContext: null,
     }
 
     controller.scope.run(() => {
@@ -1556,11 +1179,11 @@ export function useMyBoatVesselStore() {
             setEntryLiveState(namespace, previousKey, {
               activeUrl: null,
               connectionState: 'idle',
+              sourceState: 'idle',
             })
           }
 
           controller.activeEntryKey = nextKey
-          controller.nextUrlIndex = 0
 
           const activeEntry = nextKey ? namespaceState.value.entriesByKey[nextKey] || null : null
           if (!activeEntry) {
@@ -1595,7 +1218,6 @@ export function useMyBoatVesselStore() {
             return
           }
 
-          controller.nextUrlIndex = 0
           if (!nextUrls.length) {
             disconnectNamespace(namespace, controller)
             const activeEntry = getActiveEntry(namespace)
@@ -1603,6 +1225,7 @@ export function useMyBoatVesselStore() {
               setEntryLiveState(namespace, activeEntry.key, {
                 activeUrl: null,
                 connectionState: 'idle',
+                sourceState: 'idle',
                 hasSignalKSource: false,
               })
             }
@@ -1612,6 +1235,33 @@ export function useMyBoatVesselStore() {
           void connectNamespace(namespace, controller)
         },
         { deep: true },
+      )
+
+      watch(
+        () => getNamespaceEffectiveLiveDemand(namespace),
+        (nextDemand, previousDemand) => {
+          if (JSON.stringify(nextDemand) === JSON.stringify(previousDemand)) {
+            return
+          }
+
+          const activeEntry = getActiveEntry(namespace)
+          if (!activeEntry) {
+            return
+          }
+
+          if (controller.socket?.readyState === WebSocket.OPEN) {
+            sendLiveDemand(namespace, controller.socket)
+            return
+          }
+
+          if (isLiveDemandEmpty(nextDemand)) {
+            disconnectNamespace(namespace, controller)
+            return
+          }
+
+          void connectNamespace(namespace, controller)
+        },
+        { deep: true, immediate: true },
       )
     })
 
@@ -1646,9 +1296,11 @@ export function useMyBoatVesselStore() {
     publicState: readonly(publicState),
     refreshPublicVesselDetail,
     serializeAisContacts,
+    setLiveDemand,
     setActiveAuthVessel,
     setActivePublicVessel,
     setRouteStatus,
+    clearLiveDemand,
     syncMergedSnapshot,
   }
 }

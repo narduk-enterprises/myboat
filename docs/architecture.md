@@ -1,10 +1,10 @@
 # MyBoat Architecture
 
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 
 This document captures the real MyBoat deployment topology after the move to
-the shared Narduk auth authority, plus the recommended next telemetry slice
-using concrete services and hosts that already exist in the stack.
+the shared Narduk auth authority, plus the telemetry architecture the app now
+targets across cloud and local boat deployments.
 
 ## Topology
 
@@ -17,7 +17,8 @@ flowchart TB
   subgraph Users["Users"]
     Owner["Owner / captain browser"]
     Public["Public visitor browser"]
-    Boat["SignalK source or<br/>MyBoat edge agent<br/>Docker / Raspberry Pi"]
+    Boat["Boat sensors / SignalK<br/>local collector container"]
+    Local["Boat-local browser<br/>myboat.local"]
   end
 
   subgraph Cloudflare["Cloudflare edge"]
@@ -25,15 +26,15 @@ flowchart TB
     Web["Nuxt app on Cloudflare Workers<br/>https://mybo.at<br/>routes + APIs<br/>/api/ingest/v1/delta<br/>/api/signalk/relay"]
     D1["D1<br/>myboat-db<br/>vessels, installs,<br/>sharing + snapshot cache"]
     KV["Cloudflare KV<br/>binding: KV"]
-    Queue["Cloudflare Queues<br/>planned ingest buffer"]
-    Live["SSE / WebSocket fanout from mybo.at<br/>planned live owner + public updates"]
+    Live["Per-vessel MyBoat live broker<br/>owner + public live updates"]
   end
 
   subgraph Linode["Linode narduk<br/>173.255.193.57<br/>100.100.231.109"]
     Caddy["Caddy reverse proxy<br/>auth.nard.uk and vps.nard.uk"]
     Auth["supabase-auth container<br/>127.0.0.1:9999"]
     AuthPg["PostgreSQL on narduk<br/>database: supabase_auth"]
-    Influx["influx-replica on narduk<br/>planned MyBoat bucket<br/>retention + rollups"]
+    Influx["InfluxDB on Linode<br/>MyBoat telemetry buckets<br/>retention + rollups"]
+    LocalApp["Boat-local MyBoat deployment<br/>myboat.local<br/>same MyBoat API contract"]
   end
 
   subgraph AuthHosts["Fleet auth hostnames"]
@@ -50,21 +51,18 @@ flowchart TB
   AuthProd --> Caddy --> Auth --> AuthPg
   AuthStage --> Caddy
 
-  Boat -->|"POST SignalK deltas<br/>/api/ingest/v1/delta"| Web
-  Boat -.->|"optional relay today<br/>wss://mybo.at/api/signalk/relay"| Web
-
-  Web -.->|"recommended next step"| Queue
-  Queue -.->|"normalize + enrich + passage logic"| Influx
-  Queue -.->|"update snapshot,<br/>heartbeat, public-safe state"| D1
-
+  Boat -->|"POST normalized deltas<br/>/api/ingest/v1/delta"| Web
+  Boat -->|"direct local telemetry"| LocalApp
+  Web -->|"latest snapshot, install heartbeat,<br/>sharing state"| D1
+  Web -->|"write time-series history"| Influx
+  Web -->|"publish normalized live events"| Live
+  LocalApp -->|"same MyBoat API + live contract<br/>LAN only"| Local
   Web -.->|"historical queries and chart data"| Influx
-  Web -.-> Live
   Live -.-> Owner
   Live -.-> Public
 
-  class DNS,Web,D1,KV,Caddy,Auth,AuthPg,AuthProd,AuthStage live;
-  class Queue,Live,Influx planned;
-  class Owner,Public,Boat external;
+  class DNS,Web,D1,KV,Caddy,Auth,AuthPg,AuthProd,AuthStage,Live,Influx,LocalApp live;
+  class Owner,Public,Boat,Local external;
 ```
 
 ## What Is Live Today
@@ -74,7 +72,6 @@ flowchart TB
 - The app already exposes:
   - dashboard and public profile routes
   - `POST /api/ingest/v1/delta`
-  - `wss://mybo.at/api/signalk/relay`
 - Auth is no longer app-local only. The app is configured to use the external
   Supabase-compatible authority when `AUTH_AUTHORITY_URL` and the Supabase keys
   are present.
@@ -88,27 +85,44 @@ flowchart TB
 - MyBoat still keeps its own first-party app session and app-owned vessel data;
   the external auth service is the identity authority, not the app database.
 
-## Recommended Next Telemetry Slice
+## Telemetry Responsibilities
 
-- Keep D1 as the operational store for users, vessels, installations, sharing
-  controls, API key mappings, latest vessel snapshot, and derived public-safe
-  state.
-- Put durable telemetry history in Influx, using the existing
-  `influx-replica` service already present on `narduk`.
-- Insert Cloudflare Queues between `/api/ingest/v1/delta` and downstream
-  processing so the Worker does not do full telemetry normalization inline.
-- Have the queue consumer:
-  - write raw or normalized timeseries into an isolated MyBoat bucket in Influx
-  - update `vessel_live_snapshots` and installation heartbeat state in D1
-  - emit public-safe and owner-safe live updates for SSE or WebSocket fanout
-- Keep browsers off raw SignalK and raw Influx endpoints. The app should remain
-  the only public read surface for dashboard, public profile, and live updates.
+- The collector is the only supported ingest source for cloud MyBoat.
+- D1 is the operational store for:
+  - users, vessels, and installations
+  - sharing controls
+  - ingest keys
+  - installation heartbeat
+  - latest vessel snapshot and other app-facing derived state
+- InfluxDB is the historical telemetry store for all boats.
+- The live broker is the browser-facing live source for owner and public views.
+- Browsers do not connect to raw SignalK or raw InfluxDB endpoints.
+
+## Browser Data Flow
+
+Remote browser flow:
+
+1. Boat collector reads local telemetry.
+2. Collector posts normalized deltas to `POST /api/ingest/v1/delta`.
+3. MyBoat updates D1 with latest vessel snapshot and installation heartbeat.
+4. MyBoat writes telemetry history to InfluxDB.
+5. MyBoat publishes normalized live events to a per-vessel live broker.
+6. Browser loads initial state from MyBoat REST APIs.
+7. Browser subscribes to a MyBoat live route for incremental updates.
+
+Local boat flow:
+
+1. The boat runs a local MyBoat deployment on `myboat.local` or a similar LAN hostname.
+2. That local deployment reads onboard telemetry directly.
+3. Boat-local browsers read only MyBoat-shaped APIs and live updates from the local deployment.
+4. The browser contract stays the same; only the serving origin changes.
 
 ## Service Placement
 
 - `mybo.at`
   - Cloudflare custom domain for the MyBoat app
   - serves the Nuxt Worker and all app APIs
+  - owns remote owner/public reads and remote live fanout
 - `auth.nard.uk`
   - production fleet auth authority
   - exposed by Caddy on `narduk`
@@ -119,7 +133,7 @@ flowchart TB
   - Linode host
   - public IP `173.255.193.57`
   - tailscale IP `100.100.231.109`
-  - currently hosts Caddy, `supabase-auth`, PostgreSQL, and `influx-replica`
+  - currently hosts Caddy, `supabase-auth`, PostgreSQL, and InfluxDB
 
 ## Source Of Truth
 

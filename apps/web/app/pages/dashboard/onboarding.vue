@@ -27,7 +27,7 @@ const setupHighlights = [
   },
   {
     label: 'First install',
-    value: 'Keys + SignalK',
+    value: 'Keys + collector',
   },
 ]
 
@@ -108,11 +108,6 @@ async function handleComplete(redirectTo: string) {
           summary: data?.vessels?.[0]?.summary || '',
           installationLabel: data?.installations?.[0]?.label || '',
           edgeHostname: data?.installations?.[0]?.edgeHostname || '',
-          signalKUrl:
-            data?.installations?.[0]?.collectorSignalKUrl ||
-            data?.installations?.[0]?.signalKUrl ||
-            data?.defaultSignalKUrl ||
-            '',
         }"
         @complete="handleComplete"
       />

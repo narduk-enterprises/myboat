@@ -49,7 +49,7 @@ const quickSignals = [
   },
   {
     label: 'Live feed',
-    value: 'SignalK ready',
+    value: 'Collector ready',
     detail: 'Connect when hardware is ready.',
   },
   {
@@ -70,7 +70,7 @@ const workflow = [
   },
   {
     title: 'Connect a feed',
-    detail: 'Use SignalK or the relay URL.',
+    detail: 'Launch the collector and point it at your onboard feed.',
   },
   {
     title: 'Share when ready',

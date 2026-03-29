@@ -38,11 +38,17 @@ management are deferred until the single-vessel operator console is stable.
 - identity authority lives outside the app at `https://auth.nard.uk/auth/v1`
 - `https://vps.nard.uk/auth/v1` remains the staging and rollback auth origin
 - MyBoat keeps first-party app sessions and vessel data in its own app storage
-- historical telemetry is intended to land in Influx on `narduk`
-- Cloudflare Queues is the intended message backlog between ingest and
-  downstream telemetry processing
-- owner and public live views should consume a MyBoat-managed live stream, not
-  raw browser connections to boat-local SignalK or raw Influx endpoints
+- historical telemetry lands in InfluxDB on `narduk` / Linode
+- D1 remains the operational store for captain, vessel, installation, sharing,
+  heartbeat, and latest-snapshot state
+- owner and public live views consume MyBoat-managed live streams, not raw
+  browser connections to SignalK or InfluxDB
+- remote browsers load initial state from MyBoat APIs, then subscribe to
+  MyBoat-native live updates for incremental changes
+- boats can also run a local MyBoat deployment on `myboat.local` or a similar
+  LAN hostname; that local deployment serves the same MyBoat-shaped APIs and
+  live stream while reading directly from onboard telemetry to reduce boat-side
+  bandwidth
 
 ## Target users
 
@@ -112,21 +118,26 @@ credentials, and internal telemetry views.
 - owner and public pages can subscribe to low-latency live updates sourced by
   MyBoat-managed fanout
 - browsers must not depend on direct connections to a vessel's private SignalK
-  websocket
+  websocket or raw InfluxDB endpoints
+- the browser contract is always a MyBoat API plus a MyBoat-native live stream,
+  whether the app is running at `mybo.at` or on a local boat hostname
 
 ### 4. Live-source management
 
 - installs represent real onboard or near-boat device deployments
-- installs hold hostnames, SignalK stream URLs, connectivity state, event
-  counts, and last-seen timestamps
+- installs hold hostnames, connectivity state, event counts, and last-seen
+  timestamps
 - install pages can issue ingest keys tied to the install
 - one install is treated as the canonical live-data source for the vessel at
   launch
 - installation selection and setup live inside vessel/settings workflows rather
   than acting as a first-class route family in the primary IA
-- installs may use either:
-  - a direct SignalK stream URL configured by the owner
-  - a MyBoat edge agent delivered as a Docker image or Raspberry Pi image
+- installs use a MyBoat collector delivered as a Docker image or similar
+  onboard package
+- MyBoat does not store or expose user-managed SignalK websocket URLs as part
+  of the product contract
+- the collector may read local onboard telemetry, but once data enters MyBoat
+  the product serves only MyBoat-native data shapes
 
 ### 5. Buddy boats
 
@@ -136,19 +147,19 @@ credentials, and internal telemetry views.
 
 ### 6. Telemetry transport and storage
 
-- a single collector path should normalize SignalK data before fanout or
+- a single collector path normalizes incoming telemetry before fanout or
   storage
-- live viewer updates and historical ingest should happen in parallel from the
-  same normalized stream
-- historical telemetry should be batched before queue submission instead of
-  enqueueing every raw sensor tick as its own message
-- queue payload sizing should optimize for both latency and Cloudflare's `64 KB`
-  billing boundary, with time-based flushes as a hard cap
+- collector ingest is the canonical cloud entrypoint:
+  `boat sensors / SignalK -> collector -> MyBoat ingest`
+- live viewer updates and historical ingest happen in parallel from the same
+  normalized stream
 - D1 stores latest vessel state, install heartbeat, sharing flags, and other
   app-facing derived state
-- Influx stores time-series history and rollups
+- InfluxDB stores time-series history and rollups for all boats
 - public and dashboard clients read telemetry through MyBoat APIs and managed
   live channels, not through raw SignalK or raw Influx browser access
+- local boat deployments can read directly from onboard telemetry, but they
+  still expose the same MyBoat-shaped API contract to browsers
 
 ### 7. Passages
 
@@ -204,11 +215,12 @@ authenticated IA:
 1. Open settings or vessel context and reach the current installation detail.
 2. Generate an ingest key.
 3. Copy the collector command template.
-4. Point a collector or bridge service at `/api/ingest/v1/delta`.
+4. Point the collector at `/api/ingest/v1/delta` and its local onboard telemetry
+   source.
 5. Confirm live snapshot and last-seen updates on dashboard and vessel pages.
 6. Allow the same normalized telemetry stream to feed both:
    - low-latency live viewing
-   - batched historical storage
+   - historical storage in InfluxDB
 
 ### Public sharing
 
@@ -285,9 +297,11 @@ explicitly deferred.
 - Narduk auth, D1, mutation helpers, API-key hashing, SEO, and app shell
   conventions are canonical
 - the spec reflects the external Narduk auth authority and rollback hostname
-- the spec reflects Cloudflare Queues as the telemetry backlog and Influx as
-  historical time-series storage
+- the spec reflects InfluxDB as historical time-series storage and D1 as the
+  operational state store
 - logged-in visits to `/` redirect to `/dashboard`
 - `/api/ingest/v1/delta` exists and updates install + live snapshot state
+- owner and public vessel pages read live deltas through MyBoat-managed live
+  routes, not raw SignalK browser sockets
 - no placeholder home/about/contact scaffold remains
 - docs describe the real migrated product, not the provision brief

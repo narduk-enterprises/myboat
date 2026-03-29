@@ -28,10 +28,13 @@ Status: UNLOCKED
 - `GET /api/app/dashboard`
 - `POST /api/app/onboarding`
 - `GET /api/app/vessels/[vesselSlug]`
+- `GET /api/app/vessels/[vesselSlug]/live`
 - `GET /api/app/installations/[installationId]`
 - `POST /api/app/installations/[installationId]/keys`
 - `POST /api/ingest/v1/delta`
 - `GET /api/public/[username]`
+- `GET /api/public/[username]/[vesselSlug]`
+- `GET /api/public/[username]/[vesselSlug]/live`
 
 ## Page composition requirements
 
@@ -106,7 +109,7 @@ Status: UNLOCKED
 - hero
 - captain profile section
 - vessel profile section
-- live-feed setup section
+- collector setup section
 - sharing section
 - security section
 - local preferences section
@@ -143,6 +146,10 @@ Status: UNLOCKED
 - state-changing routes use shared mutation helpers
 - public/private page SEO must use `useSeo()` and `useWebPageSchema()`
 - page data loading uses `useFetch()` or `useAsyncData()`
+- browsers read only MyBoat-owned APIs and MyBoat-owned live routes
+- D1 is the operational state store; InfluxDB is the historical telemetry store
+- local boat deployments may read onboard telemetry directly, but they must
+  expose the same MyBoat-shaped browser contract as `mybo.at`
 
 ## Theme rules
 

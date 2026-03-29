@@ -12,7 +12,6 @@ import {
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
-import { applyPublicSignalKDefaults } from '#server/utils/signalkRelay'
 
 export default defineEventHandler(async (event) => {
   const username = getRouterParam(event, 'username')
@@ -47,7 +46,6 @@ export default defineEventHandler(async (event) => {
     mediaRows,
     waypointRows,
   )
-  const resolvedInstallations = applyPublicSignalKDefaults(event, installations)
 
   return {
     profile: toCaptainProfileSummary(profileRow),
@@ -56,6 +54,6 @@ export default defineEventHandler(async (event) => {
       freshnessState: getPublicFreshnessState(vessel.liveSnapshot?.observedAt || null),
     })),
     followedVessels: serializeFollowedVessels(followedVesselRows),
-    installations: resolvedInstallations,
+    installations,
   }
 })

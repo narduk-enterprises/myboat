@@ -1,18 +1,11 @@
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
-import { resolveSignalKRelayOrigin } from './shared/signalkRelay'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const localNuxtPort = Number(process.env.NUXT_PORT || 3000)
 const localSiteUrl = `http://localhost:${Number.isFinite(localNuxtPort) ? localNuxtPort : 3000}`
 const canonicalSiteUrl = process.env.SITE_URL || 'https://mybo.at'
 const publicAppUrl = process.env.SITE_URL || localSiteUrl
-const relayCspConnectSrc = [
-  process.env.CSP_CONNECT_SRC || '',
-  resolveSignalKRelayOrigin(publicAppUrl),
-]
-  .filter(Boolean)
-  .join(', ')
 
 const configuredAuthBackend = process.env.AUTH_BACKEND
 const authBackend =
@@ -74,12 +67,11 @@ export default defineNuxtConfig({
     authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',
     authServiceRoleKey: process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || '',
     authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',
-    signalkRelayUpstreamUrl:
-      process.env.SIGNALK_RELAY_UPSTREAM_URL ||
-      'wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all',
-    signalkRelayOwnerAppleId: process.env.SIGNALK_RELAY_OWNER_APPLE_ID || '',
-    signalkRelayOwnerEmail: process.env.SIGNALK_RELAY_OWNER_EMAIL || '',
-    signalkRelayOwnerUserId: process.env.SIGNALK_RELAY_OWNER_USER_ID || '',
+    influxWriteUrl: process.env.INFLUX_WRITE_URL || '',
+    influxOrg: process.env.INFLUX_ORG || '',
+    influxBucket: process.env.INFLUX_BUCKET || '',
+    influxToken: process.env.INFLUX_TOKEN || '',
+    localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
     turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
     posthogOwnerDistinctId: process.env.POSTHOG_OWNER_DISTINCT_ID || '',
     // Server-only (admin API routes)
@@ -107,7 +99,8 @@ export default defineNuxtConfig({
       posthogPublicKey: process.env.POSTHOG_PUBLIC_KEY || '',
       posthogHost: process.env.POSTHOG_HOST || 'https://us.i.posthog.com',
       gaMeasurementId: process.env.GA_MEASUREMENT_ID || '',
-      cspConnectSrc: relayCspConnectSrc,
+      cspConnectSrc: process.env.CSP_CONNECT_SRC || '',
+      localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
       // IndexNow
       indexNowKey: process.env.INDEXNOW_KEY || '',
     },

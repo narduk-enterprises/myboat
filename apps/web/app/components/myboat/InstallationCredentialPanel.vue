@@ -13,77 +13,13 @@ const { createInstallationKey, pending: loading } = useCreateInstallationKey(pro
 const keys = ref<InstallationKeySummary[]>(props.initialKeys)
 const pendingKey = shallowRef<string | null>(null)
 const baseUrl = computed(() => useRuntimeConfig().public.appUrl || routeUrl.origin)
+const localBoatHostname = computed(() => useRuntimeConfig().public.localBoatHostname || 'myboat.local')
 
-function buildCollectorCommand(signalKUrl: string) {
-  return `docker run -d -e SIGNALK_WS_URL=${signalKUrl} -e MYBOAT_INGEST_URL=${baseUrl.value}/api/ingest/v1/delta -e MYBOAT_INGEST_KEY=<YOUR_API_KEY> <collector-image>`
+function buildCollectorCommand() {
+  return `docker run -d -e SIGNALK_WS_URL=ws://your-signalk:3000/signalk/v1/stream -e MYBOAT_INGEST_URL=${baseUrl.value}/api/ingest/v1/delta -e MYBOAT_INGEST_KEY=<YOUR_API_KEY> <collector-image>`
 }
 
-const preferredSignalKUrl = computed(
-  () => props.installation.collectorSignalKUrl || 'ws://your-signalk:3000/signalk/v1/stream',
-)
-
-const signalKModeLabel = computed(() => {
-  switch (props.installation.signalKAccessMode) {
-    case 'relay':
-      return 'MyBoat relay'
-    case 'direct':
-      return 'Direct Signal K'
-    default:
-      return 'Pending'
-  }
-})
-
-const signalKModeDescription = computed(() => {
-  switch (props.installation.signalKAccessMode) {
-    case 'relay':
-      return 'The collector connects to MyBoat first, then MyBoat relays the Tideye Signal K feed.'
-    case 'direct':
-      return 'The collector connects straight to the configured Signal K websocket and still posts deltas to MyBoat.'
-    default:
-      return 'Add a Signal K websocket URL or use a relay-backed default before launching the collector.'
-  }
-})
-
-const setupCommand = computed(() => {
-  return buildCollectorCommand(preferredSignalKUrl.value)
-})
-
-const alternateSignalKTarget = computed(() => {
-  if (
-    props.installation.signalKAccessMode === 'relay' &&
-    props.installation.signalKUrl &&
-    props.installation.signalKUrl !== props.installation.collectorSignalKUrl
-  ) {
-    return {
-      label: 'Direct Signal K alternative',
-      description: 'Bypass the MyBoat relay and point the collector at the upstream websocket.',
-      signalKUrl: props.installation.signalKUrl,
-    }
-  }
-
-  if (
-    props.installation.signalKAccessMode === 'direct' &&
-    props.installation.relaySignalKUrl &&
-    props.installation.relaySignalKUrl !== props.installation.collectorSignalKUrl
-  ) {
-    return {
-      label: 'MyBoat relay alternative',
-      description:
-        'Use the MyBoat relay instead of the upstream websocket for the collector input.',
-      signalKUrl: props.installation.relaySignalKUrl,
-    }
-  }
-
-  return null
-})
-
-const alternateSetupCommand = computed(() => {
-  if (!alternateSignalKTarget.value) {
-    return null
-  }
-
-  return buildCollectorCommand(alternateSignalKTarget.value.signalKUrl)
-})
+const setupCommand = computed(() => buildCollectorCommand())
 
 async function createKey() {
   try {
@@ -132,10 +68,7 @@ async function copyValue(value: string, message: string) {
             </UBadge>
           </div>
           <p class="mt-1 text-sm text-muted">
-            {{
-              installation.edgeHostname || installation.signalKUrl || 'Connection target pending'
-            }}
-            <span v-if="installation.collectorSignalKUrl"> · {{ signalKModeLabel }}</span>
+            {{ installation.edgeHostname || localBoatHostname || 'Connection target pending' }}
           </p>
         </div>
 
@@ -155,25 +88,18 @@ async function copyValue(value: string, message: string) {
       <div class="rounded-2xl border border-default bg-elevated/60 p-4">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-sm font-medium text-default">Collector Signal K target</p>
-            <p class="mt-1 text-xs text-muted">{{ signalKModeDescription }}</p>
+            <p class="text-sm font-medium text-default">Collector input</p>
+            <p class="mt-1 text-xs text-muted">
+              Point `SIGNALK_WS_URL` at the onboard feed. MyBoat only receives normalized deltas.
+            </p>
           </div>
           <UBadge color="primary" variant="soft">
-            {{ signalKModeLabel }}
+            MyBoat ingest
           </UBadge>
         </div>
 
         <p class="mt-4 break-all rounded-xl bg-default px-3 py-2 font-mono text-sm text-default">
-          {{ installation.collectorSignalKUrl || 'Signal K URL pending' }}
-        </p>
-
-        <p
-          v-if="
-            installation.signalKUrl && installation.signalKUrl !== installation.collectorSignalKUrl
-          "
-          class="mt-3 text-xs text-muted"
-        >
-          Direct upstream available: {{ installation.signalKUrl }}
+          ws://your-signalk:3000/signalk/v1/stream
         </p>
       </div>
 
@@ -217,28 +143,22 @@ async function copyValue(value: string, message: string) {
       </div>
 
       <div
-        v-if="alternateSetupCommand"
         class="rounded-2xl border border-default bg-elevated/60 p-4"
       >
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <p class="text-sm font-medium text-default">{{ alternateSignalKTarget?.label }}</p>
-            <p class="mt-1 text-xs text-muted">{{ alternateSignalKTarget?.description }}</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-2xl border border-default bg-default/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-muted">Local boat host</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{ installation.edgeHostname || localBoatHostname }}
+            </p>
           </div>
-          <UButton
-            color="neutral"
-            variant="soft"
-            size="sm"
-            icon="i-lucide-copy"
-            @click="copyValue(alternateSetupCommand, 'Alternate collector command copied')"
-          >
-            Copy alternate
-          </UButton>
+          <div class="rounded-2xl border border-default bg-default/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-muted">Connection state</p>
+            <p class="mt-2 text-sm font-medium text-default">
+              {{ installation.connectionState }}
+            </p>
+          </div>
         </div>
-
-        <pre class="mt-4 overflow-x-auto rounded-xl bg-inverted px-4 py-3 text-xs text-inverted">{{
-          alternateSetupCommand
-        }}</pre>
       </div>
 
       <div>

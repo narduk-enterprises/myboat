@@ -13,17 +13,10 @@ const installation = computed(() => detail.value?.installation || null)
 const appFetch = useAppFetch()
 const toast = useToast()
 const actionPending = ref<'primary' | 'archive' | null>(null)
-
-const signalKModeLabel = computed(() => {
-  switch (installation.value?.signalKAccessMode) {
-    case 'relay':
-      return 'MyBoat relay'
-    case 'direct':
-      return 'Direct Signal K'
-    default:
-      return 'Signal K pending'
-  }
-})
+const localBoatHostname = computed(() => useRuntimeConfig().public.localBoatHostname || 'myboat.local')
+const collectorModeLabel = computed(() =>
+  installation.value?.installationType === 'collector_ingest' ? 'Collector ingest' : 'Collector',
+)
 
 const lastSeenLabel = computed(() => {
   if (!installation.value?.lastSeenAt) {
@@ -128,8 +121,9 @@ async function archiveInstallation() {
                 {{ detail.installation.label }}
               </h1>
               <p class="mt-3 max-w-2xl text-base text-muted sm:text-lg">
-                Linked to {{ detail.installation.vesselName }}. Issue ingest keys, choose the Signal
-                K path, and verify whether this collector is actively feeding the vessel surfaces.
+                Linked to {{ detail.installation.vesselName }}. Issue ingest keys, verify the
+                collector posture, and confirm whether this install is actively feeding the vessel
+                surfaces.
               </p>
             </div>
 
@@ -145,7 +139,7 @@ async function archiveInstallation() {
               >
                 {{ detail.installation.connectionState }}
               </UBadge>
-              <UBadge color="neutral" variant="soft">{{ signalKModeLabel }}</UBadge>
+              <UBadge color="neutral" variant="soft">{{ collectorModeLabel }}</UBadge>
               <UBadge color="primary" variant="soft">{{ detail.installation.vesselName }}</UBadge>
             </div>
 
@@ -167,8 +161,7 @@ async function archiveInstallation() {
               <p class="mt-2 font-display text-2xl text-default">
                 {{
                   detail.installation.edgeHostname ||
-                  detail.installation.collectorSignalKUrl ||
-                  detail.installation.signalKUrl ||
+                  localBoatHostname ||
                   'Hostname still pending'
                 }}
               </p>
@@ -176,9 +169,9 @@ async function archiveInstallation() {
 
               <div class="mt-4 grid gap-3 sm:grid-cols-2">
                 <div class="rounded-2xl border border-default bg-elevated/70 px-4 py-3">
-                  <p class="text-xs uppercase tracking-[0.22em] text-muted">Signal K target</p>
+                  <p class="text-xs uppercase tracking-[0.22em] text-muted">Local boat host</p>
                   <p class="mt-2 font-medium text-default">
-                    {{ detail.installation.collectorSignalKUrl || 'Pending configuration' }}
+                    {{ detail.installation.edgeHostname || localBoatHostname }}
                   </p>
                 </div>
 
@@ -204,19 +197,14 @@ async function archiveInstallation() {
 
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
               <p class="text-xs uppercase tracking-[0.24em] text-muted">Collector mode</p>
-              <p class="mt-2 font-display text-2xl text-default">{{ signalKModeLabel }}</p>
-              <p class="mt-2 text-xs text-muted">
-                {{ detail.installation.collectorSignalKUrl || 'Awaiting websocket target' }}
-              </p>
+              <p class="mt-2 font-display text-2xl text-default">{{ collectorModeLabel }}</p>
+              <p class="mt-2 text-xs text-muted">Cloud ingest with optional local boat access.</p>
             </div>
 
             <div class="metric-shell rounded-[1.5rem] p-4 shadow-card">
               <p class="text-xs uppercase tracking-[0.24em] text-muted">Edge hostname</p>
               <p class="mt-2 font-display text-2xl text-default">
-                {{ detail.installation.edgeHostname || 'Pending' }}
-              </p>
-              <p class="mt-2 text-xs text-muted">
-                {{ detail.installation.signalKUrl || 'Upstream Signal K route not set yet' }}
+                {{ detail.installation.edgeHostname || localBoatHostname }}
               </p>
             </div>
 
@@ -294,10 +282,7 @@ async function archiveInstallation() {
             <p class="text-xs uppercase tracking-wide text-muted">Connection target</p>
             <p class="mt-2 text-sm font-medium text-default">
               {{
-                detail.installation.edgeHostname ||
-                detail.installation.collectorSignalKUrl ||
-                detail.installation.signalKUrl ||
-                'No hostname or SignalK endpoint recorded yet'
+                detail.installation.edgeHostname || localBoatHostname || 'No hostname recorded yet'
               }}
             </p>
           </div>

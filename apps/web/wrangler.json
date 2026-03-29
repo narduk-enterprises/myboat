@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
   "name": "myboat",
-  "main": ".output/server/index.mjs",
+  "main": "worker-entry.ts",
   "assets": {
     "directory": ".output/public"
   },
@@ -15,6 +15,20 @@
       "binding": "DB",
       "database_name": "myboat-db",
       "database_id": "c56bed08-5796-4f2f-9cc9-9d9b43502f22"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VESSEL_LIVE_BROKER",
+        "class_name": "VesselLiveBroker"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["VesselLiveBroker"]
     }
   ],
   "ratelimits": [

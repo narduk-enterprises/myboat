@@ -35,6 +35,7 @@ const props = withDefaults(
     liveConnectionState?: 'idle' | 'connecting' | 'connected' | 'error'
     liveLastDeltaAt?: number | null
     hasSignalKSource?: boolean
+    trafficEnabled?: boolean
     heightClass?: string
     persistKey?: string | null
     showFocusPanel?: boolean
@@ -50,6 +51,7 @@ const props = withDefaults(
     liveConnectionState: undefined,
     liveLastDeltaAt: null,
     hasSignalKSource: undefined,
+    trafficEnabled: undefined,
     heightClass: 'h-[24rem] sm:h-[30rem] lg:h-[38rem] xl:h-[44rem]',
     persistKey: null,
     showFocusPanel: true,
@@ -59,11 +61,15 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{
+  'update:trafficEnabled': [value: boolean]
+}>()
+
 const mapRef = useTemplateRef<MyBoatMapHandle>('mapRoot')
 const selectedId = shallowRef<string | null>(null)
 const showRoutes = shallowRef(true)
 const showWaypoints = shallowRef(true)
-const showTraffic = shallowRef(true)
+const localTrafficEnabled = shallowRef(true)
 const showTrafficVectors = shallowRef(false)
 const showPointsOfInterest = shallowRef(true)
 const trafficInitialized = shallowRef(false)
@@ -74,38 +80,23 @@ const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const waypointPins = computed(() => buildWaypointPins(props.waypoints))
-const usingExternalTrafficState = computed(() => props.hasSignalKSource !== undefined)
-
-const internalTraffic = useMyBoatNearbyAis({
-  enabled: computed(() => showTraffic.value),
-  focusSnapshot,
-  installations: toRef(props, 'installations'),
-  primaryVessel,
+const showTraffic = computed({
+  get: () => props.trafficEnabled ?? localTrafficEnabled.value,
+  set: (value: boolean) => {
+    localTrafficEnabled.value = value
+    emit('update:trafficEnabled', value)
+  },
 })
 const aisPins = computed(() =>
-  usingExternalTrafficState.value
-    ? buildNearbyAisPins({
-        contacts: props.aisContacts || [],
-        focusSnapshot: focusSnapshot.value,
-        primaryVesselName: primaryVessel.value?.name || null,
-      })
-    : internalTraffic.aisPins.value,
+  buildNearbyAisPins({
+    contacts: props.aisContacts || [],
+    focusSnapshot: focusSnapshot.value,
+    primaryVesselName: primaryVessel.value?.name || null,
+  }),
 )
-const connectionState = computed(() =>
-  usingExternalTrafficState.value
-    ? props.liveConnectionState || 'idle'
-    : internalTraffic.connectionState.value,
-)
-const hasSignalKSource = computed(() =>
-  usingExternalTrafficState.value
-    ? Boolean(props.hasSignalKSource)
-    : internalTraffic.hasSignalKSource.value,
-)
-const lastDeltaAt = computed(() =>
-  usingExternalTrafficState.value
-    ? (props.liveLastDeltaAt ?? null)
-    : internalTraffic.lastDeltaAt.value,
-)
+const connectionState = computed(() => props.liveConnectionState || 'idle')
+const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
+const lastDeltaAt = computed(() => props.liveLastDeltaAt ?? null)
 
 const mapItems = computed(() => [
   ...vesselPins.value,

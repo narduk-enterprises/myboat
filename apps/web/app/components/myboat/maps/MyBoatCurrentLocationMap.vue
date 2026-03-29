@@ -18,27 +18,39 @@ const props = withDefaults(
     installations?: MyBoatMapInstallation[]
     aisContacts?: AisContactSummary[]
     hasSignalKSource?: boolean
+    trafficEnabled?: boolean
     heightClass?: string
   }>(),
   {
     installations: () => [],
     aisContacts: undefined,
     hasSignalKSource: undefined,
+    trafficEnabled: undefined,
     heightClass: 'h-[22rem] sm:h-[28rem] lg:h-[32rem]',
   },
 )
 
+const emit = defineEmits<{
+  'update:trafficEnabled': [value: boolean]
+}>()
+
 const mapRef = useTemplateRef<MyBoatMapHandle>('mapRoot')
 const isCompactViewport = useCompactViewport()
 const selectedId = shallowRef<string | null>(null)
-const showTraffic = shallowRef(true)
+const localTrafficEnabled = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
-const usingExternalTrafficState = computed(() => props.hasSignalKSource !== undefined)
+const showTraffic = computed({
+  get: () => props.trafficEnabled ?? localTrafficEnabled.value,
+  set: (value: boolean) => {
+    localTrafficEnabled.value = value
+    emit('update:trafficEnabled', value)
+  },
+})
 const fallbackCenter = computed(() => {
   const snapshot = focusSnapshot.value
   if (
@@ -53,26 +65,14 @@ const fallbackCenter = computed(() => {
   return { lat: 29.3043, lng: -94.7977 }
 })
 
-const internalTraffic = useMyBoatNearbyAis({
-  enabled: computed(() => showTraffic.value),
-  focusSnapshot,
-  installations: toRef(props, 'installations'),
-  primaryVessel,
-})
 const aisPins = computed(() =>
-  usingExternalTrafficState.value
-    ? buildNearbyAisPins({
-        contacts: props.aisContacts || [],
-        focusSnapshot: focusSnapshot.value,
-        primaryVesselName: primaryVessel.value?.name || null,
-      })
-    : internalTraffic.aisPins.value,
+  buildNearbyAisPins({
+    contacts: props.aisContacts || [],
+    focusSnapshot: focusSnapshot.value,
+    primaryVesselName: primaryVessel.value?.name || null,
+  }),
 )
-const hasSignalKSource = computed(() =>
-  usingExternalTrafficState.value
-    ? Boolean(props.hasSignalKSource)
-    : internalTraffic.hasSignalKSource.value,
-)
+const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
 
 function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: boolean) {
   return createVesselPinElement(item, isSelected, {

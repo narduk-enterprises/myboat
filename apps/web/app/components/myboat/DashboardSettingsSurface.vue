@@ -187,10 +187,10 @@ const setupIncomplete = computed(
       <UCard class="border-default/80 bg-default/90 shadow-card">
         <template #header>
           <div>
-            <h2 class="font-display text-2xl text-default">Live-feed setup</h2>
+            <h2 class="font-display text-2xl text-default">Collector setup</h2>
             <p class="mt-1 text-sm text-muted">
               Installation is still part of the model, but this is where the captain should think
-              about the active source.
+              about the active collector path.
             </p>
           </div>
         </template>
@@ -217,9 +217,7 @@ const setupIncomplete = computed(
               </p>
               <p class="mt-1 text-xs text-muted">
                 {{
-                  primaryInstallation?.edgeHostname ||
-                  primaryInstallation?.signalKUrl ||
-                  'Signal K target still needs configuration.'
+                  primaryInstallation?.edgeHostname || 'Local boat host still needs configuration.'
                 }}
               </p>
             </div>

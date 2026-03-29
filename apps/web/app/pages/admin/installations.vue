@@ -38,7 +38,7 @@ watchEffect(() => {
   <div v-if="overview" class="space-y-8">
     <UPageHero
       title="Installations"
-      description="Review onboard collectors, SignalK endpoints, and current connection state."
+      description="Review onboard collectors, local hosts, and current connection state."
     >
       <template #links>
         <UButton to="/admin" color="neutral" variant="soft" icon="i-lucide-arrow-left">
@@ -90,9 +90,9 @@ watchEffect(() => {
 
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <div class="rounded-2xl border border-default bg-default/80 px-4 py-3">
-              <p class="text-xs uppercase tracking-[0.24em] text-muted">SignalK</p>
+              <p class="text-xs uppercase tracking-[0.24em] text-muted">Local host</p>
               <p class="mt-2 break-all text-sm text-default">
-                {{ installation.signalKUrl || 'Pending' }}
+                {{ installation.edgeHostname || 'Pending' }}
               </p>
             </div>
             <div class="rounded-2xl border border-default bg-default/80 px-4 py-3">

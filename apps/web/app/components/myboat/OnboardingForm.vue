@@ -17,7 +17,6 @@ const schema = z.object({
   summary: z.string().max(280).optional(),
   installationLabel: z.string().min(2, 'Installation label is required'),
   edgeHostname: z.string().max(120).optional(),
-  signalKUrl: z.string().url('Enter a valid URL').optional().or(z.literal('')),
 })
 
 const props = withDefaults(
@@ -47,7 +46,6 @@ const state = reactive<z.infer<typeof schema>>({
   summary: props.initialState.summary || '',
   installationLabel: props.initialState.installationLabel || '',
   edgeHostname: props.initialState.edgeHostname || '',
-  signalKUrl: props.initialState.signalKUrl || '',
 })
 
 watch(
@@ -63,7 +61,6 @@ watch(
       props.initialState.summary,
       props.initialState.installationLabel,
       props.initialState.edgeHostname,
-      props.initialState.signalKUrl,
     ] as const,
   ([
     captainName,
@@ -76,7 +73,6 @@ watch(
     summary,
     installationLabel,
     edgeHostname,
-    signalKUrl,
   ]) => {
     state.captainName = captainName || ''
     state.username = username || ''
@@ -88,7 +84,6 @@ watch(
     state.summary = summary || ''
     state.installationLabel = installationLabel || ''
     state.edgeHostname = edgeHostname || ''
-    state.signalKUrl = signalKUrl || ''
   },
   { immediate: true },
 )
@@ -247,33 +242,19 @@ async function onSubmit() {
 
       <section class="rounded-[1.5rem] border border-default/70 bg-default/70 p-5 shadow-sm">
         <div>
-          <p class="text-sm font-medium text-default">Live feed</p>
+          <p class="text-sm font-medium text-default">Collector setup</p>
           <p class="mt-1 text-xs text-muted">
-            This is where MyBoat connects to your first reporting device.
+            MyBoat stores the canonical boat record; the collector posts telemetry into it.
           </p>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
-          <UFormField
-            name="edgeHostname"
-            label="Edge hostname"
-            description="Optional local host or device name."
-          >
-            <UInput v-model="state.edgeHostname" class="w-full" placeholder="myboat.local" />
-          </UFormField>
-
-          <UFormField
-            name="signalKUrl"
-            label="SignalK or relay URL"
-            description="Paste a SignalK websocket or MyBoat relay URL."
-          >
-            <UInput
-              v-model="state.signalKUrl"
-              class="w-full"
-              placeholder="wss://signalk-public.tideye.com/signalk/v1/stream?subscribe=all"
-            />
-          </UFormField>
-        </div>
+        <UFormField
+          name="edgeHostname"
+          label="Local boat host"
+          description="Optional LAN host for onboard access, for example myboat.local."
+        >
+          <UInput v-model="state.edgeHostname" class="w-full" placeholder="myboat.local" />
+        </UFormField>
       </section>
 
       <div

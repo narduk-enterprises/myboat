@@ -10,7 +10,16 @@ const props = defineProps<{
   detail: VesselDetailResponse
 }>()
 const store = useMyBoatVesselStore()
+const trafficEnabled = ref(true)
 const entry = computed(() => store.getAuthEntryBySlug(props.detail.vessel.slug))
+useMyBoatLiveDemand({
+  namespace: 'auth',
+  consumerId: 'dashboard-vessel-live',
+  demand: computed(() => ({
+    selfLevel: 'detail',
+    ais: trafficEnabled.value,
+  })),
+})
 
 const primaryInstallation = computed<InstallationSummary | null>(
   () =>
@@ -25,12 +34,7 @@ const liveSnapshot = computed<VesselSnapshotSummary | null>(
 )
 const liveVessel = computed(() => entry.value?.vessel || props.detail.vessel)
 const liveFeedSourceUrl = computed(
-  () =>
-    entry.value?.live.activeUrl ||
-    primaryInstallation.value?.collectorSignalKUrl ||
-    primaryInstallation.value?.relaySignalKUrl ||
-    primaryInstallation.value?.signalKUrl ||
-    null,
+  () => entry.value?.live.activeUrl || primaryInstallation.value?.edgeHostname || null,
 )
 const liveFeedStatus = computed(() => {
   switch (entry.value?.live.connectionState) {
@@ -60,6 +64,7 @@ const liveFeedStatus = computed(() => {
             :installations="detail.installations"
             :ais-contacts="store.serializeAisContacts(entry)"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            v-model:traffic-enabled="trafficEnabled"
             height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
           />
         </div>
@@ -144,7 +149,7 @@ const liveFeedStatus = computed(() => {
               <p class="mt-1 text-xs text-muted">
                 {{
                   liveFeedSourceUrl ||
-                  'Attach a live install to unlock AIS traffic and a persistent SignalK source.'
+                  'Attach a collector install to unlock AIS traffic and the MyBoat live stream.'
                 }}
               </p>
               <p class="mt-2 text-xs text-muted">{{ liveFeedStatus }}</p>
@@ -187,9 +192,6 @@ const liveFeedStatus = computed(() => {
                   <p class="mt-2 text-sm text-muted">
                     {{
                       installation.edgeHostname ||
-                      installation.collectorSignalKUrl ||
-                      installation.relaySignalKUrl ||
-                      installation.signalKUrl ||
                       'Connector details pending'
                     }}
                   </p>

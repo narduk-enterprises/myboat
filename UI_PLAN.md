@@ -257,7 +257,7 @@ Status: UNLOCKED
 - Primary sections:
   - captain identity
   - vessel identity
-  - installation and telemetry setup
+  - installation and collector setup
 - Primary CTA:
   - save and continue
 - Secondary CTA:
@@ -301,6 +301,7 @@ Status: UNLOCKED
   - connection status
   - ingest key creation
   - collector command and setup guidance
+  - local boat-mode guidance
   - existing key list
 - Primary CTA:
   - generate ingest key
@@ -322,7 +323,7 @@ Status: UNLOCKED
   - hero
   - captain profile section
   - vessel profile section
-  - live-feed setup section
+  - collector setup section
   - sharing section
   - security section
   - local preferences section

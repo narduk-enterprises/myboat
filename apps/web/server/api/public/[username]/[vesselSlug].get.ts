@@ -10,7 +10,6 @@ import {
   serializeVesselCards,
   toCaptainProfileSummary,
 } from '#server/utils/myboat'
-import { applyPublicSignalKDefaults } from '#server/utils/signalkRelay'
 
 export default defineEventHandler(async (event) => {
   const username = getRouterParam(event, 'username')
@@ -45,7 +44,6 @@ export default defineEventHandler(async (event) => {
     mediaRows,
     waypointRows,
   )[0]
-  const resolvedInstallations = applyPublicSignalKDefaults(event, installations)
 
   if (!vessel) {
     throw createError({ statusCode: 404, message: 'Public vessel not found.' })
@@ -54,7 +52,7 @@ export default defineEventHandler(async (event) => {
   return {
     profile: toCaptainProfileSummary(profileRow),
     vessel,
-    installations: resolvedInstallations,
+    installations,
     passages: passageRows,
     media: mediaRows.map((item) => ({
       id: item.id,

@@ -18,7 +18,7 @@ const showDemoLogin = import.meta.dev
 
 const dockChecklist = [
   'Open the dashboard and current boat status.',
-  'Manage installs, keys, and SignalK feeds.',
+  'Manage installs, keys, and collector feeds.',
   'Update the public page when you want to share.',
 ]
 </script>
@@ -27,7 +27,7 @@ const dockChecklist = [
   <AuthDock
     eyebrow="Captain access"
     title="Back to your boat"
-    description="Sign in to open your dashboard, manage live feeds, and update the public page."
+    description="Sign in to open your dashboard, manage collector installs, and update the public page."
     :checklist="dockChecklist"
   >
     <AuthLoginCard

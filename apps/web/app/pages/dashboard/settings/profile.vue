@@ -93,7 +93,6 @@ const currentSetup = computed(() => {
     vesselSummary: vessel?.summary || '',
     installationLabel: installation?.label || '',
     edgeHostname: installation?.edgeHostname || '',
-    signalKUrl: installation?.signalKUrl || '',
   }
 })
 
@@ -118,7 +117,6 @@ async function onSubmit() {
       summary: currentSetup.value.vesselSummary,
       installationLabel: currentSetup.value.installationLabel,
       edgeHostname: currentSetup.value.edgeHostname,
-      signalKUrl: currentSetup.value.signalKUrl,
     }
 
     await appFetch('/api/app/onboarding', {

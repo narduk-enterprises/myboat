@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { apiKeys } from '#layer/server/database/schema'
+import { useLogger } from '#layer/server/utils/logger'
 import { defineWebhookMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
 import {
@@ -9,6 +10,13 @@ import {
   vesselLiveSnapshots,
 } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { writeTelemetryToInflux } from '#server/utils/influx'
+import { publishVesselLiveMessage } from '#server/utils/liveBroker'
+import {
+  buildInfluxLines,
+  buildLivePublishMessage,
+  resolveObservedAt,
+} from '#server/utils/telemetry'
 
 const ingestSchema = z.object({
   timestamp: z.string().datetime().optional(),
@@ -28,36 +36,6 @@ const ingestSchema = z.object({
   }),
 })
 
-type SnapshotDraft = {
-  positionLat: number | null
-  positionLng: number | null
-  headingMagnetic: number | null
-  speedOverGround: number | null
-  speedThroughWater: number | null
-  windSpeedApparent: number | null
-  windAngleApparent: number | null
-  depthBelowTransducer: number | null
-  waterTemperatureKelvin: number | null
-  batteryVoltage: number | null
-  engineRpm: number | null
-}
-
-function baseSnapshot(): SnapshotDraft {
-  return {
-    positionLat: null,
-    positionLng: null,
-    headingMagnetic: null,
-    speedOverGround: null,
-    speedThroughWater: null,
-    windSpeedApparent: null,
-    windAngleApparent: null,
-    depthBelowTransducer: null,
-    waterTemperatureKelvin: null,
-    batteryVoltage: null,
-    engineRpm: null,
-  }
-}
-
 async function sha256(value: string) {
   const encoded = new TextEncoder().encode(value)
   const digest = await crypto.subtle.digest('SHA-256', encoded)
@@ -66,90 +44,13 @@ async function sha256(value: string) {
     .join('')
 }
 
-function normalizeAngleDegrees(value: unknown) {
-  if (typeof value !== 'number') {
-    return null
-  }
-
-  return Math.abs(value) > Math.PI * 2 ? value : (value * 180) / Math.PI
-}
-
-function applyDeltaValues(
-  snapshot: SnapshotDraft,
-  values: Array<{ path: string; value: unknown }>,
-) {
-  for (const item of values) {
-    const { path, value } = item
-
-    if (path === 'navigation.position' && value && typeof value === 'object') {
-      const position = value as { latitude?: unknown; longitude?: unknown }
-      snapshot.positionLat = typeof position.latitude === 'number' ? position.latitude : null
-      snapshot.positionLng = typeof position.longitude === 'number' ? position.longitude : null
-      continue
-    }
-
-    if (path === 'navigation.position.latitude') {
-      snapshot.positionLat = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'navigation.position.longitude') {
-      snapshot.positionLng = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'navigation.headingMagnetic') {
-      snapshot.headingMagnetic = normalizeAngleDegrees(value)
-      continue
-    }
-
-    if (path === 'navigation.speedOverGround') {
-      snapshot.speedOverGround = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'navigation.speedThroughWater') {
-      snapshot.speedThroughWater = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'environment.wind.speedApparent') {
-      snapshot.windSpeedApparent = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'environment.wind.angleApparent') {
-      snapshot.windAngleApparent = normalizeAngleDegrees(value)
-      continue
-    }
-
-    if (path === 'environment.depth.belowTransducer') {
-      snapshot.depthBelowTransducer = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path === 'environment.water.temperature') {
-      snapshot.waterTemperatureKelvin = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path.startsWith('electrical.batteries.') && path.endsWith('.voltage')) {
-      snapshot.batteryVoltage = typeof value === 'number' ? value : null
-      continue
-    }
-
-    if (path.startsWith('propulsion.') && path.endsWith('.revolutions')) {
-      snapshot.engineRpm = typeof value === 'number' ? value * 60 : null
-    }
-  }
-}
-
 export default defineWebhookMutation(
   {
     rateLimit: RATE_LIMIT_POLICIES.authApiKeys,
     parseBody: withValidatedBody(ingestSchema.parse),
   },
   async ({ event, body }) => {
+    const logger = useLogger(event).child('TelemetryIngest')
     const authHeader = getHeader(event, 'authorization')
     if (!authHeader?.startsWith('Bearer ')) {
       throw createError({ statusCode: 401, message: 'Missing ingest bearer token.' })
@@ -180,35 +81,40 @@ export default defineWebhookMutation(
       throw createError({ statusCode: 401, message: 'Invalid ingest key.' })
     }
 
-    const snapshot = baseSnapshot()
-    for (const update of body.delta.updates) {
-      applyDeltaValues(snapshot, update.values)
-    }
-
-    const observedAt =
-      body.timestamp ||
-      body.delta.updates.find((update) => update.timestamp)?.timestamp ||
-      new Date().toISOString()
+    const observedAt = resolveObservedAt(body.timestamp, body.delta)
     const now = new Date().toISOString()
+    const livePayload = buildLivePublishMessage({
+      delta: body.delta,
+      observedAt,
+      vesselId: installationBinding.vesselId,
+      source: installationBinding.installationType,
+      connectionState: 'live',
+    })
+    const influxLines = buildInfluxLines({
+      delta: body.delta,
+      observedAt,
+      installationId: installationBinding.installationId,
+      vesselId: installationBinding.vesselId,
+    })
 
-    if (installationBinding.isPrimary) {
+    if (installationBinding.isPrimary && livePayload.snapshot) {
       await db
         .insert(vesselLiveSnapshots)
         .values({
           vesselId: installationBinding.vesselId,
           source: installationBinding.installationType,
           observedAt,
-          positionLat: snapshot.positionLat,
-          positionLng: snapshot.positionLng,
-          headingMagnetic: snapshot.headingMagnetic,
-          speedOverGround: snapshot.speedOverGround,
-          speedThroughWater: snapshot.speedThroughWater,
-          windSpeedApparent: snapshot.windSpeedApparent,
-          windAngleApparent: snapshot.windAngleApparent,
-          depthBelowTransducer: snapshot.depthBelowTransducer,
-          waterTemperatureKelvin: snapshot.waterTemperatureKelvin,
-          batteryVoltage: snapshot.batteryVoltage,
-          engineRpm: snapshot.engineRpm,
+          positionLat: livePayload.snapshot.positionLat,
+          positionLng: livePayload.snapshot.positionLng,
+          headingMagnetic: livePayload.snapshot.headingMagnetic,
+          speedOverGround: livePayload.snapshot.speedOverGround,
+          speedThroughWater: livePayload.snapshot.speedThroughWater,
+          windSpeedApparent: livePayload.snapshot.windSpeedApparent,
+          windAngleApparent: livePayload.snapshot.windAngleApparent,
+          depthBelowTransducer: livePayload.snapshot.depthBelowTransducer,
+          waterTemperatureKelvin: livePayload.snapshot.waterTemperatureKelvin,
+          batteryVoltage: livePayload.snapshot.batteryVoltage,
+          engineRpm: livePayload.snapshot.engineRpm,
           updatedAt: now,
         })
         .onConflictDoUpdate({
@@ -216,17 +122,17 @@ export default defineWebhookMutation(
           set: {
             source: installationBinding.installationType,
             observedAt,
-            positionLat: snapshot.positionLat,
-            positionLng: snapshot.positionLng,
-            headingMagnetic: snapshot.headingMagnetic,
-            speedOverGround: snapshot.speedOverGround,
-            speedThroughWater: snapshot.speedThroughWater,
-            windSpeedApparent: snapshot.windSpeedApparent,
-            windAngleApparent: snapshot.windAngleApparent,
-            depthBelowTransducer: snapshot.depthBelowTransducer,
-            waterTemperatureKelvin: snapshot.waterTemperatureKelvin,
-            batteryVoltage: snapshot.batteryVoltage,
-            engineRpm: snapshot.engineRpm,
+            positionLat: livePayload.snapshot.positionLat,
+            positionLng: livePayload.snapshot.positionLng,
+            headingMagnetic: livePayload.snapshot.headingMagnetic,
+            speedOverGround: livePayload.snapshot.speedOverGround,
+            speedThroughWater: livePayload.snapshot.speedThroughWater,
+            windSpeedApparent: livePayload.snapshot.windSpeedApparent,
+            windAngleApparent: livePayload.snapshot.windAngleApparent,
+            depthBelowTransducer: livePayload.snapshot.depthBelowTransducer,
+            waterTemperatureKelvin: livePayload.snapshot.waterTemperatureKelvin,
+            batteryVoltage: livePayload.snapshot.batteryVoltage,
+            engineRpm: livePayload.snapshot.engineRpm,
             updatedAt: now,
           },
         })
@@ -248,6 +154,25 @@ export default defineWebhookMutation(
         lastUsedAt: observedAt,
       })
       .where(eq(apiKeys.id, installationBinding.apiKeyId))
+
+    const backgroundTasks: Promise<unknown>[] = [writeTelemetryToInflux(event, influxLines)]
+
+    if (installationBinding.isPrimary) {
+      backgroundTasks.push(
+        publishVesselLiveMessage(event, installationBinding.vesselId, livePayload),
+      )
+    }
+
+    const backgroundResults = await Promise.allSettled(backgroundTasks)
+    for (const result of backgroundResults) {
+      if (result.status === 'rejected') {
+        logger.warn('Background telemetry side-effect failed.', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          installationId: installationBinding.installationId,
+          vesselId: installationBinding.vesselId,
+        })
+      }
+    }
 
     return {
       ok: true,

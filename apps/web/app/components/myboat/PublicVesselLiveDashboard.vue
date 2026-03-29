@@ -28,6 +28,7 @@ const route = useRoute()
 const username = computed(() => String(route.params.username || ''))
 const vesselSlug = computed(() => String(route.params.vesselSlug || ''))
 const store = useMyBoatVesselStore()
+const trafficEnabled = ref(true)
 const { convertSpeed, speedUnitLabel } = useMarineUnits()
 const detail = computed(() => store.getPublicDetail(username.value, vesselSlug.value))
 const entry = computed(() => store.getPublicEntry(username.value, vesselSlug.value))
@@ -49,14 +50,18 @@ const publicPath = computed(() =>
   detail.value ? `/${detail.value.profile.username}/${detail.value.vessel.slug}` : null,
 )
 const publicLiveFeedAvailable = computed(() => Boolean(liveState.value?.hasSignalKSource))
+useMyBoatLiveDemand({
+  namespace: 'public',
+  consumerId: 'public-vessel-live',
+  demand: computed(() => ({
+    selfLevel: 'detail',
+    ais: trafficEnabled.value,
+  })),
+})
 
 const liveFeedLabel = computed(() => {
   if (!publicLiveFeedAvailable.value) {
     return 'Public API refresh'
-  }
-
-  if (primaryInstallation.value?.signalKAccessMode === 'relay') {
-    return 'Public Signal K relay'
   }
 
   return 'MyBoat live feed'
@@ -261,6 +266,7 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         :live-connection-state="liveState?.connectionState"
         :live-last-delta-at="liveState?.lastDeltaAt"
         :has-signal-k-source="liveState?.hasSignalKSource"
+        v-model:traffic-enabled="trafficEnabled"
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
         :persist-key="`public-vessel:${detail.profile.username}/${detail.vessel.slug}`"
         :show-pin-labels="false"

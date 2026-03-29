@@ -4,6 +4,7 @@ import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
 
 const { convertDepth, convertSpeed, depthUnitLabel, speedUnitLabel } = useMarineUnits()
 const store = useMyBoatVesselStore()
+const trafficEnabled = ref(true)
 const entry = computed(() => store.authActiveEntry.value)
 const detail = computed(() =>
   entry.value?.vessel ? store.getAuthDetailBySlug(entry.value.vessel.slug) : null,
@@ -26,6 +27,14 @@ const primaryInstallation = computed<InstallationSummary | null>(
 const liveSnapshot = computed<VesselSnapshotSummary | null>(
   () => detail.value?.vessel.liveSnapshot ?? null,
 )
+useMyBoatLiveDemand({
+  namespace: 'auth',
+  consumerId: 'dashboard-map',
+  demand: computed(() => ({
+    selfLevel: 'detail',
+    ais: trafficEnabled.value,
+  })),
+})
 const metricCards = computed(() => [
   {
     hint: formatTimestamp(liveSnapshot.value?.observedAt),
@@ -94,6 +103,7 @@ const metricCards = computed(() => [
             :live-connection-state="entry?.live.connectionState"
             :live-last-delta-at="entry?.live.lastDeltaAt"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            v-model:traffic-enabled="trafficEnabled"
             :persist-key="detail ? `dashboard-map:${detail.vessel.slug}` : 'dashboard-map'"
             height-class="h-[30rem] sm:h-[36rem] lg:h-[46rem] xl:h-[54rem]"
             :show-focus-panel="false"

@@ -1,5 +1,4 @@
 import { requireAuth } from '#layer/server/utils/auth'
-import { applySignalKRelayDefaults, getDefaultSignalKUrlForUser } from '#server/utils/signalkRelay'
 import {
   getCaptainProfileByUserId,
   getFollowedVesselsForUser,
@@ -23,10 +22,6 @@ export default defineEventHandler(async (event) => {
     getFollowedVesselsForUser(event, user.id),
     getInstallationsForUser(event, user.id),
   ])
-  const [resolvedInstallations, defaultSignalKUrl] = await Promise.all([
-    applySignalKRelayDefaults(event, user, installations),
-    getDefaultSignalKUrlForUser(event, user),
-  ])
 
   const vesselIds = vesselRows.map((vessel) => vessel.id)
   const [snapshotRows, passageRows, mediaRows, waypointRows] = await Promise.all([
@@ -48,8 +43,7 @@ export default defineEventHandler(async (event) => {
     profile: profileRow ? toCaptainProfileSummary(profileRow) : null,
     vessels: vesselCards,
     followedVessels: serializeFollowedVessels(followedVesselRows),
-    installations: resolvedInstallations,
-    defaultSignalKUrl,
+    installations,
     recentPassages: passageRows.slice(0, 3),
     recentMedia: mediaRows.slice(0, 6).map((item) => ({
       id: item.id,
@@ -62,10 +56,10 @@ export default defineEventHandler(async (event) => {
     })),
     stats: {
       vesselCount: vesselRows.length,
-      installationCount: resolvedInstallations.length,
+      installationCount: installations.length,
       passageCount: passageRows.length,
       mediaCount: mediaRows.length,
-      liveInstallationCount: resolvedInstallations.filter(
+      liveInstallationCount: installations.filter(
         (installation) => installation.connectionState === 'live',
       ).length,
     },

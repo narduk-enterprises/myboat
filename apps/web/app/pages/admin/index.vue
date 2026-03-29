@@ -68,7 +68,7 @@ watchEffect(() => {
           label="Installations"
           :value="String(overview.installations.length)"
           icon="i-lucide-cpu"
-          hint="Edge devices and direct SignalK connectors."
+          hint="Collector installs and telemetry endpoints."
         />
         <MarineMetricCard
           label="Live installs"

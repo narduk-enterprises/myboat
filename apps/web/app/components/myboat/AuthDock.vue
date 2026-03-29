@@ -68,7 +68,7 @@ withDefaults(
                 class="rounded-[1.35rem] border border-default bg-elevated/88 px-4 py-4 text-default shadow-[0_20px_45px_-38px_rgb(15_23_42_/_0.24)] backdrop-blur-xl"
               >
                 <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Live feed</p>
-                <p class="mt-3 font-display text-xl text-default">SignalK ready</p>
+                <p class="mt-3 font-display text-xl text-default">Collector ready</p>
                 <p class="mt-2 text-sm leading-5 text-muted">
                   Watch feed health and recent activity.
                 </p>
@@ -78,7 +78,7 @@ withDefaults(
                 class="rounded-[1.35rem] border border-default bg-elevated/88 px-4 py-4 text-default shadow-[0_20px_45px_-38px_rgb(15_23_42_/_0.24)] backdrop-blur-xl"
               >
                 <p class="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Install setup</p>
-                <p class="mt-3 font-display text-xl text-default">Keys + relay</p>
+                <p class="mt-3 font-display text-xl text-default">Keys + ingest</p>
                 <p class="mt-2 text-sm leading-5 text-muted">
                   Manage device labels and connection details.
                 </p>

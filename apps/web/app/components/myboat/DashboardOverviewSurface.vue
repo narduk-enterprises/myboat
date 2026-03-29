@@ -19,6 +19,14 @@ function extractMmsi(source: string | null | undefined) {
 }
 
 const store = useMyBoatVesselStore()
+useMyBoatLiveDemand({
+  namespace: 'auth',
+  consumerId: 'dashboard-overview',
+  demand: computed(() => ({
+    selfLevel: 'summary',
+    ais: false,
+  })),
+})
 
 const primaryEntry = computed(() => store.authActiveEntry.value)
 const primaryVessel = computed(() => primaryEntry.value?.vessel || null)
@@ -112,12 +120,12 @@ const statsCards = computed(() => [
 ])
 const setupAlert = computed(() => {
   if (!store.authState.value.profile) {
-    return {
-      description:
-        'Finish onboarding to attach the captain identity, primary vessel, and first live-data source.',
-      to: '/dashboard/onboarding',
-      title: 'Captain setup is still incomplete',
-    }
+      return {
+        description:
+          'Finish onboarding to attach the captain identity, primary vessel, and first collector install.',
+        to: '/dashboard/onboarding',
+        title: 'Captain setup is still incomplete',
+      }
   }
 
   if (!primaryVessel.value) {
@@ -130,12 +138,12 @@ const setupAlert = computed(() => {
   }
 
   if (!primaryInstallation.value) {
-    return {
-      description:
-        'Link one live-data source for the vessel so the dashboard can fill in the bridge stats.',
-      to: '/dashboard/settings',
-      title: 'No live-data source linked',
-    }
+      return {
+        description:
+          'Link one collector install for the vessel so the dashboard can fill in the bridge stats.',
+        to: '/dashboard/settings',
+        title: 'No collector install linked',
+      }
   }
 
   if (!primarySnapshot.value?.observedAt) {

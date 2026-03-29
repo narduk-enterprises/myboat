@@ -15,9 +15,9 @@ export interface MyBoatMapHandle {
 }
 
 export interface MyBoatMapInstallation {
-  collectorSignalKUrl?: string | null
-  signalKUrl?: string | null
-  relaySignalKUrl?: string | null
+  id?: string
+  label?: string
+  edgeHostname?: string | null
 }
 
 export interface MyBoatMapOverlayStyle {

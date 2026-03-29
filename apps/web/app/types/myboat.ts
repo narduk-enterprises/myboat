@@ -81,10 +81,6 @@ export interface InstallationSummary {
   label: string
   installationType: string
   edgeHostname: string | null
-  signalKUrl: string | null
-  collectorSignalKUrl: string | null
-  relaySignalKUrl: string | null
-  signalKAccessMode: 'direct' | 'relay' | 'unset'
   isPrimary: boolean
   connectionState: string
   lastSeenAt: string | null
@@ -161,10 +157,6 @@ export interface PublicInstallationSummary {
   connectionState: string
   lastSeenAt: string | null
   eventCount: number
-  signalKUrl?: string | null
-  collectorSignalKUrl?: string | null
-  relaySignalKUrl?: string | null
-  signalKAccessMode?: 'direct' | 'relay' | 'unset'
 }
 
 export interface InstallationKeySummary {
@@ -181,7 +173,6 @@ export interface DashboardOverview {
   vessels: VesselCardSummary[]
   followedVessels: FollowedVesselSummary[]
   installations: InstallationSummary[]
-  defaultSignalKUrl?: string | null
   recentPassages: PassageSummary[]
   recentMedia: MediaItemSummary[]
   stats: {
@@ -204,7 +195,6 @@ export interface OnboardingPayload {
   summary?: string
   installationLabel: string
   edgeHostname?: string
-  signalKUrl?: string
 }
 
 export interface VesselDetailResponse {
