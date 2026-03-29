@@ -1,11 +1,9 @@
-import { and, eq } from 'drizzle-orm'
+import type { AisHubSearchResult } from '~/types/myboat'
 import { z } from 'zod'
 import { defineUserMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
-import { followedVessels } from '#server/database/app-schema'
 import { rememberAisHubResults } from '#server/utils/aishub'
-import { useAppDatabase } from '#server/utils/database'
-import { serializeFollowedVessel } from '#server/utils/myboat'
+import { upsertFollowedVesselForUser } from '#server/utils/myboat'
 
 const bodySchema = z.object({
   source: z.literal('aishub').default('aishub'),
@@ -31,82 +29,34 @@ export default defineUserMutation(
     parseBody: withValidatedBody(bodySchema.parse),
   },
   async ({ event, user, body }) => {
-    const db = useAppDatabase(event)
     const now = new Date().toISOString()
+    const result: AisHubSearchResult = {
+      source: body.source,
+      matchMode: body.matchMode,
+      mmsi: body.mmsi,
+      imo: body.imo ?? null,
+      name: body.name,
+      callSign: body.callSign ?? null,
+      destination: body.destination ?? null,
+      lastReportAt: body.lastReportAt ?? null,
+      positionLat: body.positionLat ?? null,
+      positionLng: body.positionLng ?? null,
+      shipType: body.shipType ?? null,
+      sourceStations: body.sourceStations,
+    }
 
     await rememberAisHubResults(
       event,
-      [
-        {
-          source: body.source,
-          matchMode: body.matchMode,
-          mmsi: body.mmsi,
-          imo: body.imo || null,
-          name: body.name,
-          callSign: body.callSign || null,
-          destination: body.destination || null,
-          lastReportAt: body.lastReportAt || null,
-          positionLat: body.positionLat ?? null,
-          positionLng: body.positionLng ?? null,
-          shipType: body.shipType ?? null,
-          sourceStations: body.sourceStations,
-        },
-      ],
+      [result],
       now,
     )
 
-    await db
-      .insert(followedVessels)
-      .values({
-        id: crypto.randomUUID(),
-        ownerUserId: user.id,
-        source: body.source,
-        matchMode: body.matchMode,
-        mmsi: body.mmsi,
-        imo: body.imo || null,
-        name: body.name,
-        callSign: body.callSign || null,
-        destination: body.destination || null,
-        lastReportAt: body.lastReportAt || null,
-        positionLat: body.positionLat ?? null,
-        positionLng: body.positionLng ?? null,
-        shipType: body.shipType ?? null,
-        sourceStationsJson: JSON.stringify(body.sourceStations),
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [followedVessels.ownerUserId, followedVessels.mmsi],
-        set: {
-          source: body.source,
-          matchMode: body.matchMode,
-          imo: body.imo || null,
-          name: body.name,
-          callSign: body.callSign || null,
-          destination: body.destination || null,
-          lastReportAt: body.lastReportAt || null,
-          positionLat: body.positionLat ?? null,
-          positionLng: body.positionLng ?? null,
-          shipType: body.shipType ?? null,
-          sourceStationsJson: JSON.stringify(body.sourceStations),
-          updatedAt: now,
-        },
-      })
-
-    const savedFollowedVessel = await db
-      .select()
-      .from(followedVessels)
-      .where(and(eq(followedVessels.ownerUserId, user.id), eq(followedVessels.mmsi, body.mmsi)))
-      .get()
-
-    if (!savedFollowedVessel) {
-      throw new Error('Unable to load saved buddy boat.')
-    }
+    const followedVessel = await upsertFollowedVesselForUser(event, user.id, result, now)
 
     return {
       ok: true,
       mmsi: body.mmsi,
-      followedVessel: serializeFollowedVessel(savedFollowedVessel),
+      followedVessel,
     }
   },
 )

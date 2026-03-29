@@ -20,19 +20,25 @@ function sortFollowedVessels(items: FollowedVesselSummary[]) {
 export function useFollowedVesselsState() {
   const items = shallowRef<FollowedVesselSummary[]>([])
 
+  function mergeItems(nextItems: FollowedVesselSummary[]) {
+    return [ ...nextItems, ...items.value ].filter(
+      (item, index, collection) =>
+        collection.findIndex(
+          (candidate) => candidate.id === item.id || candidate.mmsi === item.mmsi,
+        ) === index,
+    )
+  }
+
   function setItems(nextItems: FollowedVesselSummary[]) {
     items.value = sortFollowedVessels(nextItems)
   }
 
   function upsertItem(nextItem: FollowedVesselSummary) {
-    setItems(
-      [nextItem, ...items.value].filter(
-        (item, index, collection) =>
-          collection.findIndex(
-            (candidate) => candidate.id === item.id || candidate.mmsi === item.mmsi,
-          ) === index,
-      ),
-    )
+    setItems(mergeItems([nextItem]))
+  }
+
+  function upsertItems(nextItems: FollowedVesselSummary[]) {
+    setItems(mergeItems(nextItems))
   }
 
   function removeItem(id: string) {
@@ -44,5 +50,6 @@ export function useFollowedVesselsState() {
     removeItem,
     setItems,
     upsertItem,
+    upsertItems,
   }
 }

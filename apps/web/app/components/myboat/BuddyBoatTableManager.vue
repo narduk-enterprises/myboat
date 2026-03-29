@@ -11,6 +11,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  imported: [vessels: FollowedVesselSummary[]]
   removed: [id: string]
   saved: [vessel: FollowedVesselSummary]
 }>()
@@ -225,6 +226,8 @@ async function onRemove(id: string) {
         </UButton>
       </div>
     </section>
+
+    <BuddyBoatImportPanel @imported="emit('imported', $event)" />
 
     <UCard class="border-default/80 bg-default/90 shadow-card">
       <template #header>

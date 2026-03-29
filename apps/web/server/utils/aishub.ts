@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { desc, eq, like } from 'drizzle-orm'
+import { desc, eq, inArray, like } from 'drizzle-orm'
 import type { AisHubSearchResponse, AisHubSearchResult } from '~/types/myboat'
 import {
   AISHUB_SEARCH_COOLDOWN_MS,
@@ -180,6 +180,35 @@ export async function rememberAisHubResults(
         },
       })
   }
+}
+
+export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: string[]) {
+  const uniqueMmsis = [...new Set(mmsis.map((mmsi) => mmsi.trim()).filter(Boolean))]
+  if (!uniqueMmsis.length) {
+    return new Map<string, AisHubSearchResult>()
+  }
+
+  const db = useAppDatabase(event)
+  const rows = await db
+    .select({
+      mmsi: aishubVessels.mmsi,
+      imo: aishubVessels.imo,
+      name: aishubVessels.name,
+      callSign: aishubVessels.callSign,
+      destination: aishubVessels.destination,
+      lastReportAt: aishubVessels.lastReportAt,
+      positionLat: aishubVessels.positionLat,
+      positionLng: aishubVessels.positionLng,
+      shipType: aishubVessels.shipType,
+      sourceStationsJson: aishubVessels.sourceStationsJson,
+    })
+    .from(aishubVessels)
+    .where(inArray(aishubVessels.mmsi, uniqueMmsis))
+    .all()
+
+  return new Map(
+    rows.map((row) => [row.mmsi, serializeStoredResult(row, row.mmsi)]),
+  )
 }
 
 async function searchStoredAisHubVessels(event: H3Event, rawQuery: string) {

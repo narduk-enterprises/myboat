@@ -143,6 +143,14 @@ export interface FollowedVesselSummary {
   updatedAt: string
 }
 
+export interface FollowedVesselImportItem {
+  mmsi: string
+  name: string
+  imo?: string | null
+  callSign?: string | null
+  destination?: string | null
+}
+
 export interface AisHubSearchResult {
   source: 'aishub'
   matchMode: 'mmsi' | 'name'
@@ -164,6 +172,11 @@ export interface AisHubSearchResponse {
   source: 'local' | 'cache' | 'upstream'
   cachedAt: string | null
   results: AisHubSearchResult[]
+}
+
+export interface FollowedVesselImportResponse {
+  ok: true
+  imported: FollowedVesselSummary[]
 }
 
 export interface AisHubSyncStatus {

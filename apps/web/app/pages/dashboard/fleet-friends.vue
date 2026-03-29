@@ -22,6 +22,7 @@ const {
   removeItem: removeFollowedVessel,
   setItems: setFollowedVessels,
   upsertItem: upsertFollowedVessel,
+  upsertItems: upsertFollowedVessels,
 } = useFollowedVesselsState()
 
 watch(
@@ -95,6 +96,7 @@ watch(
         <template #body>
           <BuddyBoatTableManager
             :items="followedVessels"
+            @imported="upsertFollowedVessels"
             @removed="removeFollowedVessel"
             @saved="upsertFollowedVessel"
           />

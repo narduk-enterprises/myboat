@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3'
+import type { AisHubSearchResult } from '~/types/myboat'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
@@ -236,6 +237,100 @@ export function serializeFollowedVessels(
   rows: Awaited<ReturnType<typeof getFollowedVesselsForUser>>,
 ) {
   return rows.map(serializeFollowedVessel)
+}
+
+export async function upsertFollowedVesselsForUser(
+  event: H3Event,
+  userId: string,
+  results: AisHubSearchResult[],
+  now = new Date().toISOString(),
+) {
+  const uniqueResults = results.filter(
+    (result, index, collection) =>
+      collection.findIndex((candidate) => candidate.mmsi === result.mmsi) === index,
+  )
+
+  if (!uniqueResults.length) {
+    return []
+  }
+
+  const db = useAppDatabase(event)
+
+  for (const result of uniqueResults) {
+    await db
+      .insert(followedVessels)
+      .values({
+        id: crypto.randomUUID(),
+        ownerUserId: userId,
+        source: result.source,
+        matchMode: result.matchMode,
+        mmsi: result.mmsi,
+        imo: result.imo || null,
+        name: result.name,
+        callSign: result.callSign || null,
+        destination: result.destination || null,
+        lastReportAt: result.lastReportAt || null,
+        positionLat: result.positionLat ?? null,
+        positionLng: result.positionLng ?? null,
+        shipType: result.shipType ?? null,
+        sourceStationsJson: JSON.stringify(result.sourceStations),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [followedVessels.ownerUserId, followedVessels.mmsi],
+        set: {
+          source: result.source,
+          matchMode: result.matchMode,
+          imo: result.imo || null,
+          name: result.name,
+          callSign: result.callSign || null,
+          destination: result.destination || null,
+          lastReportAt: result.lastReportAt || null,
+          positionLat: result.positionLat ?? null,
+          positionLng: result.positionLng ?? null,
+          shipType: result.shipType ?? null,
+          sourceStationsJson: JSON.stringify(result.sourceStations),
+          updatedAt: now,
+        },
+      })
+  }
+
+  const savedRows = await db
+    .select()
+    .from(followedVessels)
+    .where(
+      and(
+        eq(followedVessels.ownerUserId, userId),
+        inArray(
+          followedVessels.mmsi,
+          uniqueResults.map((result) => result.mmsi),
+        ),
+      ),
+    )
+    .all()
+
+  const rowsByMmsi = new Map(savedRows.map((row) => [row.mmsi, row]))
+
+  return uniqueResults
+    .map((result) => rowsByMmsi.get(result.mmsi))
+    .filter((row): row is FollowedVessel => Boolean(row))
+    .map(serializeFollowedVessel)
+}
+
+export async function upsertFollowedVesselForUser(
+  event: H3Event,
+  userId: string,
+  result: AisHubSearchResult,
+  now = new Date().toISOString(),
+) {
+  const [savedVessel] = await upsertFollowedVesselsForUser(event, userId, [result], now)
+
+  if (!savedVessel) {
+    throw new Error('Unable to load saved buddy boat.')
+  }
+
+  return savedVessel
 }
 
 export async function getPublicVesselByUsernameAndSlug(

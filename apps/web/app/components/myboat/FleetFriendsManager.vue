@@ -12,6 +12,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  imported: [vessels: FollowedVesselSummary[]]
   removed: [id: string]
   saved: [vessel: FollowedVesselSummary]
 }>()
@@ -251,6 +252,8 @@ function handleViewportChange(mmsis: string[]) {
         </UForm>
       </div>
     </UCard>
+
+    <BuddyBoatImportPanel @imported="emit('imported', $event)" />
 
     <div class="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,30rem)]">
       <FleetFriendSearchMap

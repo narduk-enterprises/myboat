@@ -26,6 +26,7 @@ const {
   removeItem: removeFollowedVessel,
   setItems: setFollowedVessels,
   upsertItem: upsertFollowedVessel,
+  upsertItems: upsertFollowedVessels,
 } = useFollowedVesselsState()
 const primaryVessel = computed(
   () =>
@@ -311,6 +312,7 @@ async function onSubmit() {
 
       <FleetFriendsManager
         :items="followedVessels"
+        @imported="upsertFollowedVessels"
         @removed="removeFollowedVessel"
         @saved="upsertFollowedVessel"
       />

@@ -3,6 +3,8 @@ import type {
   AisHubSearchResult,
   AisHubSyncStatus,
   DashboardOverview,
+  FollowedVesselImportItem,
+  FollowedVesselImportResponse,
   FollowedVesselSummary,
   InstallationDetailResponse,
   InstallationKeySummary,
@@ -194,6 +196,29 @@ export function useFollowVessel() {
 
   return {
     followVessel,
+    pending: readonly(pending),
+  }
+}
+
+export function useImportFollowedVessels() {
+  const appFetch = useAppFetch()
+  const pending = shallowRef(false)
+
+  async function importFollowedVessels(items: FollowedVesselImportItem[]) {
+    pending.value = true
+
+    try {
+      return await appFetch<FollowedVesselImportResponse>('/api/app/fleet-friends/import', {
+        method: 'POST',
+        body: { items },
+      })
+    } finally {
+      pending.value = false
+    }
+  }
+
+  return {
+    importFollowedVessels,
     pending: readonly(pending),
   }
 }
