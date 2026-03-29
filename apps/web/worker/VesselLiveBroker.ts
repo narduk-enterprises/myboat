@@ -55,11 +55,13 @@ function parseClientMessage(message: string | ArrayBuffer): VesselLiveClientMess
 }
 
 function sendSocketMessage(socket: WebSocket, message: VesselLiveServerMessage) {
-  if (socket.readyState !== WebSocket.OPEN) {
-    return
+  try {
+    socket.send(JSON.stringify(message))
+  } catch {
+    // Durable Object hibernation sockets can still surface through getWebSockets()
+    // during close handshakes; ignore failed sends and let later fanout attempts
+    // target the remaining active sockets.
   }
-
-  socket.send(JSON.stringify(message))
 }
 
 export class VesselLiveBroker extends DurableObject {
