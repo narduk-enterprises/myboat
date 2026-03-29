@@ -11,15 +11,7 @@ type NitroWorker = {
   [key: string]: unknown
 }
 
-const LIVE_BROKER_DEBUG_PREFIX = 'LIVE_BROKER_DEBUG'
 const nitroWorker = worker as NitroWorker
-
-function emitLiveBrokerDebug(event: string, fields: Record<string, unknown>) {
-  console.info(LIVE_BROKER_DEBUG_PREFIX, {
-    event,
-    ...fields,
-  })
-}
 
 function isWebSocketUpgrade(request: Request) {
   return request.headers.get('upgrade')?.toLowerCase() === 'websocket'
@@ -58,12 +50,6 @@ async function resolveLiveVesselId(
 ) {
   const detailPath = toVesselDetailPath(route)
   const detailResponse = await nitroWorker.fetch(createDetailRequest(request, detailPath), env, ctx)
-
-  emitLiveBrokerDebug('entry_live_resolve_result', {
-    namespace: route.namespace,
-    detailPath,
-    status: detailResponse.status,
-  })
 
   if (!detailResponse.ok) {
     return {
@@ -104,21 +90,11 @@ const wrappedWorker = {
       return nitroWorker.fetch(request, env, ctx)
     }
 
-    emitLiveBrokerDebug('entry_live_upgrade_start', {
-      pathname: url.pathname,
-      namespace: route.namespace,
-    })
-
     const resolved = await resolveLiveVesselId(request, env, ctx, route)
 
     if (!resolved.vesselId) {
       return resolved.response!
     }
-
-    emitLiveBrokerDebug('entry_live_forward_do', {
-      namespace: route.namespace,
-      vesselId: resolved.vesselId,
-    })
 
     return env.VESSEL_LIVE_BROKER.getByName(resolved.vesselId).fetch(request)
   },

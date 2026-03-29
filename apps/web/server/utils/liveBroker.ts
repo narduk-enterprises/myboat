@@ -1,19 +1,10 @@
 import type { H3Event } from 'h3'
-import { getHeader, getRequestURL, toWebRequest } from 'h3'
+import { getHeader, toWebRequest } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import type { VesselLivePublishMessage } from '../../shared/myboatLive'
 
 type VesselLiveBrokerEnv = {
   VESSEL_LIVE_BROKER?: DurableObjectNamespace
-}
-
-const LIVE_BROKER_DEBUG_PREFIX = 'LIVE_BROKER_DEBUG'
-
-function emitLiveBrokerDebug(event: string, fields: Record<string, unknown>) {
-  console.info(LIVE_BROKER_DEBUG_PREFIX, {
-    event,
-    ...fields,
-  })
 }
 
 function useVesselLiveBrokerNamespace(event: H3Event) {
@@ -48,13 +39,6 @@ export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
   const upgrade = getHeader(event, 'upgrade')?.toLowerCase()
   const localBrokerOrigin = getLocalBrokerOrigin(event)
 
-  emitLiveBrokerDebug('route_upgrade_start', {
-    vesselId,
-    requestUrl: getRequestURL(event).toString(),
-    upgrade: upgrade || null,
-    hasLocalBrokerOrigin: Boolean(localBrokerOrigin),
-  })
-
   if (upgrade !== 'websocket') {
     throw createError({
       statusCode: 426,
@@ -64,17 +48,9 @@ export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
 
   if (localBrokerOrigin) {
     const target = new URL(`/vessels/${vesselId}/connect`, localBrokerOrigin)
-    emitLiveBrokerDebug('route_upgrade_forward_local', {
-      vesselId,
-      target: target.toString(),
-    })
     return fetch(toProxyRequest(event, target))
   }
 
-  emitLiveBrokerDebug('route_upgrade_forward_do', {
-    vesselId,
-    target: vesselId,
-  })
   return getVesselLiveBrokerStub(event, vesselId).fetch(toProxyRequest(event))
 }
 
@@ -84,10 +60,6 @@ export async function publishVesselLiveMessage(
   payload: VesselLivePublishMessage,
 ) {
   const localBrokerOrigin = getLocalBrokerOrigin(event)
-  emitLiveBrokerDebug('route_publish_start', {
-    vesselId,
-    target: localBrokerOrigin ? 'local' : 'durable_object',
-  })
   const response = localBrokerOrigin
     ? await fetch(new URL(`/vessels/${vesselId}/publish`, localBrokerOrigin), {
         method: 'POST',
@@ -103,12 +75,6 @@ export async function publishVesselLiveMessage(
         },
         body: JSON.stringify(payload),
       })
-
-  emitLiveBrokerDebug('route_publish_result', {
-    vesselId,
-    target: localBrokerOrigin ? 'local' : 'durable_object',
-    status: response.status,
-  })
 
   if (!response.ok) {
     throw createError({
