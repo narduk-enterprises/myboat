@@ -12,6 +12,12 @@ const props = defineProps<{
 const store = useMyBoatVesselStore()
 const trafficEnabled = ref(true)
 const entry = computed(() => store.getAuthEntryBySlug(props.detail.vessel.slug))
+const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
+const trafficDetailBasePath = computed(() => `/dashboard/vessels/${props.detail.vessel.slug}/traffic`)
+const { contacts: enrichedAisContacts } = useAuthEnrichedTrafficContacts(
+  computed(() => props.detail.vessel.slug),
+  rawAisContacts,
+)
 useMyBoatLiveDemand({
   namespace: 'auth',
   consumerId: 'dashboard-vessel-live',
@@ -80,8 +86,9 @@ const liveFeedStatus = computed(() => {
           <MyBoatCurrentLocationMap
             :vessel="liveVessel"
             :installations="detail.installations"
-            :ais-contacts="store.serializeAisContacts(entry)"
+            :ais-contacts="enrichedAisContacts"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            :traffic-detail-base-path="trafficDetailBasePath"
             v-model:traffic-enabled="trafficEnabled"
             height-class="h-[18rem] sm:h-[24rem] lg:h-[32rem]"
           />

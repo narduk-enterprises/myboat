@@ -17,6 +17,17 @@ export default {
       })
     }
 
+    const contactMatch = url.pathname.match(/^\/vessels\/([^/]+)\/contacts\/(.+)$/)
+    if (contactMatch) {
+      const [, vesselId, contactId] = contactMatch
+      const stub = env.VESSEL_LIVE_BROKER_SELF.getByName(vesselId)
+
+      return stub.fetch(`https://vessel-live.internal/contacts/${contactId}`, {
+        method: request.method,
+        headers: request.headers,
+      })
+    }
+
     const match = url.pathname.match(/^\/vessels\/([^/]+)\/(connect|publish)$/)
     if (match) {
       const [, vesselId, action] = match

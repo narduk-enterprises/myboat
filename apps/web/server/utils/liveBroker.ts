@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import { getHeader, toWebRequest } from 'h3'
 import { useRuntimeConfig } from '#imports'
+import type { AisContactSummary } from '../../app/types/myboat'
 import type { VesselLivePublishMessage } from '../../shared/myboatLive'
 
 type VesselLiveBrokerEnv = {
@@ -33,6 +34,47 @@ function getLocalBrokerOrigin(event: H3Event) {
 function toProxyRequest(event: H3Event, url?: string | URL) {
   const request = toWebRequest(event)
   return url ? new Request(url, request) : request
+}
+
+async function fetchBrokerJson<T>(
+  event: H3Event,
+  vesselId: string,
+  input: {
+    path: string
+    method?: 'GET' | 'POST'
+    body?: string
+  },
+) {
+  const localBrokerOrigin = getLocalBrokerOrigin(event)
+  const request =
+    localBrokerOrigin
+      ? await fetch(new URL(`/vessels/${vesselId}${input.path}`, localBrokerOrigin), {
+          method: input.method || 'GET',
+          headers: input.body
+            ? {
+                'content-type': 'application/json',
+              }
+            : undefined,
+          body: input.body,
+        })
+      : await getVesselLiveBrokerStub(event, vesselId).fetch(
+          `https://vessel-live.internal${input.path}`,
+          {
+            method: input.method || 'GET',
+            headers: input.body
+              ? {
+                  'content-type': 'application/json',
+                }
+              : undefined,
+            body: input.body,
+          },
+        )
+
+  if (!request.ok) {
+    return null
+  }
+
+  return (await request.json()) as T
 }
 
 export async function proxyVesselLiveUpgrade(event: H3Event, vesselId: string) {
@@ -82,4 +124,16 @@ export async function publishVesselLiveMessage(
       message: 'Failed to publish vessel live update.',
     })
   }
+}
+
+export async function fetchVesselLiveContact(
+  event: H3Event,
+  vesselId: string,
+  contactId: string,
+) {
+  const response = await fetchBrokerJson<{ contact: AisContactSummary | null }>(event, vesselId, {
+    path: `/contacts/${encodeURIComponent(contactId)}`,
+  })
+
+  return response?.contact || null
 }

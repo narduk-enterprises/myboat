@@ -32,7 +32,15 @@ const trafficEnabled = ref(true)
 const { convertSpeed, speedUnitLabel } = useMarineUnits()
 const detail = computed(() => store.getPublicDetail(username.value, vesselSlug.value))
 const entry = computed(() => store.getPublicEntry(username.value, vesselSlug.value))
-const aisContacts = computed(() => store.serializeAisContacts(entry.value))
+const rawAisContacts = computed(() => store.serializeAisContacts(entry.value))
+const trafficDetailBasePath = computed(() =>
+  detail.value ? `/${detail.value.profile.username}/${detail.value.vessel.slug}/traffic` : null,
+)
+const { contacts: aisContacts } = usePublicEnrichedTrafficContacts(
+  username,
+  vesselSlug,
+  rawAisContacts,
+)
 const liveState = computed(() => entry.value?.live ?? null)
 
 const primaryInstallation = computed<PublicInstallationSummary | null>(
@@ -266,6 +274,7 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         :live-connection-state="liveState?.connectionState"
         :live-last-delta-at="liveState?.lastDeltaAt"
         :has-signal-k-source="liveState?.hasSignalKSource"
+        :traffic-detail-base-path="trafficDetailBasePath"
         v-model:traffic-enabled="trafficEnabled"
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
         :persist-key="`public-vessel:${detail.profile.username}/${detail.vessel.slug}`"

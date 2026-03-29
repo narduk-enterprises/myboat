@@ -197,6 +197,20 @@ export class VesselLiveBroker extends DurableObject {
       return new Response(null, { status: 204 })
     }
 
+    if (request.method === 'GET' && url.pathname.startsWith('/contacts/')) {
+      const contactId = decodeURIComponent(url.pathname.slice('/contacts/'.length))
+      const contact = this.stateRecord.aisContacts[contactId] || null
+
+      return Response.json(
+        {
+          contact,
+        },
+        {
+          status: contact ? 200 : 404,
+        },
+      )
+    }
+
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected websocket upgrade.', { status: 426 })
     }

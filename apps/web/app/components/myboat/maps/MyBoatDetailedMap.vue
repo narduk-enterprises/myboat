@@ -7,6 +7,7 @@ import type {
   WaypointSummary,
 } from '~/types/myboat'
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
+import { buildTrafficContactPath } from '~/utils/traffic'
 import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import {
   buildAisVectorFeatureCollection,
@@ -36,6 +37,7 @@ const props = withDefaults(
     liveLastDeltaAt?: number | null
     hasSignalKSource?: boolean
     trafficEnabled?: boolean
+    trafficDetailBasePath?: string | null
     heightClass?: string
     persistKey?: string | null
     showFocusPanel?: boolean
@@ -52,6 +54,7 @@ const props = withDefaults(
     liveLastDeltaAt: null,
     hasSignalKSource: undefined,
     trafficEnabled: undefined,
+    trafficDetailBasePath: null,
     heightClass: 'h-[24rem] sm:h-[30rem] lg:h-[38rem] xl:h-[44rem]',
     persistKey: null,
     showFocusPanel: true,
@@ -70,7 +73,7 @@ const selectedId = shallowRef<string | null>(null)
 const showRoutes = shallowRef(true)
 const showWaypoints = shallowRef(true)
 const localTrafficEnabled = shallowRef(true)
-const showTrafficVectors = shallowRef(false)
+const showTrafficVectors = shallowRef(true)
 const showPointsOfInterest = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const isCompactViewport = useCompactViewport()
@@ -131,6 +134,9 @@ const selectedAisPin = computed(() => {
   const selected = selectedPin.value
   return selected?.pinKind === 'ais' ? selected : null
 })
+const selectedAisDetailPath = computed(() =>
+  buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
+)
 const focusVessel = computed(() => selectedVessel.value || primaryVessel.value)
 
 const showsDenseLabels = computed(() => mapItems.value.length <= 3)
@@ -467,6 +473,12 @@ onBeforeUnmount(() => {
             <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
           </div>
 
+          <TrafficContactFocusCard
+            v-if="selectedAisPin"
+            :contact="selectedAisPin"
+            :detail-path="selectedAisDetailPath"
+          />
+
           <div class="flex flex-wrap gap-2">
             <UButton
               icon="i-lucide-scan-search"
@@ -535,6 +547,16 @@ onBeforeUnmount(() => {
           <p class="mt-2 font-display text-lg text-default">{{ focusedSummary.title }}</p>
           <p class="mt-2 text-sm text-muted">{{ focusedSummary.description }}</p>
           <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
+        </div>
+
+        <div
+          v-if="selectedAisPin"
+          class="absolute bottom-24 left-4 hidden max-w-[20rem] lg:block"
+        >
+          <TrafficContactFocusCard
+            :contact="selectedAisPin"
+            :detail-path="selectedAisDetailPath"
+          />
         </div>
 
         <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
