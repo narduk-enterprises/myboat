@@ -17,10 +17,16 @@ useWebPageSchema({
 const toast = useToast()
 const session = useUserSession()
 const appFetch = useAppFetch()
-const { data, pending, refresh } = await useDashboardOverview('myboat-settings-profile')
+const { data, pending } = await useDashboardOverview('myboat-settings-profile')
 
 const overview = computed(() => data.value)
 const profile = computed(() => overview.value?.profile ?? null)
+const {
+  items: followedVessels,
+  removeItem: removeFollowedVessel,
+  setItems: setFollowedVessels,
+  upsertItem: upsertFollowedVessel,
+} = useFollowedVesselsState()
 const primaryVessel = computed(
   () =>
     overview.value?.vessels.find((vessel) => vessel.isPrimary) ||
@@ -57,6 +63,18 @@ const state = reactive({
   bio: overview.value?.profile?.bio || '',
   homePort: overview.value?.profile?.homePort || '',
 })
+
+watch(
+  () => overview.value?.followedVessels,
+  (nextItems) => {
+    if (!nextItems) {
+      return
+    }
+
+    setFollowedVessels(nextItems)
+  },
+  { immediate: true },
+)
 
 watch(
   () => overview.value?.profile,
@@ -291,7 +309,11 @@ async function onSubmit() {
         </div>
       </div>
 
-      <FleetFriendsManager :items="overview.followedVessels" @changed="refresh" />
+      <FleetFriendsManager
+        :items="followedVessels"
+        @removed="removeFollowedVessel"
+        @saved="upsertFollowedVessel"
+      />
     </template>
 
     <UAlert

@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
+  type FollowedVessel,
   followedVessels,
   mediaItems,
   passages,
@@ -211,10 +212,8 @@ export async function getFollowedVesselsForUser(event: H3Event, userId: string) 
     .all()
 }
 
-export function serializeFollowedVessels(
-  rows: Awaited<ReturnType<typeof getFollowedVesselsForUser>>,
-) {
-  return rows.map((row) => ({
+export function serializeFollowedVessel(row: FollowedVessel) {
+  return {
     id: row.id,
     source: 'aishub' as const,
     matchMode: row.matchMode === 'name' ? 'name' : 'mmsi',
@@ -230,7 +229,13 @@ export function serializeFollowedVessels(
     sourceStations: parseSourceStations(row.sourceStationsJson),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  }))
+  }
+}
+
+export function serializeFollowedVessels(
+  rows: Awaited<ReturnType<typeof getFollowedVesselsForUser>>,
+) {
+  return rows.map(serializeFollowedVessel)
 }
 
 export async function getPublicVesselByUsernameAndSlug(

@@ -12,11 +12,29 @@ useWebPageSchema({
   description: 'Search, save, and chart the buddy boats this captain follows.',
 })
 
-const { data, pending, refresh } = await useDashboardOverview('myboat-fleet-friends')
+const { data, pending } = await useDashboardOverview('myboat-fleet-friends')
 
 const overview = computed(() => data.value)
 const isCompactViewport = useCompactViewport()
 const isManageBuddiesOpen = shallowRef(false)
+const {
+  items: followedVessels,
+  removeItem: removeFollowedVessel,
+  setItems: setFollowedVessels,
+  upsertItem: upsertFollowedVessel,
+} = useFollowedVesselsState()
+
+watch(
+  () => overview.value?.followedVessels,
+  (nextItems) => {
+    if (!nextItems) {
+      return
+    }
+
+    setFollowedVessels(nextItems)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -59,7 +77,7 @@ const isManageBuddiesOpen = shallowRef(false)
       />
 
       <BuddyBoatsMap
-        :vessels="overview.followedVessels"
+        :vessels="followedVessels"
         title="Buddy boats chart"
         description="Saved buddy boats with current AIS positions render here. Open the manager to search AIS Hub, add new boats, or prune the list."
         height-class="h-[30rem] sm:h-[38rem] lg:h-[46rem] xl:h-[54rem]"
@@ -75,7 +93,11 @@ const isManageBuddiesOpen = shallowRef(false)
         scrollable
       >
         <template #body>
-          <BuddyBoatTableManager :items="overview.followedVessels" @changed="refresh" />
+          <BuddyBoatTableManager
+            :items="followedVessels"
+            @removed="removeFollowedVessel"
+            @saved="upsertFollowedVessel"
+          />
         </template>
       </UModal>
     </template>

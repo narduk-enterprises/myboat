@@ -1,9 +1,11 @@
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { defineUserMutation, withValidatedBody } from '#layer/server/utils/mutation'
 import { RATE_LIMIT_POLICIES } from '#layer/server/utils/rateLimit'
 import { followedVessels } from '#server/database/app-schema'
 import { rememberAisHubResults } from '#server/utils/aishub'
 import { useAppDatabase } from '#server/utils/database'
+import { serializeFollowedVessel } from '#server/utils/myboat'
 
 const bodySchema = z.object({
   source: z.literal('aishub').default('aishub'),
@@ -91,9 +93,20 @@ export default defineUserMutation(
         },
       })
 
+    const savedFollowedVessel = await db
+      .select()
+      .from(followedVessels)
+      .where(and(eq(followedVessels.ownerUserId, user.id), eq(followedVessels.mmsi, body.mmsi)))
+      .get()
+
+    if (!savedFollowedVessel) {
+      throw new Error('Unable to load saved buddy boat.')
+    }
+
     return {
       ok: true,
       mmsi: body.mmsi,
+      followedVessel: serializeFollowedVessel(savedFollowedVessel),
     }
   },
 )

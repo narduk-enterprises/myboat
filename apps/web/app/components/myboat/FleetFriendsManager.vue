@@ -12,7 +12,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  changed: []
+  removed: [id: string]
+  saved: [vessel: FollowedVesselSummary]
 }>()
 
 const toast = useToast()
@@ -169,13 +170,13 @@ async function onAdd(result: AisHubSearchResult) {
   activeAddMmsi.value = result.mmsi
 
   try {
-    await followVessel(result)
+    const response = await followVessel(result)
     toast.add({
       title: 'Buddy boat saved',
       description: `${result.name} now appears on the captain page.`,
       color: 'success',
     })
-    emit('changed')
+    emit('saved', response.followedVessel)
   } catch (error) {
     toast.add({
       title: 'Unable to save buddy boat',
@@ -197,7 +198,7 @@ async function onRemove(id: string) {
       description: 'The captain page no longer surfaces that boat.',
       color: 'success',
     })
-    emit('changed')
+    emit('removed', id)
   } catch (error) {
     toast.add({
       title: 'Unable to remove buddy boat',

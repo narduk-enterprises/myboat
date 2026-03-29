@@ -180,10 +180,13 @@ export function useFollowVessel() {
     pending.value = true
 
     try {
-      return await appFetch<{ ok: true; mmsi: string }>('/api/app/fleet-friends', {
-        method: 'POST',
-        body: vessel,
-      })
+      return await appFetch<{ ok: true; mmsi: string; followedVessel: FollowedVesselSummary }>(
+        '/api/app/fleet-friends',
+        {
+          method: 'POST',
+          body: vessel,
+        },
+      )
     } finally {
       pending.value = false
     }
