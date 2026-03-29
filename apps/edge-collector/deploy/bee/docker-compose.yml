@@ -1,0 +1,34 @@
+services:
+  myboat-bee-consumer:
+    container_name: ${COLLECTOR_NAME:-myboat-bee-consumer}
+    build:
+      context: ./app
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SIGNALK_WS_URL: ${SIGNALK_WS_URL:-ws://127.0.0.1:3000/signalk/v1/stream?subscribe=all}
+      SIGNALK_HTTP_URL: ${SIGNALK_HTTP_URL:-http://127.0.0.1:3000/signalk/v1/api}
+      MYBOAT_INGEST_URL: ${MYBOAT_INGEST_URL:-https://mybo.at/api/ingest/v1/delta}
+      MYBOAT_IDENTITY_INGEST_URL: ${MYBOAT_IDENTITY_INGEST_URL:-}
+      MYBOAT_SOURCES_INGEST_URL: ${MYBOAT_SOURCES_INGEST_URL:-}
+      MYBOAT_INGEST_KEY: ${MYBOAT_INGEST_KEY:?set MYBOAT_INGEST_KEY in .env}
+      MYBOAT_PUBLISHER_ROLE: ${MYBOAT_PUBLISHER_ROLE:-shadow}
+      MYBOAT_STREAM_PORT: ${MYBOAT_STREAM_PORT:-4011}
+      MYBOAT_STREAM_PATH: ${MYBOAT_STREAM_PATH:-/myboat/v1/stream}
+      COLLECTOR_BATCH_SIZE: ${COLLECTOR_BATCH_SIZE:-500}
+      COLLECTOR_FLUSH_INTERVAL_MS: ${COLLECTOR_FLUSH_INTERVAL_MS:-1500}
+      COLLECTOR_MAX_BUFFER_ITEMS: ${COLLECTOR_MAX_BUFFER_ITEMS:-50000}
+      COLLECTOR_MAX_POST_ITEMS: ${COLLECTOR_MAX_POST_ITEMS:-1000}
+      COLLECTOR_IDENTITY_REFRESH_INTERVAL_MS: ${COLLECTOR_IDENTITY_REFRESH_INTERVAL_MS:-900000}
+      COLLECTOR_MIN_POST_INTERVAL_MS: ${COLLECTOR_MIN_POST_INTERVAL_MS:-1500}
+      COLLECTOR_429_BACKOFF_MS: ${COLLECTOR_429_BACKOFF_MS:-10000}
+      COLLECTOR_RECONNECT_DELAY_MS: ${COLLECTOR_RECONNECT_DELAY_MS:-5000}
+      COLLECTOR_REQUEST_TIMEOUT_MS: ${COLLECTOR_REQUEST_TIMEOUT_MS:-15000}
+      COLLECTOR_USER_AGENT: ${COLLECTOR_USER_AGENT:-myboat-bee-consumer/0.2.0}
+      MYBOAT_X_REQUESTED_WITH: ${MYBOAT_X_REQUESTED_WITH:-XMLHttpRequest}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:' + (process.env.MYBOAT_STREAM_PORT || '4011') + '/healthz').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

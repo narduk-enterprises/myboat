@@ -98,6 +98,7 @@ pnpm --filter web run db:verify
 pnpm --filter web run quality
 pnpm run quality
 pnpm run test:e2e:web
+MYBOAT_INGEST_KEY=nk_replace_me MYBOAT_PUBLISHER_ROLE=shadow ./scripts/deploy-bee-consumer.sh
 ```
 
 ## Migration Decisions
