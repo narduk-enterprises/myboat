@@ -36,9 +36,7 @@ export default defineUserMutation(
       uniqueItems.map((item) => item.mmsi),
       { bestEffort: true },
     )
-    const refreshedResults = new Map(
-      refreshedLookup.results.map((result) => [result.mmsi, result]),
-    )
+    const refreshedResults = new Map(refreshedLookup.results.map((result) => [result.mmsi, result]))
 
     const importResults: AisHubSearchResult[] = uniqueItems.map((item) => {
       const stored = refreshedResults.get(item.mmsi)

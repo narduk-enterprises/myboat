@@ -26,7 +26,9 @@ export default defineUserMutation(
     }
 
     const refresh = await refreshAisHubResultsByMmsis(event, mmsis, { bestEffort: true })
-    const followedVessels = serializeFollowedVessels(await getFollowedVesselsForUser(event, user.id))
+    const followedVessels = serializeFollowedVessels(
+      await getFollowedVesselsForUser(event, user.id),
+    )
 
     return {
       ok: true,

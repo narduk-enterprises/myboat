@@ -219,9 +219,7 @@ export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: strin
 function normalizeRequestedMmsis(mmsis: string[]) {
   return [
     ...new Set(
-      mmsis
-        .map((mmsi) => mmsi.trim())
-        .filter((mmsi): mmsi is string => /^\d{9}$/.test(mmsi)),
+      mmsis.map((mmsi) => mmsi.trim()).filter((mmsi): mmsi is string => /^\d{9}$/.test(mmsi)),
     ),
   ]
 }
@@ -419,7 +417,11 @@ async function fetchAisHubApiByMmsis(mmsis: string[], intervalMinutes?: number |
   url.searchParams.set('compress', '0')
   url.searchParams.set('mmsi', normalizedMmsis.join(','))
 
-  if (typeof intervalMinutes === 'number' && Number.isFinite(intervalMinutes) && intervalMinutes > 0) {
+  if (
+    typeof intervalMinutes === 'number' &&
+    Number.isFinite(intervalMinutes) &&
+    intervalMinutes > 0
+  ) {
     url.searchParams.set('interval', String(Math.trunc(intervalMinutes)))
   }
 

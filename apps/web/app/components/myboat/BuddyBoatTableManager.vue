@@ -116,9 +116,7 @@ function canQueryUpstream(value: string) {
 }
 
 function countMappedVessels(items: FollowedVesselSummary[]) {
-  return items.filter(
-    (item) => item.positionLat !== null && item.positionLng !== null,
-  ).length
+  return items.filter((item) => item.positionLat !== null && item.positionLng !== null).length
 }
 
 function describeRefresh(response: FollowedVesselRefreshResponse) {
