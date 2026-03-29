@@ -198,6 +198,97 @@ function buildUpsertStatement(records: AisHubApiVesselRecord[], fetchedAt: strin
   `
 }
 
+async function getTrackedFollowedMmsis(d1: D1Database) {
+  const result = await d1
+    .prepare('SELECT DISTINCT `mmsi` AS mmsi FROM `followed_vessels`')
+    .all<{ mmsi?: string | null }>()
+
+  return new Set(
+    (result.results || [])
+      .map((row) => row.mmsi?.trim() || '')
+      .filter((mmsi): mmsi is string => Boolean(mmsi)),
+  )
+}
+
+function buildFollowedVesselRefreshStatement(mmsis: string[], refreshedAt: string) {
+  const placeholders = mmsis.map(() => '?').join(', ')
+
+  return {
+    statement: `
+    UPDATE \`followed_vessels\`
+    SET
+      \`source\` = 'aishub',
+      \`imo\` = (
+        SELECT \`imo\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`name\` = (
+        SELECT \`name\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`call_sign\` = (
+        SELECT \`call_sign\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`destination\` = (
+        SELECT \`destination\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`last_report_at\` = (
+        SELECT \`last_report_at\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`position_lat\` = (
+        SELECT \`position_lat\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`position_lng\` = (
+        SELECT \`position_lng\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`ship_type\` = (
+        SELECT \`ship_type\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`source_stations_json\` = (
+        SELECT \`source_stations_json\` FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      ),
+      \`updated_at\` = ?
+    WHERE \`mmsi\` IN (${placeholders})
+      AND EXISTS (
+        SELECT 1 FROM \`aishub_vessels\`
+        WHERE \`aishub_vessels\`.\`mmsi\` = \`followed_vessels\`.\`mmsi\`
+      )
+  `,
+    bindings: [refreshedAt, ...mmsis] as Array<string>,
+  }
+}
+
+async function refreshTrackedFollowedVesselsFromAisHub(
+  d1: D1Database,
+  records: AisHubApiVesselRecord[],
+  refreshedAt: string,
+) {
+  const trackedMmsis = await getTrackedFollowedMmsis(d1)
+  const matchingMmsis = [...new Set(records.map((record) => record.mmsi))].filter((mmsi) =>
+    trackedMmsis.has(mmsi),
+  )
+
+  if (!matchingMmsis.length) {
+    return 0
+  }
+
+  const batches = chunkRecords(matchingMmsis, 100)
+
+  for (const batch of batches) {
+    const refreshQuery = buildFollowedVesselRefreshStatement(batch, refreshedAt)
+    await d1.prepare(refreshQuery.statement).bind(...refreshQuery.bindings).run()
+  }
+
+  return matchingMmsis.length
+}
+
 async function updateSyncState(d1: D1Database, patch: SyncStatePatch) {
   const updatedAt = new Date().toISOString()
 
@@ -450,6 +541,11 @@ export async function runAisHubRollingSync(
     const records = await fetchRollingSnapshot(apiKey.trim(), AISHUB_ROLLING_SYNC_LOOKBACK_MINUTES)
     await recordAisHubRequest(d1, fetchedAt)
     const batchCount = await upsertSnapshotRecords(d1, records, fetchedAt)
+    const refreshedFollowedCount = await refreshTrackedFollowedVesselsFromAisHub(
+      d1,
+      records,
+      fetchedAt,
+    )
 
     await updateSyncState(d1, {
       lastCompletedAt: fetchedAt,
@@ -467,6 +563,7 @@ export async function runAisHubRollingSync(
       lookbackMinutes: AISHUB_ROLLING_SYNC_LOOKBACK_MINUTES,
       recordCount: records.length,
       batchCount,
+      refreshedFollowedCount,
     })
 
     return {

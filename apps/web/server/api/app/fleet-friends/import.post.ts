@@ -40,13 +40,7 @@ export default defineUserMutation(
       const stored = storedResults.get(item.mmsi)
 
       if (stored) {
-        return {
-          ...stored,
-          imo: stored.imo ?? item.imo ?? null,
-          name: stored.name || item.name,
-          callSign: stored.callSign ?? item.callSign ?? null,
-          destination: stored.destination ?? item.destination ?? null,
-        }
+        return stored
       }
 
       return {

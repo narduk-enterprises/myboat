@@ -227,98 +227,6 @@ async function onRemove(id: string) {
       </div>
     </section>
 
-    <BuddyBoatImportPanel @imported="emit('imported', $event)" />
-
-    <UCard class="border-default/80 bg-default/90 shadow-card">
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="font-display text-xl text-default">Current buddies</h3>
-            <p class="mt-1 text-sm text-muted">
-              Remove boats inline and keep the captain page list clean.
-            </p>
-          </div>
-
-          <UBadge color="primary" variant="soft">{{ props.items.length }} saved</UBadge>
-        </div>
-      </template>
-
-      <UTable :data="props.items" :columns="currentColumns" sticky="header">
-        <template #name-cell="{ row }">
-          <div class="min-w-0">
-            <p class="font-medium text-default">{{ row.original.name }}</p>
-            <p class="mt-1 text-xs text-muted">
-              MMSI {{ row.original.mmsi }}
-              <span v-if="row.original.callSign"> · {{ row.original.callSign }}</span>
-              <span v-if="row.original.imo"> · IMO {{ row.original.imo }}</span>
-            </p>
-          </div>
-        </template>
-
-        <template #destination-cell="{ row }">
-          <span class="text-sm text-muted">
-            {{ row.original.destination || 'No destination published' }}
-          </span>
-        </template>
-
-        <template #lastReportAt-cell="{ row }">
-          <div class="text-sm">
-            <p class="font-medium text-default">
-              {{ formatRelativeTime(row.original.lastReportAt) }}
-            </p>
-            <p class="mt-1 text-xs text-muted">
-              {{ formatTimestamp(row.original.lastReportAt) }}
-            </p>
-          </div>
-        </template>
-
-        <template #sourceStations-cell="{ row }">
-          <div class="text-sm">
-            <p class="font-medium text-default">
-              {{
-                row.original.sourceStations.length
-                  ? `${row.original.sourceStations.length} stations`
-                  : 'API lookup'
-              }}
-            </p>
-            <p class="mt-1 text-xs text-muted">
-              {{
-                row.original.matchMode === 'name'
-                  ? 'Saved from the public finder.'
-                  : 'Saved from MMSI lookup.'
-              }}
-            </p>
-          </div>
-        </template>
-
-        <template #actions-cell="{ row }">
-          <div class="flex justify-end">
-            <UButton
-              type="button"
-              color="error"
-              variant="ghost"
-              icon="i-lucide-user-round-minus"
-              :loading="removePending && activeRemoveId === row.original.id"
-              @click="onRemove(row.original.id)"
-            >
-              Remove
-            </UButton>
-          </div>
-        </template>
-
-        <template #empty>
-          <div class="flex items-center justify-center px-4 py-10 text-center">
-            <div class="space-y-2">
-              <p class="font-medium text-default">No buddy boats saved yet</p>
-              <p class="text-sm text-muted">
-                Search AIS Hub above and add the boats you want to keep on this page.
-              </p>
-            </div>
-          </div>
-        </template>
-      </UTable>
-    </UCard>
-
     <UCard class="border-default/80 bg-default/90 shadow-card">
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -439,5 +347,97 @@ async function onRemove(id: string) {
         </div>
       </div>
     </UCard>
+
+    <UCard class="border-default/80 bg-default/90 shadow-card">
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="font-display text-xl text-default">Current buddies</h3>
+            <p class="mt-1 text-sm text-muted">
+              Remove boats inline and keep the captain page list clean.
+            </p>
+          </div>
+
+          <UBadge color="primary" variant="soft">{{ props.items.length }} saved</UBadge>
+        </div>
+      </template>
+
+      <UTable :data="props.items" :columns="currentColumns" sticky="header">
+        <template #name-cell="{ row }">
+          <div class="min-w-0">
+            <p class="font-medium text-default">{{ row.original.name }}</p>
+            <p class="mt-1 text-xs text-muted">
+              MMSI {{ row.original.mmsi }}
+              <span v-if="row.original.callSign"> · {{ row.original.callSign }}</span>
+              <span v-if="row.original.imo"> · IMO {{ row.original.imo }}</span>
+            </p>
+          </div>
+        </template>
+
+        <template #destination-cell="{ row }">
+          <span class="text-sm text-muted">
+            {{ row.original.destination || 'No destination published' }}
+          </span>
+        </template>
+
+        <template #lastReportAt-cell="{ row }">
+          <div class="text-sm">
+            <p class="font-medium text-default">
+              {{ formatRelativeTime(row.original.lastReportAt) }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{ formatTimestamp(row.original.lastReportAt) }}
+            </p>
+          </div>
+        </template>
+
+        <template #sourceStations-cell="{ row }">
+          <div class="text-sm">
+            <p class="font-medium text-default">
+              {{
+                row.original.sourceStations.length
+                  ? `${row.original.sourceStations.length} stations`
+                  : 'API lookup'
+              }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                row.original.matchMode === 'name'
+                  ? 'Saved from the public finder.'
+                  : 'Saved from MMSI lookup.'
+              }}
+            </p>
+          </div>
+        </template>
+
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end">
+            <UButton
+              type="button"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-user-round-minus"
+              :loading="removePending && activeRemoveId === row.original.id"
+              @click="onRemove(row.original.id)"
+            >
+              Remove
+            </UButton>
+          </div>
+        </template>
+
+        <template #empty>
+          <div class="flex items-center justify-center px-4 py-10 text-center">
+            <div class="space-y-2">
+              <p class="font-medium text-default">No buddy boats saved yet</p>
+              <p class="text-sm text-muted">
+                Search AIS Hub above and add the boats you want to keep on this page.
+              </p>
+            </div>
+          </div>
+        </template>
+      </UTable>
+    </UCard>
+
+    <BuddyBoatImportPanel @imported="emit('imported', $event)" />
   </div>
 </template>

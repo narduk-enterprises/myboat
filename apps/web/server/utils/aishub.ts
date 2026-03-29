@@ -9,6 +9,7 @@ import {
 } from '../../shared/aishub'
 import { aishubRequestState, aishubSearchCache, aishubVessels } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
+import { syncFollowedVesselsFromAisHubForMmsis } from '#server/utils/myboat'
 
 const AISHUB_API_URL = 'https://data.aishub.net/ws.php'
 const AISHUB_VESSELS_URL = 'https://www.aishub.net/vessels'
@@ -180,6 +181,12 @@ export async function rememberAisHubResults(
         },
       })
   }
+
+  await syncFollowedVesselsFromAisHubForMmsis(
+    event,
+    results.map((result) => result.mmsi),
+    fetchedAt,
+  )
 }
 
 export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: string[]) {

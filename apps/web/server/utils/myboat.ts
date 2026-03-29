@@ -3,6 +3,8 @@ import type { AisHubSearchResult } from '~/types/myboat'
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { apiKeys, users } from '#layer/server/database/schema'
 import {
+  aishubVessels,
+  type AisHubVessel,
   type FollowedVessel,
   followedVessels,
   mediaItems,
@@ -118,6 +120,46 @@ function parseSourceStations(value: string) {
   }
 }
 
+type FollowedVesselAuthoritySnapshot = Pick<
+  AisHubVessel,
+  | 'mmsi'
+  | 'imo'
+  | 'name'
+  | 'callSign'
+  | 'destination'
+  | 'lastReportAt'
+  | 'positionLat'
+  | 'positionLng'
+  | 'shipType'
+  | 'sourceStationsJson'
+> & {
+  updatedAt: string | null
+}
+
+export function mergeFollowedVesselAuthority(
+  row: FollowedVessel,
+  authority: FollowedVesselAuthoritySnapshot | null,
+): FollowedVessel {
+  if (!authority) {
+    return row
+  }
+
+  return {
+    ...row,
+    source: 'aishub',
+    imo: authority.imo,
+    name: authority.name,
+    callSign: authority.callSign,
+    destination: authority.destination,
+    lastReportAt: authority.lastReportAt,
+    positionLat: authority.positionLat,
+    positionLng: authority.positionLng,
+    shipType: authority.shipType,
+    sourceStationsJson: authority.sourceStationsJson,
+    updatedAt: authority.updatedAt || row.updatedAt,
+  }
+}
+
 export async function getCaptainProfileByUserId(event: H3Event, userId: string) {
   const db = useAppDatabase(event)
   return db
@@ -205,12 +247,62 @@ export async function getAllPublicVessels(event: H3Event) {
 
 export async function getFollowedVesselsForUser(event: H3Event, userId: string) {
   const db = useAppDatabase(event)
-  return db
-    .select()
+  const rows = await db
+    .select({
+      id: followedVessels.id,
+      ownerUserId: followedVessels.ownerUserId,
+      source: followedVessels.source,
+      matchMode: followedVessels.matchMode,
+      mmsi: followedVessels.mmsi,
+      imo: followedVessels.imo,
+      name: followedVessels.name,
+      callSign: followedVessels.callSign,
+      destination: followedVessels.destination,
+      lastReportAt: followedVessels.lastReportAt,
+      positionLat: followedVessels.positionLat,
+      positionLng: followedVessels.positionLng,
+      shipType: followedVessels.shipType,
+      sourceStationsJson: followedVessels.sourceStationsJson,
+      createdAt: followedVessels.createdAt,
+      updatedAt: followedVessels.updatedAt,
+      authoritativeMmsi: aishubVessels.mmsi,
+      authoritativeImo: aishubVessels.imo,
+      authoritativeName: aishubVessels.name,
+      authoritativeCallSign: aishubVessels.callSign,
+      authoritativeDestination: aishubVessels.destination,
+      authoritativeLastReportAt: aishubVessels.lastReportAt,
+      authoritativePositionLat: aishubVessels.positionLat,
+      authoritativePositionLng: aishubVessels.positionLng,
+      authoritativeShipType: aishubVessels.shipType,
+      authoritativeSourceStationsJson: aishubVessels.sourceStationsJson,
+      authoritativeUpdatedAt: aishubVessels.updatedAt,
+    })
     .from(followedVessels)
+    .leftJoin(aishubVessels, eq(followedVessels.mmsi, aishubVessels.mmsi))
     .where(eq(followedVessels.ownerUserId, userId))
     .orderBy(desc(followedVessels.updatedAt), desc(followedVessels.createdAt))
     .all()
+
+  return rows.map((row) =>
+    mergeFollowedVesselAuthority(
+      row,
+      row.authoritativeMmsi
+        ? {
+            mmsi: row.authoritativeMmsi,
+            imo: row.authoritativeImo,
+            name: row.authoritativeName || row.name,
+            callSign: row.authoritativeCallSign,
+            destination: row.authoritativeDestination,
+            lastReportAt: row.authoritativeLastReportAt,
+            positionLat: row.authoritativePositionLat,
+            positionLng: row.authoritativePositionLng,
+            shipType: row.authoritativeShipType,
+            sourceStationsJson: row.authoritativeSourceStationsJson || '[]',
+            updatedAt: row.authoritativeUpdatedAt,
+          }
+        : null,
+    ),
+  )
 }
 
 export function serializeFollowedVessel(row: FollowedVessel) {
@@ -331,6 +423,57 @@ export async function upsertFollowedVesselForUser(
   }
 
   return savedVessel
+}
+
+export async function syncFollowedVesselsFromAisHubForMmsis(
+  event: H3Event,
+  mmsis: string[],
+  now = new Date().toISOString(),
+) {
+  const uniqueMmsis = [...new Set(mmsis.map((mmsi) => mmsi.trim()).filter(Boolean))]
+
+  if (!uniqueMmsis.length) {
+    return 0
+  }
+
+  const db = useAppDatabase(event)
+  const authoritativeRows = await db
+    .select({
+      mmsi: aishubVessels.mmsi,
+      imo: aishubVessels.imo,
+      name: aishubVessels.name,
+      callSign: aishubVessels.callSign,
+      destination: aishubVessels.destination,
+      lastReportAt: aishubVessels.lastReportAt,
+      positionLat: aishubVessels.positionLat,
+      positionLng: aishubVessels.positionLng,
+      shipType: aishubVessels.shipType,
+      sourceStationsJson: aishubVessels.sourceStationsJson,
+    })
+    .from(aishubVessels)
+    .where(inArray(aishubVessels.mmsi, uniqueMmsis))
+    .all()
+
+  for (const row of authoritativeRows) {
+    await db
+      .update(followedVessels)
+      .set({
+        source: 'aishub',
+        imo: row.imo,
+        name: row.name,
+        callSign: row.callSign,
+        destination: row.destination,
+        lastReportAt: row.lastReportAt,
+        positionLat: row.positionLat,
+        positionLng: row.positionLng,
+        shipType: row.shipType,
+        sourceStationsJson: row.sourceStationsJson,
+        updatedAt: now,
+      })
+      .where(eq(followedVessels.mmsi, row.mmsi))
+  }
+
+  return authoritativeRows.length
 }
 
 export async function getPublicVesselByUsernameAndSlug(
