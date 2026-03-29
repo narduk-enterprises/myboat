@@ -90,8 +90,11 @@ watch(
         title="Manage buddies"
         description="Search AIS Hub, save buddy boats to this captain page, and remove boats you no longer want to track."
         :fullscreen="isCompactViewport"
-        class="max-w-7xl overflow-hidden"
-        scrollable
+        class="overflow-hidden"
+        :ui="{
+          content: 'w-[calc(100vw-2rem)] max-w-5xl rounded-[1.5rem] shadow-overlay',
+          body: 'overflow-y-auto p-4 sm:p-5',
+        }"
       >
         <template #body>
           <BuddyBoatTableManager
