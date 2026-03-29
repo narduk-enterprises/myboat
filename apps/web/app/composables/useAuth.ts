@@ -14,6 +14,14 @@ export function useAuth() {
     return result
   }
 
+  async function loginAsTestUser() {
+    const result = (await api.loginAsTestUser()) as AuthMutationResult
+    if (result.user) {
+      await fetchSession()
+    }
+    return result
+  }
+
   async function register(payload: {
     name: string
     email: string
@@ -78,6 +86,7 @@ export function useAuth() {
     loggedIn: isAuthenticated,
     fetchUser: fetchSession,
     login,
+    loginAsTestUser,
     register,
     signup: register,
     logout,

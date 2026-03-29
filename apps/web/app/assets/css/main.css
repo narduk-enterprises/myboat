@@ -236,21 +236,27 @@ body {
 }
 
 .marine-auth-shell {
+  position: relative;
   overflow: hidden;
   border: 1px solid rgb(186 230 253 / 0.56);
   border-radius: 2rem;
   background:
-    linear-gradient(135deg, rgb(8 47 73 / 0.12), rgb(255 255 255 / 0.46)), rgb(255 255 255 / 0.8);
+    linear-gradient(135deg, rgb(8 47 73 / 0.1), rgb(255 255 255 / 0.58)), rgb(255 255 255 / 0.84);
   box-shadow: var(--shadow-overlay);
+}
+
+.dark .marine-auth-shell {
+  border-color: rgb(56 189 248 / 0.2);
+  background: linear-gradient(135deg, rgb(8 47 73 / 0.16), rgb(2 6 23 / 0.42)), rgb(2 6 23 / 0.9);
 }
 
 .marine-auth-aside {
   position: relative;
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgb(56 189 248 / 0.26), transparent 30%),
+    radial-gradient(circle at top left, rgb(56 189 248 / 0.24), transparent 28%),
     radial-gradient(circle at 82% 18%, rgb(125 211 252 / 0.14), transparent 24%),
-    linear-gradient(160deg, rgb(15 23 42 / 0.98), rgb(8 23 41 / 0.9) 42%, rgb(8 145 178 / 0.46)),
+    linear-gradient(160deg, rgb(15 23 42 / 0.98), rgb(8 23 41 / 0.92) 42%, rgb(8 145 178 / 0.48)),
     url('/images/hero-bg.webp') center/cover;
 }
 
@@ -271,9 +277,17 @@ body {
   border-radius: 2rem;
   background:
     radial-gradient(circle at 84% 14%, rgb(56 189 248 / 0.14), transparent 16%),
-    linear-gradient(155deg, rgb(255 255 255 / 0.9), rgb(240 249 255 / 0.82));
+    linear-gradient(155deg, rgb(255 255 255 / 0.92), rgb(240 249 255 / 0.84));
   box-shadow: 0 44px 120px -60px rgb(8 47 73 / 0.28);
   backdrop-filter: blur(22px);
+}
+
+.dark .marine-auth-story {
+  border-color: rgb(56 189 248 / 0.2);
+  background:
+    radial-gradient(circle at 84% 14%, rgb(56 189 248 / 0.16), transparent 16%),
+    linear-gradient(155deg, rgb(8 23 41 / 0.94), rgb(2 6 23 / 0.9));
+  box-shadow: 0 44px 120px -60px rgb(2 6 23 / 0.6);
 }
 
 .marine-auth-story::before {
@@ -297,16 +311,91 @@ body {
 }
 
 .marine-auth-panel {
-  border-left: 1px solid rgb(186 230 253 / 0.4);
+  position: relative;
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.9), rgb(240 249 255 / 0.84)),
-    rgb(255 255 255 / 0.84);
+    radial-gradient(circle at top right, rgb(125 211 252 / 0.14), transparent 20%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(240 249 255 / 0.86)),
+    rgb(255 255 255 / 0.88);
   backdrop-filter: blur(20px);
 }
 
 .dark .marine-auth-panel {
-  border-left-color: rgb(56 189 248 / 0.2);
-  background: linear-gradient(180deg, rgb(2 6 23 / 0.88), rgb(8 23 41 / 0.82)), rgb(2 6 23 / 0.76);
+  background:
+    radial-gradient(circle at top right, rgb(14 165 233 / 0.16), transparent 20%),
+    linear-gradient(180deg, rgb(2 6 23 / 0.9), rgb(8 23 41 / 0.84)), rgb(2 6 23 / 0.76);
+}
+
+@media (min-width: 1280px) {
+  .marine-auth-panel {
+    border-left: 1px solid rgb(186 230 253 / 0.38);
+  }
+
+  .dark .marine-auth-panel {
+    border-left-color: rgb(56 189 248 / 0.18);
+  }
+}
+
+.marine-auth-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(186 230 253 / 0.6);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.95), rgb(248 252 255 / 0.88)),
+    rgb(255 255 255 / 0.92);
+  box-shadow: 0 42px 120px -72px rgb(8 47 73 / 0.52);
+  backdrop-filter: blur(20px);
+}
+
+.marine-auth-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top right, rgb(56 189 248 / 0.12), transparent 18%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.24), transparent 24%);
+}
+
+.dark .marine-auth-card {
+  border-color: rgb(56 189 248 / 0.22);
+  background: linear-gradient(180deg, rgb(8 23 41 / 0.94), rgb(2 6 23 / 0.9)), rgb(2 6 23 / 0.9);
+  box-shadow: 0 42px 120px -76px rgb(2 6 23 / 0.78);
+}
+
+.marine-auth-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(186 230 253 / 0.72);
+  background: rgb(255 255 255 / 0.82);
+  padding: 0.42rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(3 105 161);
+  backdrop-filter: blur(12px);
+}
+
+.dark .marine-auth-chip {
+  border-color: rgb(56 189 248 / 0.22);
+  background: rgb(8 23 41 / 0.8);
+  color: rgb(186 230 253);
+}
+
+.marine-auth-note {
+  border: 1px solid rgb(186 230 253 / 0.46);
+  border-radius: 1.35rem;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.9), rgb(240 249 255 / 0.82));
+  padding: 1rem;
+  box-shadow: 0 20px 54px -42px rgb(8 47 73 / 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.dark .marine-auth-note {
+  border-color: rgb(56 189 248 / 0.18);
+  background: linear-gradient(145deg, rgb(8 23 41 / 0.92), rgb(8 47 73 / 0.38));
 }
 
 .public-hero {
@@ -415,8 +504,8 @@ body {
 .marine-auth-screen {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgb(56 189 248 / 0.14), transparent 24%),
-    radial-gradient(circle at bottom right, rgb(14 165 233 / 0.14), transparent 22%);
+    radial-gradient(circle at top left, rgb(56 189 248 / 0.16), transparent 22%),
+    radial-gradient(circle at bottom right, rgb(14 165 233 / 0.16), transparent 20%);
 }
 
 ::selection {

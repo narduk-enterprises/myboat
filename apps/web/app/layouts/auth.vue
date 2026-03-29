@@ -6,7 +6,7 @@ const { colorModeIcon, cycleColorMode } = useColorModeToggle()
   <LayerChromelessShell>
     <div class="myboat-shell">
       <div class="marine-auth-screen">
-        <div class="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
+        <div class="mx-auto flex min-h-screen max-w-[92rem] flex-col px-4 py-4 sm:px-6 lg:px-8">
           <div class="flex items-center justify-between gap-4">
             <NuxtLink to="/" class="shrink-0">
               <AppBrandMark compact />
@@ -26,7 +26,7 @@ const { colorModeIcon, cycleColorMode } = useColorModeToggle()
             </div>
           </div>
 
-          <div class="flex flex-1 items-center py-6 lg:py-10">
+          <div class="flex flex-1 items-stretch py-6 lg:py-8">
             <slot />
           </div>
         </div>
