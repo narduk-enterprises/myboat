@@ -2,6 +2,7 @@ import type { Page, TestInfo } from '@playwright/test'
 import { expect, waitForHydration } from './fixtures'
 
 const MUTATION_HEADERS = {
+  'Content-Type': 'application/json',
   'X-Requested-With': 'XMLHttpRequest',
 } as const
 
@@ -24,13 +25,40 @@ export type UiAuditSeedResult = {
 }
 
 async function postJson<TResponse>(page: Page, path: string, body: Record<string, unknown> = {}) {
-  const response = await page.context().request.post(path, {
-    data: body,
-    headers: MUTATION_HEADERS,
-  })
+  const helperPage = await page.context().newPage()
 
-  expect(response.ok(), `Expected ${path} to succeed, received ${response.status()}.`).toBeTruthy()
-  return (await response.json()) as TResponse
+  try {
+    await helperPage.goto('/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    })
+
+    const response = await helperPage.evaluate(
+      async ({ body, headers, path: requestPath }) => {
+        const result = await fetch(requestPath, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        })
+
+        return {
+          ok: result.ok,
+          status: result.status,
+          payload: await result.text(),
+        }
+      },
+      {
+        path,
+        body,
+        headers: MUTATION_HEADERS,
+      },
+    )
+
+    expect(response.ok, `Expected ${path} to succeed, received ${response.status}.`).toBeTruthy()
+    return JSON.parse(response.payload) as TResponse
+  } finally {
+    await helperPage.close()
+  }
 }
 
 export async function gotoAndHydrate(page: Page, path: string) {

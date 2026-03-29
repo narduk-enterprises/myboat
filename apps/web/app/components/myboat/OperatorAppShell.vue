@@ -15,6 +15,10 @@ const { isAdmin, user, userMenuLinks } = useMyBoatShell()
 const { colorModeIcon, cycleColorMode } = useColorModeToggle()
 
 function isActive(link: MyBoatShellLink) {
+  if (link.to === '/dashboard/passages') {
+    return route.path === link.to || route.path.endsWith('/passages')
+  }
+
   if (link.match === 'prefix') {
     return route.path === link.to || route.path.startsWith(`${link.to}/`)
   }
@@ -34,6 +38,7 @@ const railLinks = computed<MyBoatShellLink[]>(() =>
     : [
         { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Live Map', to: '/dashboard/map', icon: 'i-lucide-map' },
+        { label: 'Passages', to: '/dashboard/passages', icon: 'i-lucide-route' },
         { label: 'Buddy Boats', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         {
           label: 'Settings',
@@ -59,6 +64,7 @@ const mobileLinks = computed<MyBoatShellLink[]>(() =>
     : [
         { label: 'Dashboard', to: '/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Map', to: '/dashboard/map', icon: 'i-lucide-map' },
+        { label: 'Passages', to: '/dashboard/passages', icon: 'i-lucide-route' },
         { label: 'Buddy', to: '/dashboard/fleet-friends', icon: 'i-lucide-users' },
         {
           label: 'Settings',

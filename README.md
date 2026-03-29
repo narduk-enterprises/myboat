@@ -26,12 +26,31 @@ the same browser-facing contract.
 - `/`: public product overview
 - `/login` and `/register`: branded auth entry points
 - `/dashboard`: authenticated vessel operations overview
+- `/dashboard/passages`: dedicated captain passage workspace
 - `/dashboard/onboarding`: captain, vessel, and install setup
 - `/dashboard/vessels/[vesselSlug]`: live + historical vessel detail
+- `/dashboard/vessels/[vesselSlug]/passages`: vessel-scoped passage workspace
 - `/dashboard/installations/[installationId]`: install and ingest-key management
 - `/:username`: public captain profile
+- `/:username/:vesselSlug`: public vessel live surface
+- `/:username/:vesselSlug/passages`: public vessel passage log
 - `/api/ingest/v1/delta`: collector ingest endpoint for normalized telemetry,
   observed vessel identity, and installation keys
+
+## Tideye Flagship Demo
+
+- The seeded passage workspace now includes a compact Tideye flagship demo
+  import stored in MyBoat-owned D1 data.
+- Demo playback lives in `passages.playback_json` plus `passage_ais_vessels`,
+  and is served only through MyBoat-owned endpoints:
+  - `GET /api/app/passages/[passageId]/playback`
+  - `GET /api/public/[username]/[vesselSlug]/passages/[passageId]/playback`
+- Captain and public passage pages use that compact import to drive playback,
+  timeline scrubbing, and nearby-traffic replay without exposing Tideye or
+  Influx directly to the browser.
+- This is a temporary flagship/demo migration. The long-term historical model
+  for playback bundles and AIS enrichment still needs a dedicated MyBoat-owned
+  design.
 
 ## Local Development
 

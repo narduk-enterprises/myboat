@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { FollowedVesselSummary } from '~/types/myboat'
 import { formatCoordinate, formatRelativeTime, formatTimestamp } from '~/utils/marine'
-
-interface BuddyBoatMapHandle {
-  zoomToFit: (zoomOutLevels?: number) => void
-}
+import type { MyBoatMapHandle } from './map-support'
+import { routeOverlayStyle } from './map-support'
 
 interface BuddyBoatPin {
   id: string
@@ -36,9 +34,28 @@ const props = withDefaults(
   },
 )
 
-const mapRef = useTemplateRef<BuddyBoatMapHandle>('mapSurface')
+const mapRef = useTemplateRef<MyBoatMapHandle>('mapSurface')
 const selectedId = shallowRef<string | null>(null)
 const isCompactViewport = useCompactViewport()
+const {
+  capabilities: toolCapabilities,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: false,
+  focusSnapshot: computed(() => null),
+  profile: 'viewer',
+})
 
 const pins = computed<BuddyBoatPin[]>(() =>
   props.vessels
@@ -229,15 +246,6 @@ function handleMapReady() {
           <UBadge v-if="hiddenCount" color="warning" variant="soft">
             {{ hiddenCount }} without live coordinates
           </UBadge>
-          <UButton
-            v-if="pins.length"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-scan-search"
-            @click="fitFleet"
-          >
-            Fit fleet
-          </UButton>
         </div>
       </div>
     </template>
@@ -248,16 +256,80 @@ function handleMapReady() {
           ref="mapSurface"
           v-model:selected-id="selectedId"
           :items="pins"
+          :geojson="toolGeojson"
           :create-pin-element="createMapPinElement"
+          :overlay-style-fn="routeOverlayStyle"
           :annotation-size="{ width: 110, height: 74 }"
           :zoom-span="{ lat: 0.08, lng: 0.1 }"
           :bounding-padding="0.3"
           :min-span-delta="0.16"
           :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
           :height-class="heightClass"
+          :map-style="mapStyle"
           :shows-points-of-interest="false"
+          @map-click="handleToolMapClick"
           @map-ready="handleMapReady"
-        />
+        >
+          <template #overlay>
+            <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
+              <UButton
+                class="pointer-events-auto"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                icon="i-lucide-scan-search"
+                @click="fitFleet"
+              >
+                Fit fleet
+              </UButton>
+              <MyBoatMapAdvancedTools
+                :capabilities="toolCapabilities"
+                :has-active-indicator="hasActiveIndicator"
+                :map-style="mapStyle"
+                :measure-mode="measureMode"
+                :measure-result="measureResult"
+                :show-heading-line="showHeadingLine"
+                :show-range-rings="showRangeRings"
+                size="sm"
+                @set-map-style="setMapStyle"
+                @toggle-heading-line="toggleHeadingLine"
+                @toggle-measure="toggleMeasureMode"
+                @toggle-range-rings="toggleRangeRings"
+              />
+            </div>
+          </template>
+
+          <template #footer>
+            <div class="border-t border-default/70 px-4 py-3 lg:hidden">
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  color="neutral"
+                  variant="soft"
+                  size="xs"
+                  icon="i-lucide-scan-search"
+                  @click="fitFleet"
+                >
+                  Fit fleet
+                </UButton>
+                <MyBoatMapAdvancedTools
+                  :capabilities="toolCapabilities"
+                  :has-active-indicator="hasActiveIndicator"
+                  :map-style="mapStyle"
+                  :measure-mode="measureMode"
+                  :measure-result="measureResult"
+                  :show-heading-line="showHeadingLine"
+                  :show-label="true"
+                  :show-range-rings="showRangeRings"
+                  size="xs"
+                  @set-map-style="setMapStyle"
+                  @toggle-heading-line="toggleHeadingLine"
+                  @toggle-measure="toggleMeasureMode"
+                  @toggle-range-rings="toggleRangeRings"
+                />
+              </div>
+            </div>
+          </template>
+        </MyBoatMap>
       </div>
 
       <div v-if="selectedPin" class="grid gap-3 sm:hidden">

@@ -25,6 +25,7 @@ export interface MyBoatMapOverlayStyle {
   strokeOpacity?: number
   fillColor: string
   fillOpacity?: number
+  lineDash?: number[]
   lineWidth: number
 }
 
@@ -310,6 +311,41 @@ export function routeOverlayStyle(properties: Record<string, unknown>): MyBoatMa
       fillColor: 'rgb(15 23 42)',
       fillOpacity: 0,
       lineWidth: isDangerous ? 2.8 : 2,
+    }
+  }
+
+  if (properties.featureKind === 'measure-line') {
+    return {
+      strokeColor: 'rgb(236 72 153)',
+      strokeOpacity: 0.92,
+      fillColor: 'rgb(15 23 42)',
+      fillOpacity: 0,
+      lineDash: [8, 5],
+      lineWidth: 2.35,
+    }
+  }
+
+  if (properties.featureKind === 'range-ring') {
+    return {
+      strokeColor: 'rgb(8 145 178)',
+      strokeOpacity: 0.42,
+      fillColor: 'rgb(15 23 42)',
+      fillOpacity: 0,
+      lineDash: [4, 6],
+      lineWidth: 1.5,
+    }
+  }
+
+  if (properties.featureKind === 'heading-aid') {
+    const isCourseAid = properties.aidKind === 'course'
+
+    return {
+      strokeColor: isCourseAid ? 'rgb(239 68 68)' : 'rgb(245 158 11)',
+      strokeOpacity: isCourseAid ? 0.62 : 0.74,
+      fillColor: 'rgb(15 23 42)',
+      fillOpacity: 0,
+      lineDash: isCourseAid ? [6, 4] : undefined,
+      lineWidth: 2.25,
     }
   }
 

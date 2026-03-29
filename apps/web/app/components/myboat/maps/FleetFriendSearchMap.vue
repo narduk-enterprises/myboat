@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { AisHubSearchResult } from '~/types/myboat'
 import { formatCoordinate, formatRelativeTime, formatTimestamp } from '~/utils/marine'
-
-interface SearchMapHandle {
-  zoomToFit: (zoomOutLevels?: number) => void
-}
+import type { MyBoatMapHandle } from './map-support'
+import { routeOverlayStyle } from './map-support'
 
 interface SearchResultPin {
   id: string
@@ -32,10 +30,29 @@ const emit = defineEmits<{
 
 const selectedMmsi = defineModel<string | null>('selectedMmsi', { default: null })
 
-const mapRef = useTemplateRef<SearchMapHandle>('mapSurface')
+const mapRef = useTemplateRef<MyBoatMapHandle>('mapSurface')
 const hasViewport = shallowRef(false)
 const visibleMmsis = shallowRef<string[]>([])
 const isCompactViewport = useCompactViewport()
+const {
+  capabilities: toolCapabilities,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: true,
+  focusSnapshot: computed(() => null),
+  profile: 'viewer',
+})
 
 function hasCoordinates(result: AisHubSearchResult) {
   return (
@@ -198,6 +215,10 @@ function createPinElement(item: SearchResultPin, isSelected: boolean) {
   return { element: shell }
 }
 
+function createMapPinElement(item: unknown, isSelected: boolean) {
+  return createPinElement(item as SearchResultPin, isSelected)
+}
+
 function fitResults() {
   mapRef.value?.zoomToFit(0)
 }
@@ -249,40 +270,92 @@ function handleRegionChange(region: {
           <UBadge v-if="offChartCount" color="warning" variant="soft">
             {{ offChartCount }} without coordinates
           </UBadge>
-          <UButton
-            v-if="pins.length"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-scan-search"
-            @click="fitResults"
-          >
-            Fit results
-          </UButton>
         </div>
       </div>
     </template>
 
     <div v-if="pins.length" class="space-y-4">
       <div class="overflow-hidden rounded-[1.5rem] border border-default/70">
-        <div class="h-[22rem] sm:h-[28rem] lg:h-[32rem]">
-          <ClientOnly>
-            <AppMapKit
-              ref="mapSurface"
-              v-model:selected-id="selectedMmsi"
-              class="h-full"
-              :items="pins"
-              :create-pin-element="createPinElement"
-              :annotation-size="{ width: 116, height: 80 }"
-              :zoom-span="{ lat: 0.05, lng: 0.07 }"
-              :bounding-padding="0.28"
-              :min-span-delta="0.12"
-              :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
-              :suppress-selection-zoom="true"
-              @map-ready="handleMapReady"
-              @region-change="handleRegionChange"
-            />
-          </ClientOnly>
-        </div>
+        <MyBoatMap
+          ref="mapSurface"
+          v-model:selected-id="selectedMmsi"
+          :items="pins"
+          :geojson="toolGeojson"
+          :create-pin-element="createMapPinElement"
+          :overlay-style-fn="routeOverlayStyle"
+          :annotation-size="{ width: 116, height: 80 }"
+          :zoom-span="{ lat: 0.05, lng: 0.07 }"
+          :bounding-padding="0.28"
+          :min-span-delta="0.12"
+          :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
+          height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
+          :map-style="mapStyle"
+          :shows-points-of-interest="true"
+          suppress-selection-zoom
+          @map-click="handleToolMapClick"
+          @map-ready="handleMapReady"
+          @region-change="handleRegionChange"
+        >
+          <template #overlay>
+            <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
+              <UButton
+                class="pointer-events-auto"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                icon="i-lucide-scan-search"
+                @click="fitResults"
+              >
+                Fit results
+              </UButton>
+              <MyBoatMapAdvancedTools
+                :capabilities="toolCapabilities"
+                :has-active-indicator="hasActiveIndicator"
+                :map-style="mapStyle"
+                :measure-mode="measureMode"
+                :measure-result="measureResult"
+                :show-heading-line="showHeadingLine"
+                :show-range-rings="showRangeRings"
+                size="sm"
+                @set-map-style="setMapStyle"
+                @toggle-heading-line="toggleHeadingLine"
+                @toggle-measure="toggleMeasureMode"
+                @toggle-range-rings="toggleRangeRings"
+              />
+            </div>
+          </template>
+
+          <template #footer>
+            <div class="border-t border-default/70 px-4 py-3 lg:hidden">
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  color="neutral"
+                  variant="soft"
+                  size="xs"
+                  icon="i-lucide-scan-search"
+                  @click="fitResults"
+                >
+                  Fit results
+                </UButton>
+                <MyBoatMapAdvancedTools
+                  :capabilities="toolCapabilities"
+                  :has-active-indicator="hasActiveIndicator"
+                  :map-style="mapStyle"
+                  :measure-mode="measureMode"
+                  :measure-result="measureResult"
+                  :show-heading-line="showHeadingLine"
+                  :show-label="true"
+                  :show-range-rings="showRangeRings"
+                  size="xs"
+                  @set-map-style="setMapStyle"
+                  @toggle-heading-line="toggleHeadingLine"
+                  @toggle-measure="toggleMeasureMode"
+                  @toggle-range-rings="toggleRangeRings"
+                />
+              </div>
+            </div>
+          </template>
+        </MyBoatMap>
       </div>
 
       <div v-if="fallbackResult" class="grid gap-3 sm:hidden">

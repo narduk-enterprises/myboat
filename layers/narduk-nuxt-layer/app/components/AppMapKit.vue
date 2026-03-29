@@ -48,6 +48,7 @@ export interface OverlayStyle {
   strokeOpacity?: number
   fillColor: string
   fillOpacity?: number
+  lineDash?: number[]
   lineWidth: number
 }
 
@@ -573,6 +574,7 @@ function addOverlays() {
         strokeOpacity: styleCfg.strokeOpacity ?? 1,
         fillColor: styleCfg.fillColor,
         fillOpacity: styleCfg.fillOpacity ?? 0,
+        lineDash: styleCfg.lineDash,
         lineWidth: styleCfg.lineWidth ?? 3,
       })
 
@@ -595,6 +597,7 @@ function addOverlays() {
       strokeOpacity: styleCfg.strokeOpacity ?? 1,
       fillColor: styleCfg.fillColor,
       fillOpacity: styleCfg.fillOpacity ?? 0.2,
+      lineDash: styleCfg.lineDash,
       lineWidth: styleCfg.lineWidth,
     })
 

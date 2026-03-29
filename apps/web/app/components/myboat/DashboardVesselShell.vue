@@ -49,6 +49,8 @@ const postureLabel = computed(() => {
     ? 'Live telemetry available'
     : 'Awaiting live telemetry'
 })
+
+const isPassagesView = computed(() => props.activeView === 'passages')
 </script>
 
 <template>
@@ -65,27 +67,33 @@ const postureLabel = computed(() => {
     </template>
 
     <template v-else-if="detail">
-      <UPageHero
-        :title="detail.vessel.name"
-        :description="detail.vessel.summary || fallbackDescription"
-      >
-        <template #links>
-          <UButton
-            v-if="detail.profile.username"
-            :to="`/${detail.profile.username}/${detail.vessel.slug}`"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-share-2"
-          >
-            Public vessel page
-          </UButton>
-        </template>
-      </UPageHero>
-
       <section
-        class="rounded-[1.75rem] border border-default/80 bg-default/85 px-4 py-4 shadow-card sm:px-5"
+        v-if="isPassagesView"
+        class="rounded-[1.75rem] border border-default/80 bg-default/85 px-5 py-5 shadow-card"
       >
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div class="min-w-0">
+            <div class="marine-kicker w-fit">Captain passage log</div>
+            <h1 class="mt-3 font-display text-4xl text-default">{{ detail.vessel.name }}</h1>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-muted">
+              {{ detail.vessel.summary || fallbackDescription }}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              v-if="detail.profile.username"
+              :to="`/${detail.profile.username}/${detail.vessel.slug}`"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-share-2"
+            >
+              Public vessel page
+            </UButton>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div class="flex flex-wrap gap-2">
             <UButton
               v-for="item in navigationItems"
@@ -111,6 +119,55 @@ const postureLabel = computed(() => {
           </div>
         </div>
       </section>
+
+      <template v-else>
+        <UPageHero
+          :title="detail.vessel.name"
+          :description="detail.vessel.summary || fallbackDescription"
+        >
+          <template #links>
+            <UButton
+              v-if="detail.profile.username"
+              :to="`/${detail.profile.username}/${detail.vessel.slug}`"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-share-2"
+            >
+              Public vessel page
+            </UButton>
+          </template>
+        </UPageHero>
+
+        <section
+          class="rounded-[1.75rem] border border-default/80 bg-default/85 px-4 py-4 shadow-card sm:px-5"
+        >
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="item in navigationItems"
+                :key="item.label"
+                :to="item.to"
+                :icon="item.icon"
+                :color="item.active ? 'primary' : 'neutral'"
+                :variant="item.active ? 'soft' : 'outline'"
+              >
+                {{ item.label }}
+              </UButton>
+            </div>
+
+            <div class="flex flex-wrap gap-2 text-sm">
+              <UBadge color="primary" variant="soft">{{ postureLabel }}</UBadge>
+              <UBadge color="neutral" variant="soft">
+                {{ detail.installations.length }} installs
+              </UBadge>
+              <UBadge color="neutral" variant="soft">
+                {{ detail.waypoints.length }} waypoints
+              </UBadge>
+              <UBadge color="neutral" variant="soft"> {{ detail.media.length }} media </UBadge>
+            </div>
+          </div>
+        </section>
+      </template>
 
       <slot />
     </template>

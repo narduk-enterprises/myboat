@@ -21,6 +21,7 @@ Status: UNLOCKED
 - `/`
 - `/:username`
 - `/:username/:vesselSlug`
+- `/:username/:vesselSlug/passages`
 
 ### Auth
 
@@ -35,6 +36,7 @@ Status: UNLOCKED
 
 - `/dashboard`
 - `/dashboard/map`
+- `/dashboard/passages`
 - `/dashboard/fleet-friends`
 - `/dashboard/settings`
 
@@ -42,6 +44,7 @@ Status: UNLOCKED
 
 - `/dashboard/onboarding`
 - `/dashboard/vessels/[vesselSlug]`
+- `/dashboard/vessels/[vesselSlug]/passages`
 - `/dashboard/installations/[installationId]`
 - `/dashboard/settings/profile`
 - `/dashboard/settings/security`
@@ -66,6 +69,7 @@ Status: UNLOCKED
 - Dashboard nav:
   - `Dashboard`
   - `Live Map`
+  - `Passages`
   - `Buddy Boats`
   - `Settings`
   - admin entry only for admins and only as an extra item
@@ -299,6 +303,59 @@ Status: UNLOCKED
   - vessel not found state
   - fetch failure alert inside dashboard shell
 
+### `/dashboard/vessels/[vesselSlug]/passages`
+
+- Purpose:
+  - vessel-scoped captain passage workspace
+- Primary sections:
+  - vessel hero
+  - local live/passages switcher
+  - dedicated passage workspace
+  - searchable passage rail
+  - route-focused map workspace
+  - playback theater with timeline scrubber, rate controls, and nearby traffic
+  - shared media strip
+- Primary CTA:
+  - return to live vessel view
+- Secondary CTA:
+  - open public vessel page
+- Empty:
+  - no passages
+- Notes:
+  - compact Tideye demo playback bundles should light up the playback theater
+    when present
+  - passages without playback bundles fall back to static route focus
+- Error:
+  - vessel not found state
+  - fetch failure alert inside dashboard shell
+
+### `/dashboard/passages`
+
+- Purpose:
+  - dedicated captain passage workspace
+- Primary sections:
+  - hero
+  - vessel switcher when multiple vessels exist
+  - searchable passage rail
+  - route-focused map workspace
+  - playback theater with timeline scrubber, rate controls, and nearby traffic
+  - passage metrics and note surface
+  - shared media strip
+- Primary CTA:
+  - open live view for the active vessel
+- Secondary CTA:
+  - open public passage log for the active vessel when shared
+- Empty:
+  - no vessel yet
+  - no passages yet
+- Notes:
+  - compact Tideye demo playback bundles should replay directly from MyBoat D1
+    storage when available
+  - the route remains useful without playback by falling back to route-focused
+    chart review
+- Error:
+  - fetch failure alert inside dashboard shell
+
 ### `/dashboard/installations/[installationId]`
 
 - Purpose:
@@ -434,6 +491,31 @@ Status: UNLOCKED
   - no public live data
   - no public passages
   - no public media
+- Error:
+  - vessel unavailable or not shared
+
+### `/:username/:vesselSlug/passages`
+
+- Purpose:
+  - dedicated public passage workspace
+- Primary sections:
+  - public vessel hero
+  - searchable public passage rail
+  - route-focused public map workspace
+  - read-only playback theater with timeline scrubber and nearby traffic
+  - passage metrics and note surface
+  - public media strip
+- Primary CTA:
+  - return to public live vessel page
+- Secondary CTA:
+  - open captain profile
+  - create account
+- Empty:
+  - no public passages
+- Notes:
+  - public playback must read only captain-approved compact bundles already
+    stored by MyBoat
+  - if no playback bundle exists, the page falls back to static route focus
 - Error:
   - vessel unavailable or not shared
 

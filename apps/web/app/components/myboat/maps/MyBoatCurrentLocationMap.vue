@@ -8,6 +8,7 @@ import {
   createAisPinElement,
   createAisPinFingerprint,
   createVesselPinElement,
+  routeOverlayStyle,
 } from './map-support'
 
 defineOptions({ inheritAttrs: false })
@@ -43,6 +44,27 @@ const mapInstance = shallowRef<MapKitMapSurface | null>(null)
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
+const {
+  capabilities: toolCapabilities,
+  canShowHeadingLine,
+  canShowRangeRings,
+  handleMapClick: handleToolMapClick,
+  hasActiveIndicator,
+  mapStyle,
+  measureMode,
+  measureResult,
+  setMapStyle,
+  showHeadingLine,
+  showRangeRings,
+  toggleHeadingLine,
+  toggleMeasureMode,
+  toggleRangeRings,
+  toolGeojson,
+} = useMyBoatAdvancedMapTools({
+  defaultShowsPointsOfInterest: true,
+  focusSnapshot,
+  profile: 'navigation',
+})
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const showTraffic = computed({
   get: () => props.trafficEnabled ?? localTrafficEnabled.value,
@@ -73,6 +95,7 @@ const aisPins = computed(() =>
   }),
 )
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
+const geojson = computed(() => toolGeojson.value)
 
 function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: boolean) {
   return createVesselPinElement(item, isSelected, {
@@ -181,16 +204,66 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
       ref="mapRoot"
       v-model:selected-id="selectedId"
       :items="vesselPins"
+      :geojson="geojson"
       :create-pin-element="renderMapPin"
+      :overlay-style-fn="routeOverlayStyle"
       :fallback-center="fallbackCenter"
       :annotation-size="{ width: 92, height: 72 }"
       :zoom-span="{ lat: 0.018, lng: 0.022 }"
       :bounding-padding="0.22"
       :height-class="heightClass"
+      :map-style="mapStyle"
+      :shows-points-of-interest="true"
+      @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
     >
+      <template #header>
+        <div class="border-b border-default/70 px-4 py-3 lg:hidden">
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              icon="i-lucide-crosshair"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="centerOnVessel"
+            >
+              Center vessel
+            </UButton>
+            <UButton
+              :color="toggleTrafficColor"
+              :variant="toggleTrafficVariant"
+              icon="i-lucide-radar"
+              size="xs"
+              :disabled="!hasSignalKSource"
+              @click="showTraffic = !showTraffic"
+            >
+              {{ toggleTrafficLabel }}
+            </UButton>
+            <MyBoatMapAdvancedTools
+              :capabilities="toolCapabilities"
+              :can-show-heading-line="canShowHeadingLine"
+              :can-show-range-rings="canShowRangeRings"
+              :has-active-indicator="hasActiveIndicator"
+              :map-style="mapStyle"
+              :measure-mode="measureMode"
+              :measure-result="measureResult"
+              :show-heading-line="showHeadingLine"
+              :show-label="true"
+              :show-range-rings="showRangeRings"
+              size="xs"
+              @set-map-style="setMapStyle"
+              @toggle-heading-line="toggleHeadingLine"
+              @toggle-measure="toggleMeasureMode"
+              @toggle-range-rings="toggleRangeRings"
+            />
+          </div>
+        </div>
+      </template>
+
       <template #overlay>
-        <div class="absolute right-4 top-4 flex max-w-[calc(100%-2rem)] flex-col gap-2 sm:flex-row">
+        <div
+          class="absolute right-4 top-4 hidden max-w-[calc(100%-2rem)] flex-wrap justify-end gap-2 lg:flex"
+        >
           <UButton
             class="pointer-events-auto"
             color="neutral"
@@ -210,6 +283,22 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
           >
             {{ toggleTrafficLabel }}
           </UButton>
+          <MyBoatMapAdvancedTools
+            :capabilities="toolCapabilities"
+            :can-show-heading-line="canShowHeadingLine"
+            :can-show-range-rings="canShowRangeRings"
+            :has-active-indicator="hasActiveIndicator"
+            :map-style="mapStyle"
+            :measure-mode="measureMode"
+            :measure-result="measureResult"
+            :show-heading-line="showHeadingLine"
+            :show-range-rings="showRangeRings"
+            size="sm"
+            @set-map-style="setMapStyle"
+            @toggle-heading-line="toggleHeadingLine"
+            @toggle-measure="toggleMeasureMode"
+            @toggle-range-rings="toggleRangeRings"
+          />
         </div>
       </template>
     </MyBoatMap>

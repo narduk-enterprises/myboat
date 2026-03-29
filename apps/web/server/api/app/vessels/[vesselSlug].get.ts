@@ -60,6 +60,7 @@ export default defineEventHandler(async (event) => {
     passages: passageRows,
     media: mediaRows.map((item) => ({
       id: item.id,
+      passageId: item.passageId,
       title: item.title,
       caption: item.caption,
       imageUrl: item.imageUrl,

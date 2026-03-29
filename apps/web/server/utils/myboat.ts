@@ -630,7 +630,7 @@ export async function getPassagesForVesselIds(event: H3Event, vesselIds: string[
   }
 
   const db = useAppDatabase(event)
-  return db
+  const rows = await db
     .select({
       id: passages.id,
       vesselId: passages.vesselId,
@@ -638,16 +638,24 @@ export async function getPassagesForVesselIds(event: H3Event, vesselIds: string[
       summary: passages.summary,
       departureName: passages.departureName,
       arrivalName: passages.arrivalName,
+      startPlaceLabel: passages.startPlaceLabel,
+      endPlaceLabel: passages.endPlaceLabel,
       startedAt: passages.startedAt,
       endedAt: passages.endedAt,
       distanceNm: passages.distanceNm,
       maxWindKn: passages.maxWindKn,
       trackGeojson: passages.trackGeojson,
+      playbackJson: passages.playbackJson,
     })
     .from(passages)
     .where(inArray(passages.vesselId, vesselIds))
     .orderBy(desc(passages.startedAt))
     .all()
+
+  return rows.map(({ playbackJson, ...row }) => ({
+    ...row,
+    playbackAvailable: Boolean(playbackJson || row.trackGeojson),
+  }))
 }
 
 export async function getMediaForVesselIds(event: H3Event, vesselIds: string[]) {
@@ -660,6 +668,7 @@ export async function getMediaForVesselIds(event: H3Event, vesselIds: string[]) 
     .select({
       id: mediaItems.id,
       vesselId: mediaItems.vesselId,
+      passageId: mediaItems.passageId,
       title: mediaItems.title,
       caption: mediaItems.caption,
       imageUrl: mediaItems.imageUrl,
@@ -711,6 +720,7 @@ export async function getWaypointsForVesselIds(event: H3Event, vesselIds: string
     .select({
       id: waypoints.id,
       vesselId: waypoints.vesselId,
+      passageId: waypoints.passageId,
       title: waypoints.title,
       note: waypoints.note,
       kind: waypoints.kind,

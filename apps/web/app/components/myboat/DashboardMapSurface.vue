@@ -103,6 +103,7 @@ const metricCards = computed(() => [
             :live-connection-state="entry?.live.connectionState"
             :live-last-delta-at="entry?.live.lastDeltaAt"
             :has-signal-k-source="entry?.live.hasSignalKSource"
+            tools-profile="navigation"
             v-model:traffic-enabled="trafficEnabled"
             :persist-key="detail ? `dashboard-map:${detail.vessel.slug}` : 'dashboard-map'"
             height-class="h-[30rem] sm:h-[36rem] lg:h-[46rem] xl:h-[54rem]"
