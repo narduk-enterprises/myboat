@@ -17,6 +17,7 @@ const AISHUB_GLOBAL_REQUEST_ID = 'global'
 const AISHUB_SEARCH_CACHE_TTL_MS = 10 * 60_000
 const AISHUB_LOCAL_SEARCH_LIMIT = 24
 const AISHUB_RESULT_LIMIT = 12
+const AISHUB_STORED_LOOKUP_BATCH_SIZE = 200
 
 type AisHubSearchMode = AisHubSearchResult['matchMode']
 
@@ -190,28 +191,34 @@ export async function rememberAisHubResults(
 }
 
 export async function getStoredAisHubResultsByMmsis(event: H3Event, mmsis: string[]) {
-  const uniqueMmsis = [...new Set(mmsis.map((mmsi) => mmsi.trim()).filter(Boolean))]
-  if (!uniqueMmsis.length) {
+  const batches = splitStoredAisHubMmsiBatches(mmsis)
+  if (!batches.length) {
     return new Map<string, AisHubSearchResult>()
   }
 
   const db = useAppDatabase(event)
-  const rows = await db
-    .select({
-      mmsi: aishubVessels.mmsi,
-      imo: aishubVessels.imo,
-      name: aishubVessels.name,
-      callSign: aishubVessels.callSign,
-      destination: aishubVessels.destination,
-      lastReportAt: aishubVessels.lastReportAt,
-      positionLat: aishubVessels.positionLat,
-      positionLng: aishubVessels.positionLng,
-      shipType: aishubVessels.shipType,
-      sourceStationsJson: aishubVessels.sourceStationsJson,
-    })
-    .from(aishubVessels)
-    .where(inArray(aishubVessels.mmsi, uniqueMmsis))
-    .all()
+  const rows = []
+
+  for (const batch of batches) {
+    const batchRows = await db
+      .select({
+        mmsi: aishubVessels.mmsi,
+        imo: aishubVessels.imo,
+        name: aishubVessels.name,
+        callSign: aishubVessels.callSign,
+        destination: aishubVessels.destination,
+        lastReportAt: aishubVessels.lastReportAt,
+        positionLat: aishubVessels.positionLat,
+        positionLng: aishubVessels.positionLng,
+        shipType: aishubVessels.shipType,
+        sourceStationsJson: aishubVessels.sourceStationsJson,
+      })
+      .from(aishubVessels)
+      .where(inArray(aishubVessels.mmsi, batch))
+      .all()
+
+    rows.push(...batchRows)
+  }
 
   return new Map(rows.map((row) => [row.mmsi, serializeStoredResult(row, row.mmsi)]))
 }
@@ -222,6 +229,17 @@ function normalizeRequestedMmsis(mmsis: string[]) {
       mmsis.map((mmsi) => mmsi.trim()).filter((mmsi): mmsi is string => /^\d{9}$/.test(mmsi)),
     ),
   ]
+}
+
+export function splitStoredAisHubMmsiBatches(mmsis: string[]) {
+  const uniqueMmsis = [...new Set(mmsis.map((mmsi) => mmsi.trim()).filter(Boolean))]
+  const batches: string[][] = []
+
+  for (let index = 0; index < uniqueMmsis.length; index += AISHUB_STORED_LOOKUP_BATCH_SIZE) {
+    batches.push(uniqueMmsis.slice(index, index + AISHUB_STORED_LOOKUP_BATCH_SIZE))
+  }
+
+  return batches
 }
 
 async function searchStoredAisHubVessels(event: H3Event, rawQuery: string) {
