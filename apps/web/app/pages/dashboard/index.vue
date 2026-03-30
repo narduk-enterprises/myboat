@@ -39,7 +39,6 @@ const hasDashboardState = computed(() =>
 <template>
   <div class="space-y-8">
     <template v-if="pending">
-      <USkeleton class="h-56 rounded-[2rem]" />
       <div class="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(19rem,0.82fr)]">
         <USkeleton class="h-[26rem] rounded-[1.75rem]" />
         <div class="space-y-6">

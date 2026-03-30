@@ -106,7 +106,7 @@ const context = computed(() =>
       <template #header>
         <div role="banner" class="marine-operator-header border-b border-default/70">
           <div
-            class="mx-auto flex max-w-[96rem] items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8"
+            class="mx-auto flex min-h-[4.75rem] max-w-[96rem] items-center justify-between gap-3 px-4 py-3 sm:min-h-[5rem] sm:gap-4 sm:px-6 sm:py-4 lg:px-8"
           >
             <div class="flex min-w-0 items-center gap-4">
               <NuxtLink :to="shellHomePath" class="shrink-0">
@@ -138,6 +138,8 @@ const context = computed(() =>
             </div>
           </div>
         </div>
+
+        <DashboardCaptainStatusBar v-if="props.mode === 'dashboard'" />
       </template>
 
       <div

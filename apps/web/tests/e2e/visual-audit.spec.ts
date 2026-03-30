@@ -76,15 +76,8 @@ async function buildDesktopAudit(page: Playwright.Page) {
     await captureRouteAudit(page, '/login', 'desktop-login', async (directory, captures) => {
       await captureNamedLocator(
         page,
-        page.locator('[data-testid="auth-dock-aside"]'),
-        'auth-dock-aside',
-        directory,
-        captures,
-      )
-      await captureNamedLocator(
-        page,
-        page.locator('[data-testid="auth-dock-panel"]'),
-        'auth-dock-panel',
+        page.locator('[data-testid="auth-login-card"]'),
+        'auth-login-card',
         directory,
         captures,
       )
@@ -365,9 +358,9 @@ test.describe('visual audit', () => {
           minBytes: 20_000,
         },
         {
-          path: 'desktop-login/auth-dock-aside.png',
+          path: 'desktop-login/auth-login-card.png',
           minAvgChannelStdev: 4.5,
-          minBytes: 14_000,
+          minBytes: 12_000,
         },
         {
           path: 'desktop-register/auth-dock-aside.png',

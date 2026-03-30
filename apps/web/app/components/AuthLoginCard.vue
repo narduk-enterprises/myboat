@@ -160,21 +160,18 @@ function toUserFacingError(error: unknown, fallback: string) {
 </script>
 
 <template>
-  <UCard class="marine-auth-card w-full">
+  <UCard class="marine-auth-card w-full" data-testid="auth-login-card">
     <template #header>
       <div class="space-y-4">
-        <div v-if="$slots.logo" class="hidden justify-center sm:justify-start lg:flex">
+        <div v-if="$slots.logo" class="hidden justify-center lg:flex">
           <slot name="logo" />
         </div>
 
-        <div
-          v-if="canUseApple"
-          class="flex flex-wrap items-center justify-center gap-2 sm:justify-start"
-        >
+        <div v-if="canUseApple" class="flex flex-wrap items-center justify-start gap-2">
           <div class="marine-auth-chip">Apple first</div>
         </div>
 
-        <div class="space-y-2 text-center sm:text-left">
+        <div class="space-y-2 text-center">
           <h1 class="font-display text-[2.1rem] leading-tight text-highlighted sm:text-[2.15rem]">
             {{ title }}
           </h1>
@@ -186,34 +183,16 @@ function toUserFacingError(error: unknown, fallback: string) {
     </template>
 
     <div class="space-y-4">
-      <UAlert
-        v-if="infoMsg"
-        color="success"
-        variant="subtle"
-        title="Check your inbox"
-        :description="infoMsg"
-        class="mb-4"
-      />
+      <UAlert v-if="infoMsg" color="success" variant="subtle" title="Check your inbox" :description="infoMsg"
+        class="mb-4" />
 
-      <UAlert
-        v-if="errorMsg"
-        color="error"
-        variant="subtle"
-        title="Sign-in failed"
-        :description="errorMsg"
-        class="mb-4"
-        data-testid="auth-login-error"
-      />
+      <UAlert v-if="errorMsg" color="error" variant="subtle" title="Sign-in failed" :description="errorMsg" class="mb-4"
+        data-testid="auth-login-error" />
 
       <div class="space-y-3">
-        <UButton
-          v-if="canUseApple"
-          color="neutral"
-          size="xl"
+        <UButton v-if="canUseApple" color="neutral" size="xl"
           class="w-full justify-center font-semibold shadow-[0_22px_48px_-34px_rgb(15_23_42_/_0.52)]"
-          :loading="appleLoading"
-          @click="onAppleSignIn"
-        >
+          :loading="appleLoading" @click="onAppleSignIn">
           Continue with Apple
         </UButton>
 
@@ -221,23 +200,14 @@ function toUserFacingError(error: unknown, fallback: string) {
           Fastest path back into your boat dashboard.
         </p>
 
-        <UButton
-          v-if="canUseApple"
-          type="button"
-          color="neutral"
-          variant="ghost"
-          size="lg"
-          class="w-full justify-center"
-          :icon="emailExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
-          @click="emailExpanded = !emailExpanded"
-        >
+        <UButton v-if="canUseApple" type="button" color="neutral" variant="ghost" size="lg"
+          class="w-full justify-center" :icon="emailExpanded ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          @click="emailExpanded = !emailExpanded">
           {{ emailToggleLabel }}
         </UButton>
 
-        <div
-          v-if="!canUseApple || emailExpanded"
-          class="rounded-[1.4rem] border border-default/70 bg-default/70 p-4 sm:p-5"
-        >
+        <div v-if="!canUseApple || emailExpanded"
+          class="rounded-[1.4rem] border border-default/70 bg-default/70 p-4 sm:p-5">
           <p class="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-dimmed">
             {{ canUseApple ? 'Email fallback' : 'Email sign in' }}
           </p>
@@ -247,64 +217,32 @@ function toUserFacingError(error: unknown, fallback: string) {
 
           <UForm :schema="schema" :state="state" class="mt-4 space-y-4" @submit.prevent="onSubmit">
             <UFormField name="email" label="Email" required>
-              <UInput
-                v-model="state.email"
-                type="email"
-                icon="i-lucide-mail"
-                size="xl"
-                autocomplete="email"
-                placeholder="you@example.com"
-                class="w-full"
-                data-testid="auth-login-email"
-              />
+              <UInput v-model="state.email" type="email" icon="i-lucide-mail" size="xl" autocomplete="email"
+                placeholder="you@example.com" class="w-full" data-testid="auth-login-email" />
             </UFormField>
 
             <UFormField name="password" label="Password" required>
-              <UInput
-                v-model="state.password"
-                type="password"
-                icon="i-lucide-lock"
-                size="xl"
-                autocomplete="current-password"
-                placeholder="••••••••"
-                class="w-full"
-                data-testid="auth-login-password"
-              />
+              <UInput v-model="state.password" type="password" icon="i-lucide-lock" size="xl"
+                autocomplete="current-password" placeholder="••••••••" class="w-full"
+                data-testid="auth-login-password" />
             </UFormField>
 
             <div class="flex items-center justify-between gap-3 text-sm">
               <p class="text-toned">Use the same login you use for your captain page.</p>
-              <ULink
-                :to="config.public.authResetPath"
-                class="shrink-0 font-medium text-muted hover:text-primary"
-              >
+              <ULink :to="config.public.authResetPath" class="shrink-0 font-medium text-muted hover:text-primary">
                 Forgot password?
               </ULink>
             </div>
 
-            <UButton
-              type="submit"
-              color="primary"
-              size="xl"
+            <UButton type="submit" color="primary" size="xl"
               class="w-full justify-center font-semibold shadow-[0_28px_72px_-42px_rgb(14_165_233_/_0.68)]"
-              :loading="loading"
-              data-testid="auth-login-submit"
-            >
+              :loading="loading" data-testid="auth-login-submit">
               Sign in with email
             </UButton>
 
-            <UButton
-              v-if="showDemoLogin"
-              type="button"
-              color="neutral"
-              variant="soft"
-              size="xl"
-              class="w-full justify-center font-semibold"
-              icon="i-lucide-zap"
-              :loading="demoLoading"
-              data-testid="auth-login-demo"
-              @click="onDemoLogin"
-            >
+            <UButton v-if="showDemoLogin" type="button" color="neutral" variant="soft" size="xl"
+              class="w-full justify-center font-semibold" icon="i-lucide-zap" :loading="demoLoading"
+              data-testid="auth-login-demo" @click="onDemoLogin">
               Sign In as Demo User
             </UButton>
           </UForm>
@@ -317,10 +255,7 @@ function toUserFacingError(error: unknown, fallback: string) {
         <p class="text-center text-sm text-toned">
           <template v-if="canRegister">
             Don&apos;t have an account?
-            <ULink
-              :to="config.public.authRegisterPath"
-              class="font-semibold text-primary hover:underline"
-            >
+            <ULink :to="config.public.authRegisterPath" class="font-semibold text-primary hover:underline">
               Sign up
             </ULink>
           </template>
