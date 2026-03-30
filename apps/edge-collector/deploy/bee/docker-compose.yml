@@ -27,7 +27,11 @@ services:
       COLLECTOR_USER_AGENT: ${COLLECTOR_USER_AGENT:-myboat-bee-consumer/0.2.0}
       MYBOAT_X_REQUESTED_WITH: ${MYBOAT_X_REQUESTED_WITH:-XMLHttpRequest}
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:' + (process.env.MYBOAT_STREAM_PORT || '4011') + '/healthz').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:'' + (process.env.MYBOAT_STREAM_PORT || ''4011'') + ''/healthz'').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"'
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

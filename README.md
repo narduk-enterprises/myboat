@@ -14,8 +14,8 @@ only MyBoat APIs and MyBoat-managed live streams. Boats can also run a
 boat-local deployment on `myboat.local` or a similar LAN hostname while keeping
 the same browser-facing contract.
 
-MyBoat now also de-duplicates overlapping SignalK sources before live fanout
-and history writes. The collector and cloud ingest both run the same shared
+MyBoat now also de-duplicates overlapping SignalK sources before live fanout and
+history writes. The collector and cloud ingest both run the same shared
 source-selection policy, and duplicate losers stay only in short-lived debug
 telemetry instead of inflating the canonical live or history stream.
 
