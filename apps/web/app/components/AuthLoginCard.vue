@@ -167,10 +167,6 @@ function toUserFacingError(error: unknown, fallback: string) {
           <slot name="logo" />
         </div>
 
-        <div v-if="canUseApple" class="flex flex-wrap items-center justify-start gap-2">
-          <div class="marine-auth-chip">Apple first</div>
-        </div>
-
         <div class="space-y-2 text-center">
           <h1 class="font-display text-[2.1rem] leading-tight text-highlighted sm:text-[2.15rem]">
             {{ title }}
@@ -207,7 +203,7 @@ function toUserFacingError(error: unknown, fallback: string) {
           v-if="canUseApple"
           color="neutral"
           size="xl"
-          class="w-full justify-center font-semibold shadow-[0_22px_48px_-34px_rgb(15_23_42_/_0.52)]"
+          class="w-full justify-center font-semibold"
           :loading="appleLoading"
           @click="onAppleSignIn"
         >
@@ -283,7 +279,7 @@ function toUserFacingError(error: unknown, fallback: string) {
               type="submit"
               color="primary"
               size="xl"
-              class="w-full justify-center font-semibold shadow-[0_28px_72px_-42px_rgb(14_165_233_/_0.68)]"
+              class="w-full justify-center font-semibold"
               :loading="loading"
               data-testid="auth-login-submit"
             >
