@@ -38,9 +38,10 @@ pnpm run update-layer -- --from ~/new-code/narduk-nuxt-template
 
 ## Deployment And D1 Migrations
 
-Deployment is local-only. CI may run quality checks, but it does not deploy.
+The canonical deploy path is `pnpm run ship` (wraps `tools/ship.ts`).  It can
+be triggered locally or via the Forgejo workflow described below.
 
-Standard flow:
+Standard local flow:
 
 1. Keep the working tree clean.
 2. Run remote D1 migrations if the app uses D1:
@@ -55,6 +56,21 @@ Standard flow:
 
 Local development migrations still go through the app entrypoint so shared layer
 SQL runs before app-owned SQL.
+
+### Forgejo Workflow (Phase 3 Pilot)
+
+`.forgejo/workflows/ship.yml` provides a runner-executable version of the same
+deploy path.  It is triggered manually via `workflow_dispatch`.  Required repo
+secrets:
+
+| Secret               | Purpose                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| `DOPPLER_TOKEN`      | Doppler service token (prd config) — ship.ts uses this to fetch all production secrets at runtime. |
+| `GH_PACKAGES_TOKEN`  | GitHub PAT with `read:packages` — installs `@narduk-enterprises/*` from GitHub Packages. |
+| `SHIP_GIT_TOKEN`     | _(Optional)_ PAT with repo write access. Falls back to the built-in workflow token when absent. |
+
+The GitHub Actions fallback path (`.github/workflows/ci.yml`) is unchanged
+during the pilot.
 
 ## Secrets And Environment
 
