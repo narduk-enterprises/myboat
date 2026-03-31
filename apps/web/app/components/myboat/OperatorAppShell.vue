@@ -91,10 +91,9 @@ const context = computed(() =>
   props.mode === 'admin'
     ? {
         chip: 'Operator console',
-        description:
-          'Internal controls for account health, vessel oversight, stale installs, and live telemetry posture.',
+        description: 'Account health, vessel oversight, stale installs, and telemetry posture.',
         eyebrow: 'Internal ops',
-        title: 'Keep the fleet calm and explicit',
+        title: 'Admin console',
       }
     : null,
 )
@@ -143,22 +142,27 @@ const context = computed(() =>
       </template>
 
       <div
-        class="mx-auto grid max-w-[96rem] gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6 lg:px-8 lg:py-8"
+        class="mx-auto grid max-w-[96rem] gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:px-8 lg:py-8"
       >
         <aside class="hidden lg:block">
-          <div v-if="context" class="marine-operator-panel rounded-[2rem] p-5">
-            <div class="marine-kicker w-fit">{{ context.eyebrow }}</div>
-            <h1 class="mt-4 font-display text-3xl leading-tight text-default">
+          <div
+            v-if="context"
+            class="rounded-[1.35rem] border border-default/70 bg-default/86 px-4 py-4 shadow-card"
+          >
+            <p class="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-muted">
+              {{ context.eyebrow }}
+            </p>
+            <h1 class="mt-2 font-display text-xl leading-tight text-default">
               {{ context.title }}
             </h1>
-            <p class="mt-3 text-sm leading-6 text-muted">
+            <p class="mt-2 text-sm leading-6 text-muted">
               {{ context.description }}
             </p>
           </div>
 
           <div
             class="space-y-2"
-            :class="context ? 'mt-4' : ''"
+            :class="context ? 'mt-3' : ''"
             role="navigation"
             aria-label="Section navigation"
           >
@@ -166,7 +170,7 @@ const context = computed(() =>
               v-for="link in railLinks"
               :key="link.to"
               :to="link.to"
-              class="flex items-center gap-3 rounded-[1.35rem] border px-4 py-3 text-sm font-medium transition"
+              class="flex items-center gap-3 rounded-[1.2rem] border px-3.5 py-3 text-sm font-medium transition"
               :class="
                 isActive(link)
                   ? 'border-primary/20 bg-primary/10 text-primary shadow-card'
@@ -174,7 +178,7 @@ const context = computed(() =>
               "
             >
               <span
-                class="flex size-9 items-center justify-center rounded-2xl"
+                class="flex size-8 items-center justify-center rounded-2xl"
                 :class="isActive(link) ? 'bg-primary/12' : 'bg-elevated/80'"
               >
                 <UIcon :name="link.icon" class="size-4" />
@@ -183,16 +187,29 @@ const context = computed(() =>
             </NuxtLink>
           </div>
 
-          <div v-if="context" class="marine-operator-panel mt-4 rounded-[1.75rem] p-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted">Signed in</p>
-            <p class="mt-3 font-display text-xl text-default">
-              {{ user?.name || user?.email || 'Captain account' }}
-            </p>
-            <p class="mt-2 text-sm leading-6 text-muted">
+          <div
+            class="mt-4 rounded-[1.35rem] border border-default/70 bg-default/86 px-4 py-4 shadow-card"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-muted">
+                  Signed in
+                </p>
+                <p class="mt-1 truncate font-display text-lg text-default">
+                  {{ user?.name || user?.email || 'Captain account' }}
+                </p>
+              </div>
+
+              <UBadge :color="props.mode === 'admin' ? 'error' : 'primary'" variant="soft">
+                {{ props.mode === 'admin' ? 'Admin' : 'Captain' }}
+              </UBadge>
+            </div>
+
+            <p class="mt-3 text-sm leading-6 text-muted">
               {{
                 props.mode === 'admin'
-                  ? 'Keep emergency actions explicit and review stale telemetry before touching public visibility.'
-                  : 'Use the live map for traffic, settings for captain and source changes, and contextual detail pages only when you need depth.'
+                  ? 'Keep urgent controls visible and verify stale telemetry before changing public posture.'
+                  : 'Use live views for operations and open deeper detail pages only when you need more context.'
               }}
             </p>
           </div>

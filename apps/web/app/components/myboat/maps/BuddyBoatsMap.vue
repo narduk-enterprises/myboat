@@ -23,6 +23,7 @@ const props = withDefaults(
     heightClass?: string
     emptyTitle?: string
     emptyDescription?: string
+    workspaceMode?: 'stacked' | 'split'
   }>(),
   {
     title: 'Buddy boats map',
@@ -31,6 +32,7 @@ const props = withDefaults(
     emptyTitle: 'No mapped buddy boats yet',
     emptyDescription:
       'Saved buddy boats will appear here once AIS Hub returns a current position for them.',
+    workspaceMode: 'stacked',
   },
 )
 
@@ -78,7 +80,20 @@ const pins = computed<BuddyBoatPin[]>(() =>
     })),
 )
 
+const hiddenVessels = computed(() =>
+  props.vessels.filter(
+    (vessel) =>
+      vessel.positionLat === null ||
+      vessel.positionLat === undefined ||
+      vessel.positionLng === null ||
+      vessel.positionLng === undefined,
+  ),
+)
 const hiddenCount = computed(() => props.vessels.length - pins.value.length)
+const hiddenPreview = computed(() => hiddenVessels.value.slice(0, 6))
+const hiddenPreviewRemainder = computed(() =>
+  Math.max(0, hiddenCount.value - hiddenPreview.value.length),
+)
 const selectedPin = computed(
   () => pins.value.find((pin) => pin.id === selectedId.value) || pins.value[0] || null,
 )
@@ -112,6 +127,22 @@ const hiddenDescription = computed(
   () =>
     `${hiddenCount.value} saved buddy boat${hiddenCount.value === 1 ? '' : 's'} did not include a current AIS position in the latest result.`,
 )
+const isSplitWorkspace = computed(() => props.workspaceMode === 'split')
+const mapHeightClass = computed(() => {
+  if (!isSplitWorkspace.value) {
+    return props.heightClass
+  }
+
+  if (pins.value.length <= 2) {
+    return 'h-[22rem] sm:h-[26rem] lg:h-[30rem] xl:h-[34rem]'
+  }
+
+  if (pins.value.length <= 5) {
+    return 'h-[24rem] sm:h-[28rem] lg:h-[32rem] xl:h-[36rem]'
+  }
+
+  return props.heightClass
+})
 
 watch(
   () => pins.value.map((pin) => `${pin.id}:${pin.lat}:${pin.lng}`).join('|'),
@@ -250,62 +281,41 @@ function handleMapReady() {
       </div>
     </template>
 
-    <div v-if="pins.length" class="space-y-4">
-      <div class="overflow-hidden rounded-[1.5rem] border border-default/70">
-        <MyBoatMap
-          ref="mapSurface"
-          v-model:selected-id="selectedId"
-          :items="pins"
-          :geojson="toolGeojson"
-          :create-pin-element="createMapPinElement"
-          :overlay-style-fn="routeOverlayStyle"
-          :annotation-size="{ width: 110, height: 74 }"
-          :zoom-span="{ lat: 0.08, lng: 0.1 }"
-          :bounding-padding="0.3"
-          :min-span-delta="0.16"
-          :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
-          :height-class="heightClass"
-          :map-style="mapStyle"
-          :shows-points-of-interest="false"
-          @map-click="handleToolMapClick"
-          @map-ready="handleMapReady"
-        >
-          <template #overlay>
-            <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
-              <UButton
-                class="pointer-events-auto"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                icon="i-lucide-scan-search"
-                @click="fitFleet"
-              >
-                Fit fleet
-              </UButton>
-              <MyBoatMapAdvancedTools
-                :capabilities="toolCapabilities"
-                :has-active-indicator="hasActiveIndicator"
-                :map-style="mapStyle"
-                :measure-mode="measureMode"
-                :measure-result="measureResult"
-                :show-heading-line="showHeadingLine"
-                :show-range-rings="showRangeRings"
-                size="sm"
-                @set-map-style="setMapStyle"
-                @toggle-heading-line="toggleHeadingLine"
-                @toggle-measure="toggleMeasureMode"
-                @toggle-range-rings="toggleRangeRings"
-              />
-            </div>
-          </template>
-
-          <template #footer>
-            <div class="border-t border-default/70 px-4 py-3 lg:hidden">
-              <div class="flex flex-wrap gap-2">
+    <div
+      v-if="pins.length"
+      :class="
+        isSplitWorkspace
+          ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]'
+          : 'space-y-4'
+      "
+    >
+      <div class="space-y-4">
+        <div class="overflow-hidden rounded-[1.5rem] border border-default/70">
+          <MyBoatMap
+            ref="mapSurface"
+            v-model:selected-id="selectedId"
+            :items="pins"
+            :geojson="toolGeojson"
+            :create-pin-element="createMapPinElement"
+            :overlay-style-fn="routeOverlayStyle"
+            :annotation-size="{ width: 110, height: 74 }"
+            :zoom-span="{ lat: 0.08, lng: 0.1 }"
+            :bounding-padding="0.3"
+            :min-span-delta="0.16"
+            :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
+            :height-class="mapHeightClass"
+            :map-style="mapStyle"
+            :shows-points-of-interest="false"
+            @map-click="handleToolMapClick"
+            @map-ready="handleMapReady"
+          >
+            <template #overlay>
+              <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
                 <UButton
+                  class="pointer-events-auto"
                   color="neutral"
                   variant="soft"
-                  size="xs"
+                  size="sm"
                   icon="i-lucide-scan-search"
                   @click="fitFleet"
                 >
@@ -318,94 +328,253 @@ function handleMapReady() {
                   :measure-mode="measureMode"
                   :measure-result="measureResult"
                   :show-heading-line="showHeadingLine"
-                  :show-label="true"
                   :show-range-rings="showRangeRings"
-                  size="xs"
+                  size="sm"
                   @set-map-style="setMapStyle"
                   @toggle-heading-line="toggleHeadingLine"
                   @toggle-measure="toggleMeasureMode"
                   @toggle-range-rings="toggleRangeRings"
                 />
               </div>
+            </template>
+
+            <template #footer>
+              <div class="border-t border-default/70 px-4 py-3 lg:hidden">
+                <div class="flex flex-wrap gap-2">
+                  <UButton
+                    color="neutral"
+                    variant="soft"
+                    size="xs"
+                    icon="i-lucide-scan-search"
+                    @click="fitFleet"
+                  >
+                    Fit fleet
+                  </UButton>
+                  <MyBoatMapAdvancedTools
+                    :capabilities="toolCapabilities"
+                    :has-active-indicator="hasActiveIndicator"
+                    :map-style="mapStyle"
+                    :measure-mode="measureMode"
+                    :measure-result="measureResult"
+                    :show-heading-line="showHeadingLine"
+                    :show-label="true"
+                    :show-range-rings="showRangeRings"
+                    size="xs"
+                    @set-map-style="setMapStyle"
+                    @toggle-heading-line="toggleHeadingLine"
+                    @toggle-measure="toggleMeasureMode"
+                    @toggle-range-rings="toggleRangeRings"
+                  />
+                </div>
+              </div>
+            </template>
+          </MyBoatMap>
+        </div>
+
+        <template v-if="!isSplitWorkspace">
+          <div v-if="selectedPin" class="grid gap-3 sm:hidden">
+            <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
+              <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
+              <p class="mt-1 text-xs text-muted">{{ focusSubtitle }}</p>
+              <p class="mt-3 text-sm font-medium text-default">{{ destinationLabel }}</p>
+              <p class="mt-1 text-xs text-muted">{{ callSignLabel }}</p>
             </div>
-          </template>
-        </MyBoatMap>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
+                <p class="mt-2 text-sm font-medium text-default">
+                  {{ formatRelativeTime(selectedReportAt) }}
+                </p>
+                <p class="mt-1 text-xs text-muted">{{ formatTimestamp(selectedReportAt) }}</p>
+              </div>
+
+              <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.22em] text-muted">Coordinates</p>
+                <p class="mt-2 text-sm font-medium text-default">{{ latitudeLabel }}</p>
+                <p class="mt-1 text-xs text-muted">{{ longitudeLabel }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
+              <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
+              <p class="mt-1 text-xs text-muted">{{ focusSubtitle }}</p>
+            </div>
+
+            <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
+              <p class="mt-2 font-medium text-default">
+                {{ formatRelativeTime(selectedReportAt) }}
+              </p>
+              <p class="mt-1 text-xs text-muted">{{ formatTimestamp(selectedReportAt) }}</p>
+            </div>
+
+            <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Destination</p>
+              <p class="mt-2 font-medium text-default">{{ destinationLabel }}</p>
+              <p class="mt-1 text-xs text-muted">{{ callSignLabel }}</p>
+            </div>
+
+            <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Coordinates</p>
+              <p class="mt-2 font-medium text-default">{{ latitudeLabel }}</p>
+              <p class="mt-1 text-xs text-muted">{{ longitudeLabel }}</p>
+            </div>
+          </div>
+
+          <UAlert
+            v-if="hiddenCount"
+            color="warning"
+            variant="soft"
+            title="Some buddy boats are off the map"
+            :description="hiddenDescription"
+          />
+
+          <div
+            class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+          >
+            <UButton
+              v-for="pin in pins"
+              :key="pin.id"
+              size="xs"
+              class="shrink-0"
+              :color="selectedId === pin.id ? 'primary' : 'neutral'"
+              :variant="selectedId === pin.id ? 'soft' : 'outline'"
+              @click="selectedId = selectedId === pin.id ? null : pin.id"
+            >
+              {{ pin.title }}
+            </UButton>
+          </div>
+        </template>
       </div>
 
-      <div v-if="selectedPin" class="grid gap-3 sm:hidden">
-        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
+      <div v-if="isSplitWorkspace" class="space-y-4">
+        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-4">
+          <p class="text-xs uppercase tracking-[0.22em] text-muted">Focused vessel</p>
           <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
           <p class="mt-1 text-xs text-muted">{{ focusSubtitle }}</p>
-          <p class="mt-3 text-sm font-medium text-default">{{ destinationLabel }}</p>
+          <p class="mt-4 text-sm font-medium text-default">{{ destinationLabel }}</p>
           <p class="mt-1 text-xs text-muted">{{ callSignLabel }}</p>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
           <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
-            <p class="mt-2 text-sm font-medium text-default">
-              {{ formatRelativeTime(selectedReportAt) }}
-            </p>
+            <p class="mt-2 font-medium text-default">{{ formatRelativeTime(selectedReportAt) }}</p>
             <p class="mt-1 text-xs text-muted">{{ formatTimestamp(selectedReportAt) }}</p>
           </div>
 
           <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.22em] text-muted">Coordinates</p>
-            <p class="mt-2 text-sm font-medium text-default">{{ latitudeLabel }}</p>
+            <p class="mt-2 font-medium text-default">{{ latitudeLabel }}</p>
             <p class="mt-1 text-xs text-muted">{{ longitudeLabel }}</p>
           </div>
         </div>
+
+        <UAlert
+          v-if="hiddenCount"
+          color="warning"
+          variant="soft"
+          title="Some buddy boats are off the map"
+          :description="hiddenDescription"
+        />
+
+        <div
+          v-if="hiddenCount"
+          class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-4"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.22em] text-muted">Off-map boats</p>
+              <p class="mt-1 text-sm text-muted">
+                Keep missing boats visible here until a current position arrives.
+              </p>
+            </div>
+            <UBadge color="warning" variant="soft">{{ hiddenCount }}</UBadge>
+          </div>
+
+          <div class="mt-3 space-y-2">
+            <div
+              v-for="vessel in hiddenPreview"
+              :key="vessel.id"
+              class="rounded-[1rem] border border-default/70 bg-default/70 px-3 py-3"
+            >
+              <p class="font-medium text-default">{{ vessel.name }}</p>
+              <p class="mt-1 text-xs text-muted">MMSI {{ vessel.mmsi }}</p>
+              <p class="mt-2 text-xs text-muted">
+                {{
+                  vessel.lastReportAt
+                    ? `Last report ${formatRelativeTime(vessel.lastReportAt)}`
+                    : 'No current position reported yet.'
+                }}
+              </p>
+            </div>
+          </div>
+
+          <p v-if="hiddenPreviewRemainder" class="mt-3 text-xs text-muted">
+            {{ hiddenPreviewRemainder }} more boat{{ hiddenPreviewRemainder === 1 ? '' : 's' }}
+            remain off the map.
+          </p>
+        </div>
+
+        <div
+          v-if="pins.length > 1"
+          class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-4"
+        >
+          <p class="text-xs uppercase tracking-[0.22em] text-muted">Mapped focus</p>
+          <p class="mt-1 text-sm text-muted">Switch focus without losing the main map workspace.</p>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              v-for="pin in pins"
+              :key="pin.id"
+              size="xs"
+              :color="selectedId === pin.id ? 'primary' : 'neutral'"
+              :variant="selectedId === pin.id ? 'soft' : 'outline'"
+              @click="selectedId = selectedId === pin.id ? null : pin.id"
+            >
+              {{ pin.title }}
+            </UButton>
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.22em] text-muted">Focus</p>
-          <p class="mt-2 font-display text-lg text-default">{{ focusTitle }}</p>
-          <p class="mt-1 text-xs text-muted">{{ focusSubtitle }}</p>
-        </div>
-
-        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.22em] text-muted">Last report</p>
-          <p class="mt-2 font-medium text-default">{{ formatRelativeTime(selectedReportAt) }}</p>
-          <p class="mt-1 text-xs text-muted">{{ formatTimestamp(selectedReportAt) }}</p>
-        </div>
-
-        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.22em] text-muted">Destination</p>
-          <p class="mt-2 font-medium text-default">{{ destinationLabel }}</p>
-          <p class="mt-1 text-xs text-muted">{{ callSignLabel }}</p>
-        </div>
-
-        <div class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.22em] text-muted">Coordinates</p>
-          <p class="mt-2 font-medium text-default">{{ latitudeLabel }}</p>
-          <p class="mt-1 text-xs text-muted">{{ longitudeLabel }}</p>
-        </div>
-      </div>
+    <div v-else-if="props.vessels.length" class="space-y-4">
+      <MarineEmptyState
+        icon="i-lucide-users"
+        :title="emptyTitle"
+        :description="emptyDescription"
+        compact
+      />
 
       <UAlert
-        v-if="hiddenCount"
         color="warning"
         variant="soft"
-        title="Some buddy boats are off the map"
+        title="Saved buddy boats are waiting for coordinates"
         :description="hiddenDescription"
       />
 
-      <div
-        class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
-      >
-        <UButton
-          v-for="pin in pins"
-          :key="pin.id"
-          size="xs"
-          class="shrink-0"
-          :color="selectedId === pin.id ? 'primary' : 'neutral'"
-          :variant="selectedId === pin.id ? 'soft' : 'outline'"
-          @click="selectedId = selectedId === pin.id ? null : pin.id"
+      <div class="grid gap-3 md:grid-cols-2">
+        <div
+          v-for="vessel in hiddenPreview"
+          :key="vessel.id"
+          class="rounded-[1.25rem] border border-default bg-elevated/70 px-4 py-4"
         >
-          {{ pin.title }}
-        </UButton>
+          <p class="font-medium text-default">{{ vessel.name }}</p>
+          <p class="mt-1 text-xs text-muted">MMSI {{ vessel.mmsi }}</p>
+          <p class="mt-2 text-xs text-muted">
+            {{
+              vessel.lastReportAt
+                ? `Last report ${formatRelativeTime(vessel.lastReportAt)}`
+                : 'No current position reported yet.'
+            }}
+          </p>
+        </div>
       </div>
     </div>
 

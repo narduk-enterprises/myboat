@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatRelativeTime } from '~/utils/marine'
+
 definePageMeta({ layout: 'dashboard', middleware: ['auth'] })
 
 useSeo({
@@ -36,28 +38,40 @@ watch(
   },
   { immediate: true },
 )
+
+const mappedCount = computed(
+  () =>
+    followedVessels.value.filter(
+      (vessel) => vessel.positionLat !== null && vessel.positionLng !== null,
+    ).length,
+)
+const hiddenCount = computed(() => followedVessels.value.length - mappedCount.value)
+const freshestReportLabel = computed(() => {
+  const freshest = [...followedVessels.value]
+    .filter((vessel) => vessel.lastReportAt)
+    .sort(
+      (left, right) =>
+        new Date(right.lastReportAt || 0).getTime() - new Date(left.lastReportAt || 0).getTime(),
+    )[0]
+
+  return freshest?.lastReportAt ? formatRelativeTime(freshest.lastReportAt) : 'No telemetry yet'
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <template v-if="pending">
-      <USkeleton class="h-16 rounded-[1.5rem]" />
+      <USkeleton class="h-40 rounded-[1.5rem]" />
       <USkeleton class="h-[40rem] rounded-[1.75rem]" />
     </template>
 
     <template v-else-if="overview">
-      <div
-        class="flex flex-col gap-4 rounded-[1.75rem] border border-default/70 bg-default/85 px-5 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between"
+      <OperatorRouteMasthead
+        eyebrow="Buddy boats"
+        title="Track the fleet you care about"
+        description="Use the map as the primary workspace, keep the active buddy-boat context visible, and open the manager only when you need to search, save, or prune the list."
       >
-        <div>
-          <h1 class="font-display text-3xl text-default">Buddy Boats</h1>
-          <p class="mt-1 text-sm text-muted">
-            Keep the fleet chart front and center, then open the manager when you need to search,
-            save, or remove buddy boats for this captain page.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2">
+        <template #actions>
           <UButton
             color="primary"
             icon="i-lucide-users-round"
@@ -66,8 +80,32 @@ watch(
           >
             Manage Buddies
           </UButton>
-        </div>
-      </div>
+        </template>
+
+        <template #meta>
+          <div class="grid gap-3 md:grid-cols-3">
+            <div class="rounded-[1.15rem] border border-default/70 bg-elevated/70 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted">Mapped</p>
+              <p class="mt-2 font-display text-lg text-default">{{ mappedCount }}</p>
+              <p class="mt-1 text-xs text-muted">Buddy boats with current AIS coordinates.</p>
+            </div>
+
+            <div class="rounded-[1.15rem] border border-default/70 bg-elevated/70 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted">Off map</p>
+              <p class="mt-2 font-display text-lg text-default">{{ hiddenCount }}</p>
+              <p class="mt-1 text-xs text-muted">Saved boats waiting for a current position.</p>
+            </div>
+
+            <div class="rounded-[1.15rem] border border-default/70 bg-elevated/70 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
+                Freshest report
+              </p>
+              <p class="mt-2 font-display text-lg text-default">{{ freshestReportLabel }}</p>
+              <p class="mt-1 text-xs text-muted">Latest AIS report visible in this workspace.</p>
+            </div>
+          </div>
+        </template>
+      </OperatorRouteMasthead>
 
       <UAlert
         v-if="!overview.profile"
@@ -81,7 +119,8 @@ watch(
         :vessels="followedVessels"
         title="Buddy boats chart"
         description="Saved buddy boats with current AIS positions render here. Open the manager to search AIS Hub, add new boats, or prune the list."
-        height-class="h-[30rem] sm:h-[38rem] lg:h-[46rem] xl:h-[54rem]"
+        height-class="h-[26rem] sm:h-[30rem] lg:h-[36rem] xl:h-[40rem]"
+        workspace-mode="split"
         empty-description="Open Manage Buddies to search AIS Hub, save the boats you care about, and bring them onto this chart once current coordinates are available."
       />
 
