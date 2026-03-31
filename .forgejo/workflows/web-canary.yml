@@ -99,9 +99,10 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
-          # Configures .npmrc so that NODE_AUTH_TOKEN authenticates against the
-          # platform Forgejo npm registry for @narduk-enterprises/* packages.
+          # Limit the Forgejo registry override to the private @narduk-enterprises
+          # scope so public npm packages still resolve from the default registry.
           registry-url: 'https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/'
+          scope: '@narduk-enterprises'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
