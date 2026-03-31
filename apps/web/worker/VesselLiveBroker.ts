@@ -11,8 +11,12 @@ import type {
 } from '../shared/myboatLive'
 import {
   DEFAULT_LIVE_DEMAND,
-  mergeAisContactSummary,
+  canonicalAisStorageKey,
+  diffRemovedAisContactKeys,
+  mergeAisContactsIntoRecord,
   normalizeLiveDemand,
+  pruneAisContactRecordBySnapshot,
+  pruneStaleAisContactRecord,
 } from '../shared/myboatLive'
 
 type PersistedBrokerState = {
@@ -121,8 +125,8 @@ export class VesselLiveBroker extends DurableObject {
   }
 
   private async handlePublish(payload: VesselLivePublishMessage) {
-    const aisRemovals: string[] = []
-    const aisUpserts: AisContactSummary[] = []
+    const previousAisContacts = this.stateRecord.aisContacts
+    const aisUpsertKeys = new Set<string>()
 
     if (payload.snapshot !== undefined) {
       this.stateRecord.snapshot = payload.snapshot || null
@@ -136,18 +140,28 @@ export class VesselLiveBroker extends DurableObject {
       this.stateRecord.lastObservedAt = payload.lastObservedAt || null
     }
 
-    for (const contact of payload.aisContacts || []) {
-      if (!contact?.id) {
-        continue
+    const incomingAis = (payload.aisContacts || []).filter((contact) => Boolean(contact?.id))
+    if (incomingAis.length) {
+      for (const contact of incomingAis) {
+        aisUpsertKeys.add(canonicalAisStorageKey(contact))
       }
 
-      const mergedContact = mergeAisContactSummary(
-        this.stateRecord.aisContacts[contact.id],
-        contact,
+      this.stateRecord.aisContacts = mergeAisContactsIntoRecord(
+        this.stateRecord.aisContacts,
+        incomingAis,
       )
-      this.stateRecord.aisContacts[contact.id] = mergedContact
-      aisUpserts.push(mergedContact)
     }
+
+    this.stateRecord.aisContacts = pruneStaleAisContactRecord(
+      this.stateRecord.aisContacts,
+      Date.now(),
+    )
+
+    this.stateRecord.aisContacts = pruneAisContactRecordBySnapshot(
+      this.stateRecord.aisContacts,
+      this.stateRecord.snapshot,
+    )
+    const aisRemovals = diffRemovedAisContactKeys(previousAisContacts, this.stateRecord.aisContacts)
 
     await this.persistState()
 
@@ -161,7 +175,12 @@ export class VesselLiveBroker extends DurableObject {
       )
     }
 
-    for (const contact of aisUpserts) {
+    for (const key of aisUpsertKeys) {
+      const contact = this.stateRecord.aisContacts[key]
+      if (!contact) {
+        continue
+      }
+
       this.fanout(
         {
           type: 'ais_upsert',

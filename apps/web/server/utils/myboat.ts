@@ -18,7 +18,7 @@ import {
   vessels,
   waypoints,
 } from '#server/database/app-schema'
-import { useAppDatabase } from '#server/utils/database'
+import { D1_MAX_BOUND_PARAMETERS_PER_QUERY, useAppDatabase } from '#server/utils/database'
 import { serializeObservedIdentitySummary } from '#server/utils/vesselIdentity'
 
 function normalizeSlugPart(value: string) {
@@ -455,22 +455,27 @@ export async function syncFollowedVesselsFromAisHubForMmsis(
   }
 
   const db = useAppDatabase(event)
-  const authoritativeRows = await db
-    .select({
-      mmsi: aishubVessels.mmsi,
-      imo: aishubVessels.imo,
-      name: aishubVessels.name,
-      callSign: aishubVessels.callSign,
-      destination: aishubVessels.destination,
-      lastReportAt: aishubVessels.lastReportAt,
-      positionLat: aishubVessels.positionLat,
-      positionLng: aishubVessels.positionLng,
-      shipType: aishubVessels.shipType,
-      sourceStationsJson: aishubVessels.sourceStationsJson,
-    })
-    .from(aishubVessels)
-    .where(inArray(aishubVessels.mmsi, uniqueMmsis))
-    .all()
+  const authoritativeRows = []
+  for (let index = 0; index < uniqueMmsis.length; index += D1_MAX_BOUND_PARAMETERS_PER_QUERY) {
+    const batch = uniqueMmsis.slice(index, index + D1_MAX_BOUND_PARAMETERS_PER_QUERY)
+    const batchRows = await db
+      .select({
+        mmsi: aishubVessels.mmsi,
+        imo: aishubVessels.imo,
+        name: aishubVessels.name,
+        callSign: aishubVessels.callSign,
+        destination: aishubVessels.destination,
+        lastReportAt: aishubVessels.lastReportAt,
+        positionLat: aishubVessels.positionLat,
+        positionLng: aishubVessels.positionLng,
+        shipType: aishubVessels.shipType,
+        sourceStationsJson: aishubVessels.sourceStationsJson,
+      })
+      .from(aishubVessels)
+      .where(inArray(aishubVessels.mmsi, batch))
+      .all()
+    authoritativeRows.push(...batchRows)
+  }
 
   for (const row of authoritativeRows) {
     await db

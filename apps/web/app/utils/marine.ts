@@ -16,6 +16,14 @@ export function formatCoordinate(value: number | null | undefined, isLatitude: b
   return `${degrees}°${minutes}'${seconds.toFixed(1)}"${suffix}`
 }
 
+/**
+ * Node (ICU) often formats en-US datetime as "Dec 5, 2023, 6:10 AM" while WebKit uses
+ * "Dec 5, 2023 at 6:10 AM". Normalizing avoids SSR/client hydration text mismatches.
+ */
+function normalizeEnUsDateTimeCommaBeforeTime(formatted: string) {
+  return formatted.replace(/,\s+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM))$/i, ' at $1')
+}
+
 export function formatTimestamp(
   value: string | null | undefined,
   options?: Intl.DateTimeFormatOptions,
@@ -24,14 +32,21 @@ export function formatTimestamp(
     return 'Unavailable'
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Unavailable'
+  }
+
+  const formatted = new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     ...options,
-  }).format(new Date(value))
+  }).format(date)
+
+  return normalizeEnUsDateTimeCommaBeforeTime(formatted)
 }
 
 export function formatRelativeTime(value: string | null | undefined) {

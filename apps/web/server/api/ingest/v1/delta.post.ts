@@ -27,6 +27,7 @@ import {
   resolveObservedAt,
 } from '#server/utils/telemetry'
 import { recordTelemetrySelectionState } from '#server/utils/telemetrySources'
+import { filterAisContactsNearSnapshot } from '../../../../shared/myboatLive'
 import {
   extractObservedSelfIdentityPatchFromDelta,
   mergeObservedIdentityPatches,
@@ -312,7 +313,17 @@ export default defineWebhookMutation(
     }
 
     if (aggregatedAisContacts.size) {
-      livePayload.aisContacts = Array.from(aggregatedAisContacts.values())
+      let aisContacts = Array.from(aggregatedAisContacts.values())
+      if (
+        latestSnapshot?.positionLat !== null &&
+        latestSnapshot?.positionLat !== undefined &&
+        latestSnapshot.positionLng !== null &&
+        latestSnapshot.positionLng !== undefined
+      ) {
+        aisContacts = filterAisContactsNearSnapshot(aisContacts, latestSnapshot)
+      }
+
+      livePayload.aisContacts = aisContacts
     }
 
     if (

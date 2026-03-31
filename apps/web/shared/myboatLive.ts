@@ -108,6 +108,147 @@ function preferDefined<T>(next: T | null | undefined, previous: T | null | undef
   return next ?? previous ?? null
 }
 
+/** Drop AIS contacts from live maps after this age (matches broker pruning). */
+export const AIS_CONTACT_DISPLAY_STALE_MS = 5 * 60 * 1000
+
+/** Max distance from own-ship position for live AIS contacts (maps, broker, public nearby API). */
+export const AIS_NEARBY_RADIUS_NM = 24
+
+export function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const earthRadiusMeters = 6_371_000
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2)
+
+  return (earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1852
+}
+
+export function isAisContactNearSnapshot(
+  contact: AisContactSummary,
+  snapshot: VesselSnapshotSummary | null | undefined,
+  radiusNm: number = AIS_NEARBY_RADIUS_NM,
+) {
+  if (
+    snapshot?.positionLat === null ||
+    snapshot?.positionLat === undefined ||
+    snapshot.positionLng === null ||
+    snapshot.positionLng === undefined
+  ) {
+    return true
+  }
+
+  if (
+    contact.lat === null ||
+    contact.lat === undefined ||
+    contact.lng === null ||
+    contact.lng === undefined
+  ) {
+    return false
+  }
+
+  return (
+    haversineNm(snapshot.positionLat, snapshot.positionLng, contact.lat, contact.lng) <= radiusNm
+  )
+}
+
+export function filterAisContactsNearSnapshot(
+  contacts: AisContactSummary[],
+  snapshot: VesselSnapshotSummary | null | undefined,
+  radiusNm: number = AIS_NEARBY_RADIUS_NM,
+) {
+  if (
+    snapshot?.positionLat === null ||
+    snapshot?.positionLat === undefined ||
+    snapshot.positionLng === null ||
+    snapshot.positionLng === undefined
+  ) {
+    return contacts
+  }
+
+  return contacts.filter((contact) => isAisContactNearSnapshot(contact, snapshot, radiusNm))
+}
+
+export function pruneAisContactRecordBySnapshot(
+  contacts: Record<string, AisContactSummary>,
+  snapshot: VesselSnapshotSummary | null | undefined,
+  radiusNm: number = AIS_NEARBY_RADIUS_NM,
+): Record<string, AisContactSummary> {
+  if (
+    snapshot?.positionLat === null ||
+    snapshot?.positionLat === undefined ||
+    snapshot.positionLng === null ||
+    snapshot.positionLng === undefined
+  ) {
+    return contacts
+  }
+
+  const next: Record<string, AisContactSummary> = {}
+
+  for (const [key, contact] of Object.entries(contacts)) {
+    if (isAisContactNearSnapshot(contact, snapshot, radiusNm)) {
+      next[key] = contact
+    }
+  }
+
+  return next
+}
+
+/**
+ * Stable map/broker key: one entry per MMSI when known, otherwise SignalK context id.
+ * Prevents duplicate pins when the same vessel appears as both `mmsi:…` and a URN path.
+ */
+export function canonicalAisStorageKey(contact: Pick<AisContactSummary, 'id' | 'mmsi'>): string {
+  const mmsi = contact.mmsi?.trim()
+  if (mmsi && /^\d{6,}$/.test(mmsi)) {
+    return `mmsi:${mmsi}`
+  }
+
+  return contact.id.trim() || contact.id
+}
+
+export function mergeAisContactsIntoRecord(
+  existing: Record<string, AisContactSummary>,
+  incoming: AisContactSummary[],
+): Record<string, AisContactSummary> {
+  const merged: Record<string, AisContactSummary> = {}
+
+  for (const contact of [...Object.values(existing), ...incoming]) {
+    const key = canonicalAisStorageKey(contact)
+    const normalized = { ...contact, id: key }
+    merged[key] = mergeAisContactSummary(merged[key], normalized)
+  }
+
+  return merged
+}
+
+export function pruneStaleAisContactRecord(
+  contacts: Record<string, AisContactSummary>,
+  nowMs: number = Date.now(),
+  staleMs: number = AIS_CONTACT_DISPLAY_STALE_MS,
+): Record<string, AisContactSummary> {
+  const next: Record<string, AisContactSummary> = {}
+
+  for (const [key, contact] of Object.entries(contacts)) {
+    if (nowMs - contact.lastUpdateAt <= staleMs) {
+      next[key] = contact
+    }
+  }
+
+  return next
+}
+
+export function diffRemovedAisContactKeys(
+  previous: Record<string, AisContactSummary>,
+  next: Record<string, AisContactSummary>,
+) {
+  return Object.keys(previous).filter((key) => !(key in next))
+}
+
 export function mergeAisContactSummary(
   previous: AisContactSummary | null | undefined,
   next: AisContactSummary,

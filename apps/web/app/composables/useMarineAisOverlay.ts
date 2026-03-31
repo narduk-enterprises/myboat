@@ -7,6 +7,12 @@ interface MapKitAnnotationRef {
   coordinate: unknown
 }
 
+interface MapKitSelectableSurface extends MapKitMapSurface {
+  selectedAnnotation?: MapKitAnnotationRef | null
+  addEventListener?: (name: string, handler: (event: unknown) => void) => void
+  removeEventListener?: (name: string, handler: (event: unknown) => void) => void
+}
+
 export interface MapKitMapSurface {
   addAnnotation(annotation: MapKitAnnotationRef): void
   removeAnnotation(annotation: MapKitAnnotationRef): void
@@ -18,6 +24,7 @@ interface MarineAisOverlayOptions<T extends { id: string; lat: number; lng: numb
   enabled: Readonly<Ref<boolean>>
   selectedId: Ref<string | null>
   createPinElement: (pin: T, isSelected: boolean) => { element: HTMLElement; cleanup?: () => void }
+  createCalloutElement?: (pin: T) => { element: HTMLElement; cleanup?: () => void }
   renderFingerprint?: (pin: T, isSelected: boolean) => string
   renderKey?: Readonly<Ref<string | number>>
   movementThresholdMeters?: number
@@ -43,9 +50,11 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
 ) {
   const annotationRefs = new Map<string, MapKitAnnotationRef>()
   const cleanupRefs = new Map<string, (() => void) | undefined>()
+  const calloutCleanupRefs = new Map<string, (() => void) | undefined>()
   const renderedCoords = new Map<string, { lat: number; lng: number }>()
   const renderedFingerprints = new Map<string, string>()
-  const activeMap = shallowRef<MapKitMapSurface | null>(null)
+  const activeMap = shallowRef<MapKitSelectableSurface | null>(null)
+  let deselectHandler: ((event: unknown) => void) | null = null
   const resolvedAnnotationSize = computed(() => {
     if (options.annotationSize === undefined) {
       return DEFAULT_AIS_ANNOTATION_SIZE
@@ -65,6 +74,8 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
 
     cleanupRefs.get(id)?.()
     cleanupRefs.delete(id)
+    calloutCleanupRefs.get(id)?.()
+    calloutCleanupRefs.delete(id)
     annotationRefs.delete(id)
     renderedCoords.delete(id)
     renderedFingerprints.delete(id)
@@ -79,6 +90,47 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
 
   function buildFingerprint(pin: T) {
     return options.renderFingerprint?.(pin, options.selectedId.value === pin.id) ?? ''
+  }
+
+  function syncSelectedAnnotation() {
+    const targetMap = activeMap.value
+    if (!targetMap || !options.createCalloutElement) {
+      return
+    }
+
+    targetMap.selectedAnnotation = options.selectedId.value
+      ? (annotationRefs.get(options.selectedId.value) ?? null)
+      : null
+  }
+
+  function bindSelectionEvents(targetMap: MapKitSelectableSurface | null) {
+    if (!targetMap?.addEventListener || !options.createCalloutElement || deselectHandler) {
+      return
+    }
+
+    deselectHandler = () => {
+      queueMicrotask(() => {
+        if (activeMap.value?.selectedAnnotation != null) {
+          return
+        }
+
+        const selectedId = options.selectedId.value
+        if (selectedId && annotationRefs.has(selectedId)) {
+          options.selectedId.value = null
+        }
+      })
+    }
+
+    targetMap.addEventListener('deselect', deselectHandler)
+  }
+
+  function unbindSelectionEvents(targetMap: MapKitSelectableSurface | null = activeMap.value) {
+    if (!targetMap?.removeEventListener || !deselectHandler) {
+      return
+    }
+
+    targetMap.removeEventListener('deselect', deselectHandler)
+    deselectHandler = null
   }
 
   function createAnnotation(pin: T) {
@@ -96,7 +148,14 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
         wrapper.appendChild(element)
         wrapper.addEventListener('click', (event) => {
           event.stopPropagation()
-          options.selectedId.value = options.selectedId.value === pin.id ? null : pin.id
+          const nextSelectedId = options.selectedId.value === pin.id ? null : pin.id
+          options.selectedId.value = nextSelectedId
+          if (options.createCalloutElement) {
+            const targetMap = activeMap.value
+            if (targetMap) {
+              targetMap.selectedAnnotation = nextSelectedId ? annotation : null
+            }
+          }
         })
 
         cleanupRefs.set(pin.id, cleanup)
@@ -104,10 +163,24 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
       },
       {
         anchorOffset: new DOMPoint(0, -annotationSize.height / 2),
-        calloutEnabled: false,
+        calloutEnabled: Boolean(options.createCalloutElement),
         animates: false,
         size: annotationSize,
         data: { id: pin.id },
+        ...(options.createCalloutElement
+          ? {
+              callout: {
+                calloutElementForAnnotation: () => {
+                  const currentPin =
+                    options.pins.value.find((candidate) => candidate.id === pin.id) ?? pin
+                  const { element, cleanup } = options.createCalloutElement!(currentPin)
+                  calloutCleanupRefs.get(pin.id)?.()
+                  calloutCleanupRefs.set(pin.id, cleanup)
+                  return element
+                },
+              },
+            }
+          : {}),
       },
     ) as MapKitAnnotationRef
 
@@ -133,17 +206,21 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
     for (const pin of options.pins.value) {
       addPin(pin, targetMap)
     }
+
+    syncSelectedAnnotation()
   }
 
   function syncMapReference() {
-    const targetMap = options.map.value
+    const targetMap = options.map.value as MapKitSelectableSurface | null
 
     if (targetMap === activeMap.value) {
       return targetMap
     }
 
+    unbindSelectionEvents(activeMap.value)
     clearAll(activeMap.value)
     activeMap.value = targetMap
+    bindSelectionEvents(targetMap)
     return targetMap
   }
 
@@ -192,6 +269,8 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
         renderedCoords.set(pin.id, { lat: pin.lat, lng: pin.lng })
       }
     }
+
+    syncSelectedAnnotation()
   }
 
   watch(
@@ -202,18 +281,21 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
     { immediate: true },
   )
 
+  // Watch the pins ref directly — `options` is a plain object, so a getter like
+  // `() => options.pins.value` can fail to re-run when the computed list is replaced.
   watch(
-    () => options.pins.value,
+    options.pins,
     () => {
       syncPins()
     },
-    { deep: false },
+    { deep: true },
   )
 
   watch(
     () => options.selectedId.value,
     () => {
       rebuildAll()
+      syncSelectedAnnotation()
     },
   )
 
@@ -230,6 +312,7 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
   )
 
   onBeforeUnmount(() => {
+    unbindSelectionEvents(activeMap.value)
     clearAll(activeMap.value)
     activeMap.value = null
   })

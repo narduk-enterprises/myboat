@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  MyBoatMapGeoJsonFeature,
   MyBoatMapGeoJsonFeatureCollection,
   MyBoatMapHandle,
   MyBoatMapOverlayStyle,
@@ -94,6 +95,8 @@ const emit = defineEmits<{
     region: { latDelta: number; lngDelta: number; centerLat: number; centerLng: number },
   ]
   'map-click': [coords: { lat: number; lng: number }]
+  'feature-select': [feature: MyBoatMapGeoJsonFeature]
+  'fullscreen-change': [value: boolean]
 }>()
 
 const selectedId = defineModel<string | null>('selectedId', { default: null })
@@ -200,12 +203,17 @@ function handleMapClick(coords: { lat: number; lng: number }) {
   emit('map-click', coords)
 }
 
+function handleFeatureSelect(feature: MyBoatMapGeoJsonFeature) {
+  emit('feature-select', feature)
+}
+
 function syncFullscreenState() {
   if (!import.meta.client || !props.allowFullscreen) {
     return
   }
 
   isFullscreen.value = document.fullscreenElement === mapHost.value
+  emit('fullscreen-change', isFullscreen.value)
 }
 
 function toggleFullscreen() {
@@ -254,11 +262,24 @@ watch(
   },
 )
 
+watch(isFullscreen, async () => {
+  if (!import.meta.client || !props.allowFullscreen) {
+    return
+  }
+
+  await nextTick()
+  applyMapStyle()
+  window.dispatchEvent(new Event('resize'))
+})
+
 defineExpose({
+  clearRememberedView,
   getMap: () => mapRef.value?.getMap() ?? null,
+  isFullscreen: () => isFullscreen.value,
   setRegion: (center: { lat: number; lng: number }, span?: { lat: number; lng: number }) => {
     mapRef.value?.setRegion(center, span)
   },
+  toggleFullscreen,
   zoomToFit: (zoomOutLevels = 0) => {
     mapRef.value?.zoomToFit(zoomOutLevels)
   },
@@ -269,12 +290,19 @@ defineExpose({
   <div class="space-y-3">
     <slot name="header" v-bind="slotBindings" />
 
-    <div ref="mapHost" class="relative">
+    <div
+      ref="mapHost"
+      :class="[
+        allowFullscreen && isFullscreen
+          ? 'relative z-[200] flex min-h-0 w-full flex-col bg-default min-h-[100dvh]'
+          : 'relative',
+      ]"
+    >
       <div class="pointer-events-none absolute inset-0 z-10">
         <slot name="overlay" v-bind="slotBindings" />
       </div>
 
-      <div :class="[heightClass, isFullscreen ? '!h-screen' : '']">
+      <div :class="[allowFullscreen && isFullscreen ? 'min-h-0 w-full flex-1' : heightClass]">
         <ClientOnly>
           <AppMapKit
             ref="mapSurface"
@@ -297,6 +325,7 @@ defineExpose({
             @map-ready="handleMapReady"
             @map-click="handleMapClick"
             @region-change="handleRegionChange"
+            @feature-select="handleFeatureSelect"
           />
         </ClientOnly>
       </div>

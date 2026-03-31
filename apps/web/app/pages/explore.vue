@@ -179,7 +179,6 @@ const discoveryRules = [
           height-class="h-[22rem] sm:h-[28rem] lg:h-[34rem]"
           :show-focus-panel="false"
           :show-layer-toggles="false"
-          :show-stats-rail="false"
           :show-pin-labels="false"
         />
 

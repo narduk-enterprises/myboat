@@ -134,7 +134,6 @@ const metricCards = computed(() => [
             :show-focus-panel="false"
             :show-layer-toggles="false"
             :show-pin-labels="false"
-            :show-stats-rail="false"
           />
         </div>
       </UCard>

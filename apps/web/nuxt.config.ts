@@ -49,7 +49,7 @@ export default defineNuxtConfig({
   components: [{ path: resolve(__dirname, 'app/components'), pathPrefix: false }],
 
   // nitro-cloudflare-dev proxies D1 bindings to the local dev server
-  modules: ['nitro-cloudflare-dev'],
+  modules: ['@pinia/nuxt', 'nitro-cloudflare-dev'],
 
   nitro: {
     experimental: {

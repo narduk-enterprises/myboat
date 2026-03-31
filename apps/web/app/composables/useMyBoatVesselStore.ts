@@ -23,11 +23,16 @@ import type {
   VesselLiveServerMessage,
 } from '../../shared/myboatLive'
 import {
+  AIS_CONTACT_DISPLAY_STALE_MS,
   createMyBoatLiveWebSocketUrl,
+  filterAisContactsNearSnapshot,
+  haversineNm,
   isLiveDemandEmpty,
-  mergeAisContactSummary,
+  isAisContactNearSnapshot,
+  mergeAisContactsIntoRecord,
   mergeLiveDemands,
   normalizeLiveDemand,
+  pruneStaleAisContactRecord,
 } from '../../shared/myboatLive'
 
 type VesselStoreRouteStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -76,7 +81,6 @@ export interface VesselStoreNamespaceState {
 }
 
 const SELF_OVERLAY_MAX_DISTANCE_NM = 30
-const AIS_STALE_TIMEOUT_MS = 15 * 60 * 1000
 const AIS_STALE_SWEEP_MS = 60_000
 const RECONNECT_DELAY_MS = 4_000
 
@@ -188,20 +192,6 @@ function withMergedSnapshot(
   }
 }
 
-function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const earthRadiusMeters = 6_371_000
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2)
-
-  return (earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1852
-}
-
 function canMergeLiveSnapshot(
   storedSnapshot: VesselSnapshotSummary | null,
   liveSnapshot: VesselSnapshotSummary | null,
@@ -279,20 +269,8 @@ async function decodeMessageData(data: string | ArrayBuffer | Blob) {
   return await data.text()
 }
 function pruneStaleAisContacts(contacts: Record<string, AisContactSummary>) {
-  const now = Date.now()
-  let removedAny = false
-  const next: Record<string, AisContactSummary> = {}
-
-  for (const [key, contact] of Object.entries(contacts)) {
-    if (now - contact.lastUpdateAt > AIS_STALE_TIMEOUT_MS) {
-      removedAny = true
-      continue
-    }
-
-    next[key] = contact
-  }
-
-  return removedAny ? next : contacts
+  const next = pruneStaleAisContactRecord(contacts, Date.now(), AIS_CONTACT_DISPLAY_STALE_MS)
+  return Object.keys(next).length === Object.keys(contacts).length ? contacts : next
 }
 
 function buildPublicEntryKey(username: string, vesselSlug: string) {
@@ -596,10 +574,11 @@ export function useMyBoatVesselStore() {
       const currentEntry = entriesByKey[key] || createEmptyEntry(key, 'public')
       const storedSnapshot = vessel.liveSnapshot ?? currentEntry.storedSnapshot
       const mergedSnapshot = mergeSnapshots(storedSnapshot, currentEntry.liveSnapshot)
+      const vesselInstallations = installationsByVesselId[vessel.id] || currentEntry.installations
 
       entriesByKey[key] = {
         ...currentEntry,
-        installations: installationsByVesselId[vessel.id] || currentEntry.installations,
+        installations: vesselInstallations,
         key,
         lastHydratedAt: now,
         lastRefreshedAt: now,
@@ -610,6 +589,10 @@ export function useMyBoatVesselStore() {
         publicVesselSlug: vessel.slug,
         storedSnapshot,
         vessel: withMergedSnapshot(vessel, mergedSnapshot),
+        live: {
+          ...currentEntry.live,
+          hasSignalKSource: vesselInstallations.length > 0,
+        },
       }
     }
 
@@ -761,12 +744,10 @@ export function useMyBoatVesselStore() {
     contacts: AisContactSummary[],
   ) {
     updateEntry(namespace, entryKey, (currentEntry) => {
-      const nextContacts = contacts.reduce<Record<string, AisContactSummary>>(
-        (accumulator, contact) => {
-          accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
-          return accumulator
-        },
-        {},
+      const nextContacts = pruneStaleAisContactRecord(
+        mergeAisContactsIntoRecord({}, contacts),
+        Date.now(),
+        AIS_CONTACT_DISPLAY_STALE_MS,
       )
 
       return {
@@ -1001,17 +982,25 @@ export function useMyBoatVesselStore() {
     entryKey: string,
     contact: AisContactSummary,
   ) {
-    updateEntry(namespace, entryKey, (currentEntry) => ({
-      ...currentEntry,
-      aisContacts: {
-        ...currentEntry.aisContacts,
-        [contact.id]: mergeAisContactSummary(currentEntry.aisContacts[contact.id], contact),
-      },
-      live: {
-        ...currentEntry.live,
-        lastDeltaAt: Date.now(),
-      },
-    }))
+    updateEntry(namespace, entryKey, (currentEntry) => {
+      const mergedSelf = mergeSnapshots(currentEntry.storedSnapshot, currentEntry.liveSnapshot)
+      if (!isAisContactNearSnapshot(contact, mergedSelf)) {
+        return currentEntry
+      }
+
+      return {
+        ...currentEntry,
+        aisContacts: pruneStaleAisContactRecord(
+          mergeAisContactsIntoRecord(currentEntry.aisContacts, [contact]),
+          Date.now(),
+          AIS_CONTACT_DISPLAY_STALE_MS,
+        ),
+        live: {
+          ...currentEntry.live,
+          lastDeltaAt: Date.now(),
+        },
+      }
+    })
   }
 
   function applyAisRemove(namespace: VesselStoreNamespace, entryKey: string, contactId: string) {
@@ -1038,12 +1027,14 @@ export function useMyBoatVesselStore() {
       case 'sync':
         applyLiveSnapshot(namespace, entryKey, message.snapshot, message.connectionState)
         updateEntry(namespace, entryKey, (currentEntry) => {
-          const nextContacts = message.aisContacts.reduce<Record<string, AisContactSummary>>(
-            (accumulator, contact) => {
-              accumulator[contact.id] = mergeAisContactSummary(accumulator[contact.id], contact)
-              return accumulator
-            },
-            {},
+          const filteredSyncAis = filterAisContactsNearSnapshot(
+            message.aisContacts,
+            message.snapshot,
+          )
+          const nextContacts = pruneStaleAisContactRecord(
+            mergeAisContactsIntoRecord({}, filteredSyncAis),
+            Date.now(),
+            AIS_CONTACT_DISPLAY_STALE_MS,
           )
 
           return {

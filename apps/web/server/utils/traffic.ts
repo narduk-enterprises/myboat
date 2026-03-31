@@ -6,12 +6,17 @@ import { useRuntimeConfig } from '#imports'
 import { getStoredAisHubResultsByMmsis } from '#server/utils/aishub'
 import { vesselInstallations } from '#server/database/app-schema'
 import { useAppDatabase } from '#server/utils/database'
-import { mergeAisContactSummary } from '../../shared/myboatLive'
+import {
+  AIS_CONTACT_DISPLAY_STALE_MS,
+  AIS_NEARBY_RADIUS_NM,
+  haversineNm,
+  mergeAisContactSummary,
+} from '../../shared/myboatLive'
 import { fetchVesselLiveState } from '#server/utils/liveBroker'
 import { extractObservedIdentityPatchFromSignalKModel } from '#server/utils/vesselIdentity'
 
 const SIGNALK_TRAFFIC_TIMEOUT_MS = 8_000
-export const TRAFFIC_NEARBY_RADIUS_NM = 24
+export const TRAFFIC_NEARBY_RADIUS_NM = AIS_NEARBY_RADIUS_NM
 
 type TrafficMetadata = Pick<
   AisContactSummary,
@@ -54,19 +59,69 @@ function unwrapSignalKValue(value: unknown): unknown {
   return value
 }
 
-function readSignalKPath(model: unknown, path: string) {
+function parseTimestampMs(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function unwrapSignalKNodeValue(value: unknown) {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'value' in value &&
+    (value as { value?: unknown }).value &&
+    typeof (value as { value?: unknown }).value === 'object' &&
+    !Array.isArray((value as { value?: unknown }).value)
+  ) {
+    return (value as { value?: unknown }).value as Record<string, unknown>
+  }
+
+  return null
+}
+
+function readSignalKPathNode(model: unknown, path: string) {
   const segments = path.split('.')
   let current = model
 
   for (const segment of segments) {
     if (!current || typeof current !== 'object' || Array.isArray(current)) {
-      return
+      return null
     }
 
-    current = (current as Record<string, unknown>)[segment]
+    const record = current as Record<string, unknown>
+    if (segment in record) {
+      current = record[segment]
+      continue
+    }
+
+    const unwrapped = unwrapSignalKNodeValue(record)
+    if (unwrapped && segment in unwrapped) {
+      current = unwrapped[segment]
+      continue
+    }
+
+    return null
   }
 
-  return unwrapSignalKValue(current)
+  return current
+}
+
+function readSignalKPath(model: unknown, path: string) {
+  return unwrapSignalKValue(readSignalKPathNode(model, path))
+}
+
+function readSignalKPathTimestamp(model: unknown, path: string) {
+  const node = readSignalKPathNode(model, path)
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    return null
+  }
+
+  return parseTimestampMs((node as { timestamp?: unknown }).timestamp)
 }
 
 function asString(value: unknown) {
@@ -95,6 +150,27 @@ function extractSignalKPosition(value: unknown) {
     lat: asNumber(position.latitude),
     lng: asNumber(position.longitude),
   }
+}
+
+function resolveSignalKContactObservedAtMs(model: unknown) {
+  const candidates = [
+    readSignalKPathTimestamp(model, 'navigation.position'),
+    readSignalKPathTimestamp(model, 'navigation.courseOverGroundTrue'),
+    readSignalKPathTimestamp(model, 'navigation.speedOverGround'),
+    readSignalKPathTimestamp(model, 'navigation.headingTrue'),
+    readSignalKPathTimestamp(model, 'navigation.headingMagnetic'),
+    readSignalKPathTimestamp(model, 'navigation.state'),
+  ].filter((value): value is number => value !== null)
+
+  return candidates.length ? Math.max(...candidates) : null
+}
+
+function filterFreshTrafficContacts(
+  contacts: AisContactSummary[],
+  nowMs: number,
+  staleMs: number = AIS_CONTACT_DISPLAY_STALE_MS,
+) {
+  return contacts.filter((contact) => nowMs - contact.lastUpdateAt <= staleMs)
 }
 
 function trafficContactKeys(contact: Pick<AisContactSummary, 'id' | 'mmsi'>) {
@@ -226,17 +302,6 @@ function mergeTrafficMetadata(
   }
 }
 
-function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const earthRadiusMeters = 6_371_000
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-
-  return (earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1852
-}
-
 async function resolveSignalKBaseUrlForVessel(event: H3Event, vesselId: string) {
   const db = useAppDatabase(event)
   const installation = await db
@@ -288,10 +353,10 @@ async function fetchSignalKTrafficCatalog(event: H3Event, vesselId: string) {
   }
 }
 
-function buildTrafficContactFromSignalKVessel(
+export function buildTrafficContactFromSignalKVessel(
   contextKey: string,
   rawValue: unknown,
-  observedAtMs: number,
+  fallbackObservedAtMs: number,
 ) {
   const identity = getSignalKContextIdentity(contextKey)
   if (!identity) {
@@ -303,6 +368,7 @@ function buildTrafficContactFromSignalKVessel(
   const position = extractSignalKPosition(positionValue)
   const lat = position.lat ?? asNumber(readSignalKPath(rawValue, 'navigation.position.latitude'))
   const lng = position.lng ?? asNumber(readSignalKPath(rawValue, 'navigation.position.longitude'))
+  const observedAtMs = resolveSignalKContactObservedAtMs(rawValue) ?? fallbackObservedAtMs
 
   return {
     id: identity.id,
@@ -389,14 +455,17 @@ async function fetchSignalKTrafficContacts(event: H3Event, vesselId: string) {
     return []
   }
 
-  const observedAtMs = Date.now()
+  const nowMs = Date.now()
 
-  return Object.entries(catalog)
-    .filter(([contextKey]) => contextKey !== 'self')
-    .map(([contextKey, rawValue]) =>
-      buildTrafficContactFromSignalKVessel(contextKey, rawValue, observedAtMs),
-    )
-    .filter((contact): contact is AisContactSummary => Boolean(contact))
+  return filterFreshTrafficContacts(
+    Object.entries(catalog)
+      .filter(([contextKey]) => contextKey !== 'self')
+      .map(([contextKey, rawValue]) =>
+        buildTrafficContactFromSignalKVessel(contextKey, rawValue, nowMs),
+      )
+      .filter((contact): contact is AisContactSummary => Boolean(contact)),
+    nowMs,
+  )
 }
 
 function mergeTrafficContactCollections(
@@ -511,9 +580,11 @@ export async function listNearbyTrafficContactsForVessel(
     brokerState?.contacts || [],
     signalKContacts,
   )
-  const aisHubMetadata = await fetchAisHubTrafficMetadata(event, combinedContacts)
+  const nowMs = Date.now()
+  const freshContacts = filterFreshTrafficContacts(combinedContacts, nowMs)
+  const aisHubMetadata = await fetchAisHubTrafficMetadata(event, freshContacts)
 
-  const mergedContacts = combinedContacts
+  const mergedContacts = freshContacts
     .map((contact) =>
       mergeTrafficMetadata(
         contact,

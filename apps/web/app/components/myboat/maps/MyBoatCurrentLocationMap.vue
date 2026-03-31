@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
-import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
+import type { AisVesselCategoryKey, MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
 import type { AisContactSummary, VesselCardSummary } from '~/types/myboat'
 import { mergeFeatureCollections } from './advanced-tools'
 import {
@@ -10,6 +10,7 @@ import {
   createAisPinElement,
   createAisPinFingerprint,
   createVesselPinElement,
+  filterAisPinsByHiddenCategories,
   routeOverlayStyle,
 } from './map-support'
 import { buildTrafficContactPath } from '~/utils/traffic'
@@ -47,6 +48,8 @@ const localTrafficEnabled = shallowRef(true)
 const showTrafficVectors = shallowRef(true)
 const trafficInitialized = shallowRef(false)
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
+const aisHiddenCategoryKeys = ref<AisVesselCategoryKey[]>([])
+const aisHiddenCategorySet = computed(() => new Set(aisHiddenCategoryKeys.value))
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
@@ -93,17 +96,20 @@ const fallbackCenter = computed(() => {
   return { lat: 29.3043, lng: -94.7977 }
 })
 
-const aisPins = computed(() =>
+const nearbyAisPinsRaw = computed(() =>
   buildNearbyAisPins({
     contacts: props.aisContacts || [],
     focusSnapshot: focusSnapshot.value,
     primaryVessel: primaryVessel.value,
   }),
 )
-const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
+const visibleAisPins = computed(() =>
+  filterAisPinsByHiddenCategories(nearbyAisPinsRaw.value, aisHiddenCategorySet.value),
+)
+const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(visibleAisPins.value))
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
 const selectedAisPin = computed(
-  () => aisPins.value.find((pin) => pin.id === selectedId.value) || null,
+  () => visibleAisPins.value.find((pin) => pin.id === selectedId.value) || null,
 )
 const selectedAisDetailPath = computed(() =>
   buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
@@ -127,17 +133,17 @@ function renderMapPin(item: unknown, isSelected: boolean) {
   return renderVesselPin(item as (typeof vesselPins.value)[number], isSelected)
 }
 
-function renderAisPin(item: (typeof aisPins.value)[number], isSelected: boolean) {
+function renderAisPin(item: (typeof visibleAisPins.value)[number], isSelected: boolean) {
   return createAisPinElement(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
-    pinCount: aisPins.value.length,
+    pinCount: visibleAisPins.value.length,
   })
 }
 
-function renderAisFingerprint(item: (typeof aisPins.value)[number], isSelected: boolean) {
+function renderAisFingerprint(item: (typeof visibleAisPins.value)[number], isSelected: boolean) {
   return createAisPinFingerprint(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
-    pinCount: aisPins.value.length,
+    pinCount: visibleAisPins.value.length,
   })
 }
 
@@ -191,9 +197,21 @@ watch(showTraffic, (enabled) => {
   }
 })
 
+watch(aisHiddenCategoryKeys, () => {
+  if (!selectedId.value?.startsWith('ais:')) {
+    return
+  }
+
+  if (visibleAisPins.value.some((pin) => pin.id === selectedId.value)) {
+    return
+  }
+
+  selectedId.value = null
+})
+
 useMarineAisOverlay({
   map: mapInstance,
-  pins: aisPins,
+  pins: visibleAisPins,
   enabled: computed(() => showTraffic.value && hasSignalKSource.value),
   selectedId,
   createPinElement: renderAisPin,
@@ -214,7 +232,7 @@ const toggleTrafficLabel = computed(() => {
 })
 
 const toggleTrafficColor = computed(() => (showTraffic.value ? 'primary' : 'neutral'))
-const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outline'))
+const toggleTrafficVariant = computed(() => (showTraffic.value ? 'solid' : 'outline'))
 </script>
 
 <template>
@@ -235,11 +253,12 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
       :bounding-padding="0.22"
       :height-class="heightClass"
       :map-style="mapStyle"
+      allow-fullscreen
       :shows-points-of-interest="true"
       @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
     >
-      <template #header>
+      <template #header="{ isFullscreen, toggleFullscreen }">
         <div class="border-b border-default/70 px-4 py-3 lg:hidden">
           <div class="flex flex-wrap gap-2">
             <UButton
@@ -250,6 +269,17 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
               @click="centerOnVessel"
             >
               Center vessel
+            </UButton>
+            <UButton
+              :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              title="Fill the browser viewport with the map"
+              aria-label="Fill the browser viewport with the map"
+              @click="toggleFullscreen"
+            >
+              {{ isFullscreen ? 'Exit full view' : 'Full view' }}
             </UButton>
             <UButton
               :color="toggleTrafficColor"
@@ -264,13 +294,18 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
             <UButton
               v-if="showTraffic"
               :color="showTrafficVectors ? 'primary' : 'neutral'"
-              :variant="showTrafficVectors ? 'soft' : 'outline'"
+              :variant="showTrafficVectors ? 'solid' : 'outline'"
               icon="i-lucide-navigation-2"
               size="xs"
               @click="showTrafficVectors = !showTrafficVectors"
             >
               Vectors
             </UButton>
+            <MyBoatAisVesselTypeFilterPopover
+              v-if="showTraffic && hasSignalKSource"
+              v-model:hidden-keys="aisHiddenCategoryKeys"
+              size="xs"
+            />
             <MyBoatMapAdvancedTools
               :capabilities="toolCapabilities"
               :can-show-heading-line="canShowHeadingLine"
@@ -292,7 +327,7 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
         </div>
       </template>
 
-      <template #overlay>
+      <template #overlay="{ isFullscreen, toggleFullscreen }">
         <div
           class="absolute right-4 top-4 hidden max-w-[calc(100%-2rem)] flex-wrap justify-end gap-2 lg:flex"
         >
@@ -307,6 +342,16 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
           </UButton>
           <UButton
             class="pointer-events-auto"
+            :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            title="Fill the browser viewport with the map"
+            aria-label="Fill the browser viewport with the map"
+            @click="toggleFullscreen"
+          />
+          <UButton
+            class="pointer-events-auto"
             :color="toggleTrafficColor"
             :variant="toggleTrafficVariant"
             icon="i-lucide-radar"
@@ -319,12 +364,17 @@ const toggleTrafficVariant = computed(() => (showTraffic.value ? 'soft' : 'outli
             v-if="showTraffic"
             class="pointer-events-auto"
             :color="showTrafficVectors ? 'primary' : 'neutral'"
-            :variant="showTrafficVectors ? 'soft' : 'outline'"
+            :variant="showTrafficVectors ? 'solid' : 'outline'"
             icon="i-lucide-navigation-2"
             @click="showTrafficVectors = !showTrafficVectors"
           >
             Vectors
           </UButton>
+          <MyBoatAisVesselTypeFilterPopover
+            v-if="showTraffic && hasSignalKSource"
+            v-model:hidden-keys="aisHiddenCategoryKeys"
+            size="sm"
+          />
           <MyBoatMapAdvancedTools
             :capabilities="toolCapabilities"
             :can-show-heading-line="canShowHeadingLine"

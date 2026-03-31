@@ -290,13 +290,14 @@ function handleRegionChange(region: {
           :fallback-center="{ lat: 29.3043, lng: -94.7977 }"
           height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
           :map-style="mapStyle"
+          allow-fullscreen
           :shows-points-of-interest="true"
           suppress-selection-zoom
           @map-click="handleToolMapClick"
           @map-ready="handleMapReady"
           @region-change="handleRegionChange"
         >
-          <template #overlay>
+          <template #overlay="{ isFullscreen, toggleFullscreen }">
             <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
               <UButton
                 class="pointer-events-auto"
@@ -308,6 +309,16 @@ function handleRegionChange(region: {
               >
                 Fit results
               </UButton>
+              <UButton
+                class="pointer-events-auto"
+                :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                title="Fill the browser viewport with the map"
+                aria-label="Fill the browser viewport with the map"
+                @click="toggleFullscreen"
+              />
               <MyBoatMapAdvancedTools
                 :capabilities="toolCapabilities"
                 :has-active-indicator="hasActiveIndicator"
@@ -325,7 +336,7 @@ function handleRegionChange(region: {
             </div>
           </template>
 
-          <template #footer>
+          <template #footer="{ isFullscreen, toggleFullscreen }">
             <div class="border-t border-default/70 px-4 py-3 lg:hidden">
               <div class="flex flex-wrap gap-2">
                 <UButton
@@ -336,6 +347,17 @@ function handleRegionChange(region: {
                   @click="fitResults"
                 >
                   Fit results
+                </UButton>
+                <UButton
+                  :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                  color="neutral"
+                  variant="soft"
+                  size="xs"
+                  title="Fill the browser viewport with the map"
+                  aria-label="Fill the browser viewport with the map"
+                  @click="toggleFullscreen"
+                >
+                  {{ isFullscreen ? 'Exit full view' : 'Full view' }}
                 </UButton>
                 <MyBoatMapAdvancedTools
                   :capabilities="toolCapabilities"

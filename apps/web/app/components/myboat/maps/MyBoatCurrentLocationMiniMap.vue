@@ -8,9 +8,12 @@ const props = withDefaults(
   defineProps<{
     vessel: VesselCardSummary | null
     heightClass?: string
+    /** When true, show controls to expand the chart to the full browser viewport. */
+    allowViewportFullscreen?: boolean
   }>(),
   {
     heightClass: 'h-[20rem] sm:h-[24rem] lg:h-[28rem]',
+    allowViewportFullscreen: true,
   },
 )
 
@@ -54,7 +57,39 @@ function renderMapPin(item: unknown, isSelected: boolean) {
     :zoom-span="{ lat: 0.018, lng: 0.022 }"
     :bounding-padding="0.22"
     :height-class="heightClass"
-  />
+    :allow-fullscreen="allowViewportFullscreen"
+  >
+    <template v-if="allowViewportFullscreen" #overlay="{ isFullscreen, toggleFullscreen }">
+      <div class="absolute right-3 top-3 z-20 hidden lg:block">
+        <UButton
+          class="pointer-events-auto"
+          :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+          color="neutral"
+          variant="soft"
+          size="sm"
+          title="Fill the browser viewport with the map"
+          aria-label="Fill the browser viewport with the map"
+          @click="toggleFullscreen"
+        />
+      </div>
+    </template>
+
+    <template v-if="allowViewportFullscreen" #footer="{ isFullscreen, toggleFullscreen }">
+      <div class="border-t border-default/70 px-3 py-2 lg:hidden">
+        <UButton
+          :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+          color="neutral"
+          variant="soft"
+          size="xs"
+          title="Fill the browser viewport with the map"
+          aria-label="Fill the browser viewport with the map"
+          @click="toggleFullscreen"
+        >
+          {{ isFullscreen ? 'Exit full view' : 'Full view' }}
+        </UButton>
+      </div>
+    </template>
+  </MyBoatMap>
 
   <AppEmptyState
     v-else

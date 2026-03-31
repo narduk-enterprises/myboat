@@ -311,7 +311,6 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         :show-pin-labels="false"
         :show-focus-panel="false"
         :show-layer-toggles="false"
-        :show-stats-rail="false"
         :show-advanced-tools="false"
         :default-traffic-vectors="false"
       />

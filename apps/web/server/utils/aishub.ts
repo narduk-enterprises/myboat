@@ -8,7 +8,7 @@ import {
   parseAisHubVesselsHtml,
 } from '../../shared/aishub'
 import { aishubRequestState, aishubSearchCache, aishubVessels } from '#server/database/app-schema'
-import { useAppDatabase } from '#server/utils/database'
+import { D1_MAX_BOUND_PARAMETERS_PER_QUERY, useAppDatabase } from '#server/utils/database'
 import { syncFollowedVesselsFromAisHubForMmsis } from '#server/utils/myboat'
 
 const AISHUB_API_URL = 'https://data.aishub.net/ws.php'
@@ -17,7 +17,7 @@ const AISHUB_GLOBAL_REQUEST_ID = 'global'
 const AISHUB_SEARCH_CACHE_TTL_MS = 10 * 60_000
 const AISHUB_LOCAL_SEARCH_LIMIT = 24
 const AISHUB_RESULT_LIMIT = 12
-const AISHUB_STORED_LOOKUP_BATCH_SIZE = 200
+const AISHUB_STORED_LOOKUP_BATCH_SIZE = D1_MAX_BOUND_PARAMETERS_PER_QUERY
 
 type AisHubSearchMode = AisHubSearchResult['matchMode']
 

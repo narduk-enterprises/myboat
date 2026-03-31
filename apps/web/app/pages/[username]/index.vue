@@ -10,19 +10,63 @@ const { data, error } = await usePublicProfile(username.value)
 watch(
   () => data.value,
   (nextProfile) => {
-    store.setActivePublicVessel(null)
-
     if (!nextProfile) {
+      store.setActivePublicVessel(null)
       return
     }
 
     store.hydratePublicProfile(nextProfile)
+    const primary = nextProfile.vessels.find((vessel) => vessel.isPrimary) ?? nextProfile.vessels[0]
+    if (primary) {
+      store.setActivePublicVessel(`${nextProfile.profile.username}/${primary.slug}`)
+    } else {
+      store.setActivePublicVessel(null)
+    }
   },
   { immediate: true },
 )
 
+onBeforeUnmount(() => {
+  store.setActivePublicVessel(null)
+})
+
 const profile = computed(() => data.value ?? null)
 const publicVessels = computed(() => store.getPublicProfileEntries(username.value))
+
+const trafficContextSlug = computed(() => {
+  const vessels = profile.value?.vessels ?? []
+  const primary = vessels.find((vessel) => vessel.isPrimary) ?? vessels[0]
+  return primary?.slug ?? ''
+})
+
+const trafficEntry = computed(() =>
+  trafficContextSlug.value ? store.getPublicEntry(username.value, trafficContextSlug.value) : null,
+)
+const rawAisContacts = computed(() => store.serializeAisContacts(trafficEntry.value))
+const { contacts: aisContacts } = usePublicEnrichedTrafficContacts(
+  username,
+  trafficContextSlug,
+  rawAisContacts,
+)
+
+const trafficMapEnabled = ref(true)
+usePublicNearbyTrafficHydrator(
+  username,
+  trafficContextSlug,
+  computed(() => trafficEntry.value?.key ?? null),
+  trafficMapEnabled,
+)
+
+useMyBoatLiveDemand({
+  namespace: 'public',
+  consumerId: 'public-profile-map',
+  demand: computed(() => ({
+    selfLevel: 'detail',
+    ais: trafficMapEnabled.value,
+  })),
+})
+
+const trafficLiveState = computed(() => trafficEntry.value?.live ?? null)
 
 useSeo({
   title: profile.value ? `@${profile.value.profile.username}` : 'Captain profile',
@@ -77,15 +121,23 @@ useWebPageSchema({
         </div>
       </section>
 
-      <MyBoatSurfaceMap
-        :vessels="publicVessels"
-        :passages="[]"
-        height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
-        :show-focus-panel="false"
-        :show-layer-toggles="false"
-        :show-stats-rail="false"
-        :show-pin-labels="false"
-      />
+      <div data-testid="public-profile-map">
+        <MyBoatSurfaceMap
+          :vessels="publicVessels"
+          :passages="[]"
+          height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
+          :show-focus-panel="false"
+          :show-layer-toggles="false"
+          :show-pin-labels="false"
+          :allow-traffic="Boolean(trafficContextSlug)"
+          v-model:traffic-enabled="trafficMapEnabled"
+          :ais-contacts="aisContacts"
+          :has-signal-k-source="Boolean(trafficLiveState?.hasSignalKSource)"
+          :live-connection-state="trafficLiveState?.connectionState ?? 'idle'"
+          :live-last-delta-at="trafficLiveState?.lastDeltaAt ?? null"
+          :show-ais-toggle="Boolean(trafficContextSlug)"
+        />
+      </div>
 
       <section
         data-testid="public-vessel-grid"

@@ -9,6 +9,7 @@ vi.mock('#server/database/app-schema', () => ({
 }))
 
 vi.mock('#server/utils/database', () => ({
+  D1_MAX_BOUND_PARAMETERS_PER_QUERY: 100,
   useAppDatabase: () => {
     throw new Error('Database access is not available in this unit test.')
   },
@@ -30,11 +31,13 @@ describe('AISHub stored lookup batching', () => {
 
     const batches = splitStoredAisHubMmsiBatches(rawMmsis)
 
-    expect(batches).toHaveLength(3)
-    expect(batches[0]).toHaveLength(200)
-    expect(batches[1]).toHaveLength(200)
-    expect(batches[2]).toHaveLength(5)
+    expect(batches).toHaveLength(5)
+    expect(batches[0]).toHaveLength(100)
+    expect(batches[1]).toHaveLength(100)
+    expect(batches[2]).toHaveLength(100)
+    expect(batches[3]).toHaveLength(100)
+    expect(batches[4]).toHaveLength(5)
     expect(batches[0]?.[0]).toBe('100000000')
-    expect(batches[2]?.[4]).toBe('100000404')
+    expect(batches[4]?.[4]).toBe('100000404')
   })
 })

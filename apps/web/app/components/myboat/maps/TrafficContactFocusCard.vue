@@ -1,13 +1,36 @@
 <script setup lang="ts">
 import type { TrafficContactDetailSummary } from '~/types/traffic'
 import { formatRelativeTime } from '~/utils/marine'
-import { formatTrafficContactDimensions, formatTrafficMovement } from '~/utils/traffic'
-import type { MyBoatAisPin } from './map-support'
-import { formatDistanceNm, getAisCategory } from './map-support'
+import {
+  formatTrafficContactDimensions,
+  formatTrafficMovement,
+  isTrafficMoving,
+} from '~/utils/traffic'
+import {
+  AIS_VECTOR_LOOKAHEAD_MINUTES,
+  type MyBoatAisPin,
+  formatDistanceNm,
+  getAisCategory,
+} from './map-support'
 
-const props = defineProps<{
-  contact: MyBoatAisPin | TrafficContactDetailSummary
-  detailPath?: string | null
+const props = withDefaults(
+  defineProps<{
+    contact: MyBoatAisPin | TrafficContactDetailSummary
+    detailPath?: string | null
+    /** COG prediction line is visible for this contact (global or per-vessel). */
+    vectorLineEnabled?: boolean
+    /** Show per-contact vector toggle (moving target with course). */
+    showVectorControls?: boolean
+  }>(),
+  {
+    detailPath: null,
+    vectorLineEnabled: false,
+    showVectorControls: true,
+  },
+)
+
+const emit = defineEmits<{
+  'toggle-vector': []
 }>()
 
 const category = computed(() => getAisCategory(props.contact.shipType, props.contact.sog))
@@ -19,6 +42,28 @@ const lastUpdatedLabel = computed(() =>
 )
 const movementLabel = computed(() => formatTrafficMovement(props.contact))
 const dimensionsLabel = computed(() => formatTrafficContactDimensions(props.contact))
+
+const canPlotCourseVector = computed(() => {
+  if (!isTrafficMoving(props.contact.sog)) {
+    return false
+  }
+
+  const course = props.contact.cog ?? props.contact.heading
+  return course !== null && course !== undefined
+})
+
+function openMarineTraffic() {
+  const mmsi = props.contact.mmsi?.trim()
+  if (!mmsi || !import.meta.client) {
+    return
+  }
+
+  window.open(
+    `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${encodeURIComponent(mmsi)}`,
+    '_blank',
+    'noopener,noreferrer',
+  )
+}
 </script>
 
 <template>
@@ -57,6 +102,45 @@ const dimensionsLabel = computed(() => formatTrafficContactDimensions(props.cont
       </p>
       <p>{{ dimensionsLabel }}</p>
       <p>Updated {{ lastUpdatedLabel }}</p>
+    </div>
+
+    <div
+      v-if="showVectorControls && canPlotCourseVector"
+      class="mt-4 flex flex-wrap gap-2 border-t border-default/60 pt-3"
+    >
+      <UButton
+        :color="vectorLineEnabled ? 'primary' : 'neutral'"
+        :variant="vectorLineEnabled ? 'soft' : 'outline'"
+        size="sm"
+        class="min-w-0 flex-1"
+        icon="i-lucide-navigation-2"
+        @click="emit('toggle-vector')"
+      >
+        {{ AIS_VECTOR_LOOKAHEAD_MINUTES }} min vector
+      </UButton>
+      <UButton
+        v-if="contact.mmsi"
+        color="neutral"
+        variant="outline"
+        size="sm"
+        class="min-w-0 flex-1"
+        icon="i-lucide-external-link"
+        @click="openMarineTraffic"
+      >
+        MarineTraffic
+      </UButton>
+    </div>
+
+    <div v-else-if="contact.mmsi" class="mt-4 flex flex-wrap gap-2 border-t border-default/60 pt-3">
+      <UButton
+        color="neutral"
+        variant="outline"
+        size="sm"
+        icon="i-lucide-external-link"
+        @click="openMarineTraffic"
+      >
+        MarineTraffic
+      </UButton>
     </div>
 
     <div v-if="detailPath" class="mt-4 flex flex-wrap gap-2">

@@ -9,11 +9,33 @@ import type {
 } from '~/types/myboat'
 import { buildTrackFeatureCollection } from '~/utils/marine'
 import { isTrafficMoving, speedMetersPerSecondToKnots } from '~/utils/traffic'
+import { AIS_NEARBY_RADIUS_NM, haversineNm } from '../../../../shared/myboatLive'
+
+export { AIS_NEARBY_RADIUS_NM, haversineNm }
 
 export interface MyBoatMapHandle {
   setRegion: (center: { lat: number; lng: number }, span?: { lat: number; lng: number }) => void
   zoomToFit: (zoomOutLevels?: number) => void
   getMap: () => MapKitMapSurface | null
+  clearRememberedView?: () => void
+  toggleFullscreen?: () => void
+  isFullscreen?: () => boolean
+}
+
+export interface MyBoatMapSelectionDetail {
+  id: string
+  pinKind: MyBoatPin['pinKind']
+  title: string
+  description?: string | null
+  meta?: string | null
+  timestamp?: string | null
+  imageUrl?: string | null
+  lat?: number | null
+  lng?: number | null
+  sog?: number | null
+  heading?: number | null
+  mmsi?: string | null
+  destination?: string | null
 }
 
 export interface MyBoatMapInstallation {
@@ -107,7 +129,6 @@ export interface MyBoatAisPin {
 export type MyBoatSurfacePin = MyBoatVesselPin | MyBoatWaypointPin | MyBoatMediaPin
 export type MyBoatPin = MyBoatSurfacePin | MyBoatAisPin
 
-export const AIS_NEARBY_RADIUS_NM = 24
 export const AIS_VECTOR_LOOKAHEAD_MINUTES = 12
 export const AIS_VECTOR_MIN_DISTANCE_NM = 0.12
 export const AIS_VECTOR_MAX_DISTANCE_NM = 2.2
@@ -256,17 +277,6 @@ export function buildPassageFeatureCollection(passages: PassageSummary[]) {
   return buildTrackFeatureCollection(passages) as MyBoatMapGeoJsonFeatureCollection
 }
 
-export function haversineNm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const earthRadiusMeters = 6_371_000
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-
-  return (earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1852
-}
-
 function projectPoint(lat: number, lng: number, bearingDeg: number, distanceNm: number) {
   const earthRadiusNm = 3440.065
   const angularDistance = distanceNm / earthRadiusNm
@@ -289,56 +299,67 @@ function projectPoint(lat: number, lng: number, bearingDeg: number, distanceNm: 
   return [(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI] as const
 }
 
-export function buildAisVectorFeatureCollection(pins: MyBoatAisPin[]) {
-  const features = pins
-    .filter((pin) => isTrafficMoving(pin.sog))
-    .map((pin) => {
-      const speedOverGround = speedMetersPerSecondToKnots(pin.sog)
-      const course = pin.cog ?? pin.heading
-      if (
-        course === null ||
-        course === undefined ||
-        speedOverGround === null ||
-        speedOverGround === undefined
-      ) {
-        return null
-      }
+export interface BuildAisVectorOptions {
+  /** When true, render a COG vector for every moving AIS pin (global “Vectors” toggle). */
+  showAllMoving?: boolean
+  /** Contact IDs that keep a vector when `showAllMoving` is false (per-vessel toggle). */
+  contactIds?: ReadonlySet<string>
+}
 
-      const projectedDistanceNm = Math.min(
-        AIS_VECTOR_MAX_DISTANCE_NM,
-        Math.max(AIS_VECTOR_MIN_DISTANCE_NM, speedOverGround * (AIS_VECTOR_LOOKAHEAD_MINUTES / 60)),
-      )
-      const projectedPoint = projectPoint(pin.lat, pin.lng, course, projectedDistanceNm)
+export function buildAisVectorFeatureCollection(
+  pins: MyBoatAisPin[],
+  options?: BuildAisVectorOptions,
+) {
+  const showAllMoving = options?.showAllMoving ?? true
+  const contactIds = options?.contactIds
 
-      return {
-        type: 'Feature' as const,
-        properties: {
-          featureKind: 'ais-vector',
-          danger: pin.distanceNm <= 1.5,
-          shipType: pin.shipType,
-        },
-        geometry: {
-          type: 'LineString' as const,
-          coordinates: [[pin.lng, pin.lat], projectedPoint],
-        },
-      }
-    })
-    .filter(
-      (
-        feature,
-      ): feature is {
-        type: 'Feature'
-        properties: {
-          featureKind: string
-          danger: boolean
-          shipType: number | null
-        }
-        geometry: {
-          type: 'LineString'
-          coordinates: Array<number[] | readonly [number, number]>
-        }
-      } => feature !== null,
+  const candidatePins = pins.filter((pin) => {
+    if (!isTrafficMoving(pin.sog)) {
+      return false
+    }
+
+    if (showAllMoving) {
+      return true
+    }
+
+    return contactIds?.has(pin.contactId) ?? false
+  })
+
+  const features: MyBoatMapGeoJsonFeature[] = []
+
+  for (const pin of candidatePins) {
+    const speedOverGround = speedMetersPerSecondToKnots(pin.sog)
+    const course = pin.cog ?? pin.heading
+    if (
+      course === null ||
+      course === undefined ||
+      speedOverGround === null ||
+      speedOverGround === undefined
+    ) {
+      continue
+    }
+
+    const projectedDistanceNm = Math.min(
+      AIS_VECTOR_MAX_DISTANCE_NM,
+      Math.max(AIS_VECTOR_MIN_DISTANCE_NM, speedOverGround * (AIS_VECTOR_LOOKAHEAD_MINUTES / 60)),
     )
+    const projectedPoint = projectPoint(pin.lat, pin.lng, course, projectedDistanceNm)
+
+    features.push({
+      type: 'Feature',
+      properties: {
+        featureKind: 'ais-vector',
+        danger: pin.distanceNm <= 1.5,
+        shipType: pin.shipType,
+        aisContactId: pin.contactId,
+        aisPinId: pin.id,
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [[pin.lng, pin.lat], projectedPoint],
+      },
+    })
+  }
 
   return {
     type: 'FeatureCollection' as const,
@@ -454,88 +475,158 @@ export function aisDisplayName(contact: AisContactSummary) {
   return contact.id.slice(0, 18)
 }
 
-export function getAisCategory(shipType: number | null, sog: number | null) {
+export type AisVesselCategoryKey =
+  | 'fishing'
+  | 'tow'
+  | 'sail'
+  | 'pleasure'
+  | 'passenger'
+  | 'cargo'
+  | 'tanker'
+  | 'military'
+  | 'service'
+  | 'transit'
+  | 'holding'
+
+export type AisVesselCategoryShape =
+  | 'trawler'
+  | 'tow'
+  | 'sail'
+  | 'yacht'
+  | 'ferry'
+  | 'cargo'
+  | 'tanker'
+  | 'naval'
+  | 'utility'
+  | 'generic'
+
+export interface AisVesselCategory {
+  key: AisVesselCategoryKey
+  label: string
+  color: string
+  fill: string
+  shape: AisVesselCategoryShape
+}
+
+/** Ordered labels for the AIS vessel-type filter in map overlays. */
+export const AIS_VESSEL_CATEGORY_FILTER_OPTIONS: { key: AisVesselCategoryKey; label: string }[] = [
+  { key: 'pleasure', label: 'Pleasure craft' },
+  { key: 'sail', label: 'Sailing' },
+  { key: 'fishing', label: 'Fishing' },
+  { key: 'passenger', label: 'Passenger' },
+  { key: 'cargo', label: 'Cargo' },
+  { key: 'tanker', label: 'Tanker' },
+  { key: 'tow', label: 'Tow / tug' },
+  { key: 'service', label: 'Service' },
+  { key: 'military', label: 'Military' },
+  { key: 'transit', label: 'Transit (unknown, moving)' },
+  { key: 'holding', label: 'Holding (unknown, idle)' },
+]
+
+export function filterAisPinsByHiddenCategories(
+  pins: MyBoatAisPin[],
+  hidden: ReadonlySet<AisVesselCategoryKey>,
+): MyBoatAisPin[] {
+  if (hidden.size === 0) {
+    return pins
+  }
+
+  return pins.filter((pin) => !hidden.has(getAisCategory(pin.shipType, pin.sog).key))
+}
+
+export function getAisCategory(shipType: number | null, sog: number | null): AisVesselCategory {
   if (shipType === 30)
     return {
+      key: 'fishing',
       label: 'Fishing',
       color: 'rgb(14 165 233)',
       fill: 'rgb(224 242 254)',
-      shape: 'trawler' as const,
+      shape: 'trawler',
     }
   if (shipType !== null && shipType >= 31 && shipType <= 33) {
     return {
+      key: 'tow',
       label: 'Tow',
       color: 'rgb(245 158 11)',
       fill: 'rgb(254 243 199)',
-      shape: 'tow' as const,
+      shape: 'tow',
     }
   }
   if (shipType === 36)
     return {
+      key: 'sail',
       label: 'Sail',
       color: 'rgb(6 182 212)',
       fill: 'rgb(207 250 254)',
-      shape: 'sail' as const,
+      shape: 'sail',
     }
   if (shipType === 37)
     return {
+      key: 'pleasure',
       label: 'Pleasure',
       color: 'rgb(236 72 153)',
       fill: 'rgb(252 231 243)',
-      shape: 'yacht' as const,
+      shape: 'yacht',
     }
   if (shipType !== null && shipType >= 60 && shipType <= 69) {
     return {
+      key: 'passenger',
       label: 'Passenger',
       color: 'rgb(59 130 246)',
       fill: 'rgb(219 234 254)',
-      shape: 'ferry' as const,
+      shape: 'ferry',
     }
   }
   if (shipType !== null && shipType >= 70 && shipType <= 79) {
     return {
+      key: 'cargo',
       label: 'Cargo',
       color: 'rgb(132 204 22)',
       fill: 'rgb(236 252 203)',
-      shape: 'cargo' as const,
+      shape: 'cargo',
     }
   }
   if (shipType !== null && shipType >= 80 && shipType <= 89) {
     return {
+      key: 'tanker',
       label: 'Tanker',
       color: 'rgb(239 68 68)',
       fill: 'rgb(254 226 226)',
-      shape: 'tanker' as const,
+      shape: 'tanker',
     }
   }
   if (shipType === 35)
     return {
+      key: 'military',
       label: 'Military',
       color: 'rgb(15 23 42)',
       fill: 'rgb(226 232 240)',
-      shape: 'naval' as const,
+      shape: 'naval',
     }
   if (shipType !== null && shipType >= 40 && shipType <= 55) {
     return {
+      key: 'service',
       label: 'Service',
       color: 'rgb(249 115 22)',
       fill: 'rgb(255 237 213)',
-      shape: 'utility' as const,
+      shape: 'utility',
     }
   }
 
   return isTrafficMoving(sog)
     ? {
+        key: 'transit',
         label: 'Transit',
         color: 'rgb(99 102 241)',
         fill: 'rgb(224 231 255)',
-        shape: 'utility' as const,
+        shape: 'utility',
       }
     : {
+        key: 'holding',
         label: 'Holding',
         color: 'rgb(100 116 139)',
         fill: 'rgb(226 232 240)',
-        shape: 'generic' as const,
+        shape: 'generic',
       }
 }
 
@@ -562,7 +653,7 @@ export function createVesselPinElement(
 ) {
   const shell = document.createElement('div')
   shell.style.cssText =
-    'display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;pointer-events:none;'
+    'display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;pointer-events:auto;'
 
   const marker = document.createElement('div')
   marker.style.cssText = [

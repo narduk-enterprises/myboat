@@ -1,3 +1,5 @@
+import type { MaybeRefOrGetter } from 'vue'
+
 import type {
   AisHubSearchResponse,
   AisHubSearchResult,
@@ -40,6 +42,32 @@ export function usePublicVesselDetail(username: string, vesselSlug: string) {
   return useFetch<PublicVesselDetailResponse>(`/api/public/${username}/${vesselSlug}`, {
     key: `myboat-public-vessel-${username}-${vesselSlug}`,
   })
+}
+
+/**
+ * Public vessel detail that tracks reactive username/slug (no request until slug is set).
+ * Implemented with useAsyncData so the lazy URL shape stays type-safe (useFetch refs disallow null).
+ */
+export function useReactivePublicVesselDetail(
+  username: MaybeRefOrGetter<string>,
+  vesselSlug: MaybeRefOrGetter<string | null | undefined>,
+) {
+  return useAsyncData<PublicVesselDetailResponse | null>(
+    'myboat-reactive-public-vessel-detail',
+    async () => {
+      const u = toValue(username)
+      const s = toValue(vesselSlug)
+      if (!u || !s) {
+        return null
+      }
+
+      return await $fetch<PublicVesselDetailResponse>(`/api/public/${u}/${s}`)
+    },
+    {
+      watch: [() => toValue(username), () => toValue(vesselSlug)],
+      immediate: true,
+    },
+  )
 }
 
 const PUBLIC_VESSEL_REFRESH_MS = 10_000

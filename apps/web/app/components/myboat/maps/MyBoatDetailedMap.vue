@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { h, render } from 'vue'
 import type { MapKitMapSurface } from '~/composables/useMarineAisOverlay'
 import type {
   AisContactSummary,
@@ -8,10 +9,16 @@ import type {
   WaypointSummary,
 } from '~/types/myboat'
 import { formatRelativeTime, formatTimestamp } from '~/utils/marine'
-import { buildTrafficContactPath, formatTrafficSpeed } from '~/utils/traffic'
-import type { MyBoatMapHandle, MyBoatMapInstallation } from './map-support'
+import { buildTrafficContactPath } from '~/utils/traffic'
 import { mergeFeatureCollections, type MyBoatMapToolsProfile } from './advanced-tools'
+import TrafficContactFocusCard from './TrafficContactFocusCard.vue'
 import {
+  type AisVesselCategoryKey,
+  type MyBoatAisPin,
+  type MyBoatMapGeoJsonFeature,
+  type MyBoatMapHandle,
+  type MyBoatMapInstallation,
+  type MyBoatMapSelectionDetail,
   buildAisVectorFeatureCollection,
   buildNearbyAisPins,
   buildMediaPins,
@@ -23,6 +30,7 @@ import {
   createMediaPinElement,
   createVesselPinElement,
   createWaypointPinElement,
+  filterAisPinsByHiddenCategories,
   formatDistanceNm,
   getAisCategory,
   routeOverlayStyle,
@@ -48,8 +56,10 @@ const props = withDefaults(
     persistKey?: string | null
     showFocusPanel?: boolean
     showLayerToggles?: boolean
+    showRoutes?: boolean
+    showWaypointsLayer?: boolean
+    showMediaLayer?: boolean
     showPinLabels?: boolean
-    showStatsRail?: boolean
     showAdvancedTools?: boolean
     /** When false, AIS vector overlay stays off until toggles are shown again */
     defaultTrafficVectors?: boolean
@@ -71,8 +81,10 @@ const props = withDefaults(
     persistKey: null,
     showFocusPanel: true,
     showLayerToggles: true,
+    showRoutes: undefined,
+    showWaypointsLayer: undefined,
+    showMediaLayer: undefined,
     showPinLabels: true,
-    showStatsRail: true,
     showAdvancedTools: true,
     defaultTrafficVectors: true,
     autoFitKey: null,
@@ -80,16 +92,24 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  'selection-change': [value: MyBoatMapSelectionDetail | null]
+  'update:showMediaLayer': [value: boolean]
+  'update:showRoutes': [value: boolean]
+  'update:showWaypointsLayer': [value: boolean]
   'update:trafficEnabled': [value: boolean]
 }>()
 
 const mapRef = useTemplateRef<MyBoatMapHandle>('mapRoot')
 const selectedId = shallowRef<string | null>(null)
-const showRoutes = shallowRef(true)
-const showWaypoints = shallowRef(true)
-const showMedia = shallowRef(true)
+const localShowRoutes = shallowRef(true)
+const localShowWaypoints = shallowRef(true)
+const localShowMedia = shallowRef(true)
 const localTrafficEnabled = shallowRef(true)
 const showTrafficVectors = shallowRef(props.defaultTrafficVectors)
+/** Per-contact COG lines when global vectors are off (Tideye-style). */
+const aisPerContactVectorIds = shallowRef<Set<string>>(new Set())
+const aisHiddenCategoryKeys = ref<AisVesselCategoryKey[]>([])
+const aisHiddenCategorySet = computed(() => new Set(aisHiddenCategoryKeys.value))
 const trafficInitialized = shallowRef(false)
 const isCompactViewport = useCompactViewport()
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
@@ -156,6 +176,27 @@ const {
 const vesselPins = computed(() => (props.vessel ? buildVesselPins([props.vessel]) : []))
 const waypointPins = computed(() => buildWaypointPins(props.waypoints))
 const mediaPins = computed(() => buildMediaPins(props.media))
+const showRoutes = computed({
+  get: () => props.showRoutes ?? localShowRoutes.value,
+  set: (value: boolean) => {
+    localShowRoutes.value = value
+    emit('update:showRoutes', value)
+  },
+})
+const showWaypoints = computed({
+  get: () => props.showWaypointsLayer ?? localShowWaypoints.value,
+  set: (value: boolean) => {
+    localShowWaypoints.value = value
+    emit('update:showWaypointsLayer', value)
+  },
+})
+const showMedia = computed({
+  get: () => props.showMediaLayer ?? localShowMedia.value,
+  set: (value: boolean) => {
+    localShowMedia.value = value
+    emit('update:showMediaLayer', value)
+  },
+})
 const showTraffic = computed({
   get: () => props.trafficEnabled ?? localTrafficEnabled.value,
   set: (value: boolean) => {
@@ -163,12 +204,15 @@ const showTraffic = computed({
     emit('update:trafficEnabled', value)
   },
 })
-const aisPins = computed(() =>
+const nearbyAisPinsRaw = computed(() =>
   buildNearbyAisPins({
     contacts: props.aisContacts || [],
     focusSnapshot: focusSnapshot.value,
     primaryVessel: primaryVessel.value,
   }),
+)
+const visibleAisPins = computed(() =>
+  filterAisPinsByHiddenCategories(nearbyAisPinsRaw.value, aisHiddenCategorySet.value),
 )
 const connectionState = computed(() => props.liveConnectionState || 'idle')
 const hasSignalKSource = computed(() => Boolean(props.hasSignalKSource))
@@ -180,15 +224,26 @@ const mapItems = computed(() => [
   ...(showMedia.value ? mediaPins.value : []),
 ])
 const baseGeojson = computed(() => buildPassageFeatureCollection(props.passages))
-const trafficVectorGeojson = computed(() => buildAisVectorFeatureCollection(aisPins.value))
+const showAnyAisVector = computed(
+  () => showTraffic.value && (showTrafficVectors.value || aisPerContactVectorIds.value.size > 0),
+)
+const trafficVectorGeojson = computed(() =>
+  buildAisVectorFeatureCollection(visibleAisPins.value, {
+    showAllMoving: showTrafficVectors.value,
+    contactIds: aisPerContactVectorIds.value,
+  }),
+)
 const geojson = computed(() =>
   mergeFeatureCollections(
     showRoutes.value ? baseGeojson.value : null,
-    showTraffic.value && showTrafficVectors.value ? trafficVectorGeojson.value : null,
+    showAnyAisVector.value ? trafficVectorGeojson.value : null,
     toolGeojson.value,
   ),
 )
-const allPins = computed(() => [...mapItems.value, ...(showTraffic.value ? aisPins.value : [])])
+const allPins = computed(() => [
+  ...mapItems.value,
+  ...(showTraffic.value ? visibleAisPins.value : []),
+])
 const hasMapData = computed(
   () =>
     mapItems.value.length > 0 ||
@@ -216,6 +271,116 @@ const selectedMediaPin = computed(() => {
 const selectedAisDetailPath = computed(() =>
   buildTrafficContactPath(props.trafficDetailBasePath, selectedAisPin.value?.contactId),
 )
+const selectedAisVectorLineEnabled = computed(() => {
+  const pin = selectedAisPin.value
+  if (!pin) {
+    return false
+  }
+
+  return showTrafficVectors.value || aisPerContactVectorIds.value.has(pin.contactId)
+})
+const selectedMapSelection = computed<MyBoatMapSelectionDetail | null>(() => {
+  if (selectedMediaPin.value) {
+    return {
+      id: selectedMediaPin.value.id,
+      pinKind: 'media',
+      title: selectedMediaPin.value.title,
+      description: selectedMediaPin.value.caption,
+      meta: selectedMediaPin.value.sharePublic ? 'Public photo' : 'Owner-only photo',
+      timestamp: selectedMediaPin.value.capturedAt,
+      imageUrl: selectedMediaPin.value.imageUrl,
+      lat: selectedMediaPin.value.lat,
+      lng: selectedMediaPin.value.lng,
+    }
+  }
+
+  if (selectedPin.value?.pinKind === 'waypoint') {
+    return {
+      id: selectedPin.value.id,
+      pinKind: 'waypoint',
+      title: selectedPin.value.title,
+      description: selectedPin.value.kind.replaceAll('_', ' '),
+      meta: selectedPin.value.visitedAt ? 'Waypoint logged' : null,
+      timestamp: selectedPin.value.visitedAt,
+      lat: selectedPin.value.lat,
+      lng: selectedPin.value.lng,
+    }
+  }
+
+  if (selectedAisPin.value) {
+    return {
+      id: selectedAisPin.value.id,
+      pinKind: 'ais',
+      title: selectedAisPin.value.title,
+      description: selectedAisPin.value.navState,
+      meta: selectedAisPin.value.callSign || selectedAisPin.value.destination,
+      timestamp: new Date(selectedAisPin.value.lastUpdateAt).toISOString(),
+      lat: selectedAisPin.value.lat,
+      lng: selectedAisPin.value.lng,
+      sog: selectedAisPin.value.sog,
+      heading: selectedAisPin.value.heading,
+      mmsi: selectedAisPin.value.mmsi,
+      destination: selectedAisPin.value.destination,
+    }
+  }
+
+  return null
+})
+
+function isAisVectorEnabled(contactId: string) {
+  return showTrafficVectors.value || aisPerContactVectorIds.value.has(contactId)
+}
+
+function toggleAisPerContactVector(contactId: string) {
+  const next = new Set(aisPerContactVectorIds.value)
+  if (next.has(contactId)) {
+    next.delete(contactId)
+  } else {
+    next.add(contactId)
+  }
+
+  aisPerContactVectorIds.value = next
+}
+
+function toggleSelectedAisPerContactVector() {
+  const id = selectedAisPin.value?.contactId
+  if (!id) {
+    return
+  }
+
+  toggleAisPerContactVector(id)
+}
+
+function createTrafficCalloutElement(pin: MyBoatAisPin) {
+  const container = document.createElement('div')
+  render(
+    h(TrafficContactFocusCard, {
+      contact: pin,
+      detailPath: buildTrafficContactPath(props.trafficDetailBasePath, pin.contactId),
+      vectorLineEnabled: isAisVectorEnabled(pin.contactId),
+      showVectorControls: showTraffic.value,
+      onToggleVector: () => toggleAisPerContactVector(pin.contactId),
+    }),
+    container,
+  )
+
+  return {
+    element: container,
+    cleanup: () => render(null, container),
+  }
+}
+
+function handleMapFeatureSelect(feature: MyBoatMapGeoJsonFeature) {
+  const properties = feature.properties
+  if (properties.featureKind !== 'ais-vector') {
+    return
+  }
+
+  const pinId = typeof properties.aisPinId === 'string' ? properties.aisPinId : null
+  const contactId = typeof properties.aisContactId === 'string' ? properties.aisContactId : null
+  selectedId.value = pinId ?? (contactId ? `ais:${contactId}` : null)
+}
+
 const focusVessel = computed(() => selectedVessel.value || primaryVessel.value)
 
 const showsDenseLabels = computed(() => mapItems.value.length <= 3)
@@ -259,7 +424,9 @@ const trafficStatus = computed(() => {
 
   switch (connectionState.value) {
     case 'connected':
-      return aisPins.value.length ? `${aisPins.value.length} nearby` : 'No contacts nearby'
+      return visibleAisPins.value.length
+        ? `${visibleAisPins.value.length} nearby`
+        : 'No contacts nearby'
     case 'connecting':
       return 'Connecting'
     case 'error':
@@ -365,95 +532,6 @@ const focusPanelMeta = computed(() => {
   return trafficStatus.value
 })
 
-const stats = computed(() => {
-  if (selectedMediaPin.value) {
-    return [
-      {
-        label: 'Captured',
-        value: selectedMediaPin.value.capturedAt
-          ? formatRelativeTime(selectedMediaPin.value.capturedAt)
-          : '--',
-      },
-      {
-        label: 'Visibility',
-        value: selectedMediaPin.value.sharePublic ? 'Public' : 'Owner only',
-      },
-      {
-        label: 'Type',
-        value: selectedMediaPin.value.isCover ? 'Cover photo' : 'Photo',
-      },
-      {
-        label: 'Position',
-        value: `${selectedMediaPin.value.lat.toFixed(3)}, ${selectedMediaPin.value.lng.toFixed(3)}`,
-      },
-    ]
-  }
-
-  if (selectedAisPin.value) {
-    return [
-      {
-        label: 'Observed',
-        value: formatRelativeTime(new Date(selectedAisPin.value.lastUpdateAt).toISOString()),
-      },
-      {
-        label: 'Range',
-        value: formatDistanceNm(selectedAisPin.value.distanceNm),
-      },
-      {
-        label: 'SOG',
-        value:
-          selectedAisPin.value.sog === null || selectedAisPin.value.sog === undefined
-            ? '--'
-            : formatTrafficSpeed(selectedAisPin.value.sog),
-      },
-      {
-        label: 'Heading',
-        value:
-          selectedAisPin.value.heading === null || selectedAisPin.value.heading === undefined
-            ? '--'
-            : `${Math.round(selectedAisPin.value.heading)}°`,
-      },
-    ]
-  }
-
-  if (focusVessel.value && focusSnapshot.value) {
-    return [
-      {
-        label: 'Observed',
-        value: formatRelativeTime(focusSnapshot.value.observedAt),
-      },
-      {
-        label: 'SOG',
-        value:
-          focusSnapshot.value.speedOverGround === null ||
-          focusSnapshot.value.speedOverGround === undefined
-            ? '--'
-            : formatTrafficSpeed(focusSnapshot.value.speedOverGround),
-      },
-      {
-        label: 'Heading',
-        value:
-          focusSnapshot.value.headingMagnetic === null ||
-          focusSnapshot.value.headingMagnetic === undefined
-            ? '--'
-            : `${Math.round(focusSnapshot.value.headingMagnetic)}°`,
-      },
-      {
-        label: 'Traffic',
-        value: trafficStatus.value,
-      },
-    ]
-  }
-
-  return [
-    { label: 'Routes', value: String(baseGeojson.value.features.length) },
-    { label: 'Waypoints', value: String(waypointPins.value.length) },
-    { label: 'Photos', value: String(mediaPins.value.length) },
-    { label: 'Traffic', value: trafficStatus.value },
-    { label: 'AIS', value: String(aisPins.value.length) },
-  ]
-})
-
 function renderVesselPin(item: (typeof vesselPins.value)[number], isSelected: boolean) {
   return createVesselPinElement(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
@@ -476,19 +554,19 @@ function renderMediaPin(item: (typeof mediaPins.value)[number], isSelected: bool
   })
 }
 
-function renderAisPin(item: (typeof aisPins.value)[number], isSelected: boolean) {
+function renderAisPin(item: (typeof visibleAisPins.value)[number], isSelected: boolean) {
   return createAisPinElement(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
-    pinCount: aisPins.value.length,
+    pinCount: visibleAisPins.value.length,
     showLabel: props.showPinLabels,
     displayScale: aisPinDisplayScale.value,
   })
 }
 
-function renderAisFingerprint(item: (typeof aisPins.value)[number], isSelected: boolean) {
+function renderAisFingerprint(item: (typeof visibleAisPins.value)[number], isSelected: boolean) {
   return createAisPinFingerprint(item, isSelected, {
     isCompactViewport: isCompactViewport.value,
-    pinCount: aisPins.value.length,
+    pinCount: visibleAisPins.value.length,
     showLabel: props.showPinLabels,
   })
 }
@@ -545,6 +623,7 @@ watch(
     if (!available) {
       showTraffic.value = false
       showTrafficVectors.value = false
+      aisPerContactVectorIds.value = new Set()
     }
   },
   { immediate: true },
@@ -553,10 +632,19 @@ watch(
 watch(showTraffic, (enabled) => {
   if (!enabled) {
     showTrafficVectors.value = false
+    aisPerContactVectorIds.value = new Set()
   }
 })
 
-watch([showWaypoints, showMedia, showTraffic], () => {
+watch(
+  selectedMapSelection,
+  (value) => {
+    emit('selection-change', value)
+  },
+  { immediate: true },
+)
+
+watch([showWaypoints, showMedia, showTraffic, aisHiddenCategoryKeys], () => {
   if (!selectedId.value) return
   if (allPins.value.some((item) => item.id === selectedId.value)) return
   selectedId.value = null
@@ -576,10 +664,11 @@ watch(
 
 useMarineAisOverlay({
   map: mapInstance,
-  pins: aisPins,
+  pins: visibleAisPins,
   enabled: computed(() => showTraffic.value && hasSignalKSource.value),
   selectedId,
   createPinElement: renderAisPin,
+  createCalloutElement: createTrafficCalloutElement,
   renderFingerprint: renderAisFingerprint,
   renderKey: computed(() => (isCompactViewport.value ? 'compact' : 'full')),
   annotationSize: aisAnnotationSize,
@@ -591,6 +680,14 @@ onBeforeUnmount(() => {
   }
 
   mapInstance.value = null
+})
+
+defineExpose({
+  clearRememberedView: () => mapRef.value?.clearRememberedView?.(),
+  centerOnVessel,
+  isFullscreen: () => mapRef.value?.isFullscreen?.() ?? false,
+  toggleFullscreen: () => mapRef.value?.toggleFullscreen?.(),
+  zoomToFit: (zoomOutLevels = 0) => mapRef.value?.zoomToFit(zoomOutLevels),
 })
 </script>
 
@@ -620,6 +717,7 @@ onBeforeUnmount(() => {
       @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
       @region-change="handleMapRegionChange"
+      @feature-select="handleMapFeatureSelect"
     >
       <template
         #header="{ clearRememberedView, fitToContent, isFullscreen, savedRegion, toggleFullscreen }"
@@ -647,6 +745,9 @@ onBeforeUnmount(() => {
             v-if="selectedAisPin"
             :contact="selectedAisPin"
             :detail-path="selectedAisDetailPath"
+            :vector-line-enabled="selectedAisVectorLineEnabled"
+            :show-vector-controls="showTraffic"
+            @toggle-vector="toggleSelectedAisPerContactVector"
           />
 
           <div class="flex flex-wrap gap-2">
@@ -683,9 +784,11 @@ onBeforeUnmount(() => {
               color="neutral"
               variant="soft"
               size="xs"
+              title="Fill the browser viewport with the map"
+              aria-label="Fill the browser viewport with the map"
               @click="toggleFullscreen"
             >
-              {{ isFullscreen ? 'Exit full screen' : 'Full screen' }}
+              {{ isFullscreen ? 'Exit full view' : 'Full view' }}
             </UButton>
             <MyBoatMapAdvancedTools
               v-if="showAdvancedTools"
@@ -738,10 +841,6 @@ onBeforeUnmount(() => {
           <p v-if="focusPanelMeta" class="mt-3 text-xs text-muted">{{ focusPanelMeta }}</p>
         </div>
 
-        <div v-if="selectedAisPin" class="absolute bottom-24 left-4 hidden max-w-[20rem] lg:block">
-          <TrafficContactFocusCard :contact="selectedAisPin" :detail-path="selectedAisDetailPath" />
-        </div>
-
         <div class="absolute right-4 top-4 hidden flex-wrap justify-end gap-2 lg:flex">
           <UButton
             class="pointer-events-auto"
@@ -769,9 +868,14 @@ onBeforeUnmount(() => {
             color="neutral"
             variant="soft"
             size="sm"
-            title="Toggle fullscreen map"
-            aria-label="Toggle fullscreen map"
+            title="Fill the browser viewport with the map"
+            aria-label="Fill the browser viewport with the map"
             @click="toggleFullscreen"
+          />
+          <MyBoatAisVesselTypeFilterPopover
+            v-if="showTraffic && hasSignalKSource"
+            v-model:hidden-keys="aisHiddenCategoryKeys"
+            size="sm"
           />
           <MyBoatMapAdvancedTools
             v-if="showAdvancedTools"
@@ -795,15 +899,15 @@ onBeforeUnmount(() => {
         </div>
 
         <div
-          v-if="showLayerToggles || showStatsRail"
+          v-if="showLayerToggles"
           class="absolute inset-x-4 bottom-4 hidden items-end justify-between gap-3 lg:flex"
         >
-          <div v-if="showLayerToggles" class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2">
             <UButton
               class="pointer-events-auto"
               icon="i-lucide-route"
-              :color="showRoutes ? 'primary' : 'neutral'"
-              :variant="showRoutes ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showRoutes ? 'solid' : 'outline'"
               size="xs"
               @click="showRoutes = !showRoutes"
             >
@@ -813,8 +917,8 @@ onBeforeUnmount(() => {
               v-if="waypointPins.length"
               class="pointer-events-auto"
               icon="i-lucide-map-pinned"
-              :color="showWaypoints ? 'primary' : 'neutral'"
-              :variant="showWaypoints ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showWaypoints ? 'solid' : 'outline'"
               size="xs"
               @click="showWaypoints = !showWaypoints"
             >
@@ -824,8 +928,8 @@ onBeforeUnmount(() => {
               v-if="mediaPins.length"
               class="pointer-events-auto"
               icon="i-lucide-camera"
-              :color="showMedia ? 'primary' : 'neutral'"
-              :variant="showMedia ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showMedia ? 'solid' : 'outline'"
               size="xs"
               @click="showMedia = !showMedia"
             >
@@ -835,49 +939,42 @@ onBeforeUnmount(() => {
               class="pointer-events-auto"
               icon="i-lucide-radar"
               :color="showTraffic ? 'primary' : 'neutral'"
-              :variant="showTraffic ? 'soft' : 'outline'"
+              :variant="showTraffic ? 'solid' : 'outline'"
               size="xs"
               :disabled="!hasSignalKSource"
               @click="showTraffic = !showTraffic"
             >
-              AIS {{ aisPins.length ? `(${aisPins.length})` : '' }}
+              AIS {{ visibleAisPins.length ? `(${visibleAisPins.length})` : '' }}
             </UButton>
             <UButton
               v-if="showTraffic"
               class="pointer-events-auto"
               icon="i-lucide-navigation-2"
               :color="showTrafficVectors ? 'primary' : 'neutral'"
-              :variant="showTrafficVectors ? 'soft' : 'outline'"
+              :variant="showTrafficVectors ? 'solid' : 'outline'"
               size="xs"
               @click="showTrafficVectors = !showTrafficVectors"
             >
               Vectors
             </UButton>
-          </div>
-
-          <div v-if="showStatsRail" class="grid flex-1 gap-2 sm:grid-cols-4 xl:max-w-3xl">
-            <div
-              v-for="stat in stats"
-              :key="stat.label"
-              class="rounded-[1.15rem] border border-default/70 bg-default/84 px-3 py-2 shadow-card backdrop-blur-xl"
-            >
-              <p class="text-[10px] uppercase tracking-[0.2em] text-muted">{{ stat.label }}</p>
-              <p class="mt-1 text-sm font-semibold text-default">{{ stat.value }}</p>
-            </div>
+            <MyBoatAisVesselTypeFilterPopover
+              v-if="showTraffic && hasSignalKSource"
+              v-model:hidden-keys="aisHiddenCategoryKeys"
+              size="xs"
+            />
           </div>
         </div>
       </template>
 
-      <template #footer>
-        <div
-          v-if="showLayerToggles || showStatsRail"
-          class="space-y-3 border-t border-default/70 px-4 py-3 lg:hidden"
-        >
+      <template
+        #footer="{ clearRememberedView, fitToContent, isFullscreen, savedRegion, toggleFullscreen }"
+      >
+        <div class="space-y-3 border-t border-default/70 px-4 py-3 lg:hidden">
           <div v-if="showLayerToggles" class="flex flex-wrap gap-2">
             <UButton
               icon="i-lucide-route"
-              :color="showRoutes ? 'primary' : 'neutral'"
-              :variant="showRoutes ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showRoutes ? 'solid' : 'outline'"
               size="xs"
               @click="showRoutes = !showRoutes"
             >
@@ -886,8 +983,8 @@ onBeforeUnmount(() => {
             <UButton
               v-if="waypointPins.length"
               icon="i-lucide-map-pinned"
-              :color="showWaypoints ? 'primary' : 'neutral'"
-              :variant="showWaypoints ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showWaypoints ? 'solid' : 'outline'"
               size="xs"
               @click="showWaypoints = !showWaypoints"
             >
@@ -896,8 +993,8 @@ onBeforeUnmount(() => {
             <UButton
               v-if="mediaPins.length"
               icon="i-lucide-camera"
-              :color="showMedia ? 'primary' : 'neutral'"
-              :variant="showMedia ? 'soft' : 'outline'"
+              color="neutral"
+              :variant="showMedia ? 'solid' : 'outline'"
               size="xs"
               @click="showMedia = !showMedia"
             >
@@ -906,34 +1003,101 @@ onBeforeUnmount(() => {
             <UButton
               icon="i-lucide-radar"
               :color="showTraffic ? 'primary' : 'neutral'"
-              :variant="showTraffic ? 'soft' : 'outline'"
+              :variant="showTraffic ? 'solid' : 'outline'"
               size="xs"
               :disabled="!hasSignalKSource"
               @click="showTraffic = !showTraffic"
             >
-              AIS {{ aisPins.length ? `(${aisPins.length})` : '' }}
+              AIS {{ visibleAisPins.length ? `(${visibleAisPins.length})` : '' }}
             </UButton>
             <UButton
               v-if="showTraffic"
               icon="i-lucide-navigation-2"
               :color="showTrafficVectors ? 'primary' : 'neutral'"
-              :variant="showTrafficVectors ? 'soft' : 'outline'"
+              :variant="showTrafficVectors ? 'solid' : 'outline'"
               size="xs"
               @click="showTrafficVectors = !showTrafficVectors"
             >
               Vectors
             </UButton>
+            <MyBoatAisVesselTypeFilterPopover
+              v-if="showTraffic && hasSignalKSource"
+              v-model:hidden-keys="aisHiddenCategoryKeys"
+              size="xs"
+            />
+            <UButton
+              :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              title="Fill the browser viewport with the map"
+              aria-label="Fill the browser viewport with the map"
+              @click="toggleFullscreen"
+            >
+              {{ isFullscreen ? 'Exit full view' : 'Full view' }}
+            </UButton>
           </div>
 
-          <div v-if="showStatsRail" class="grid grid-cols-2 gap-2">
-            <div
-              v-for="stat in stats"
-              :key="stat.label"
-              class="rounded-[1.15rem] border border-default/70 bg-default/84 px-3 py-2 shadow-card backdrop-blur-xl"
+          <div v-else class="flex flex-wrap gap-2">
+            <UButton
+              icon="i-lucide-scan-search"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="fitToContent(0)"
             >
-              <p class="text-[10px] uppercase tracking-[0.2em] text-muted">{{ stat.label }}</p>
-              <p class="mt-1 text-sm font-semibold text-default">{{ stat.value }}</p>
-            </div>
+              Fit map
+            </UButton>
+            <UButton
+              icon="i-lucide-crosshair"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="centerOnVessel"
+            >
+              Center vessel
+            </UButton>
+            <UButton
+              v-if="savedRegion"
+              icon="i-lucide-rotate-ccw"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              @click="clearRememberedView"
+            >
+              Reset view
+            </UButton>
+            <UButton
+              :icon="isFullscreen ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+              color="neutral"
+              variant="soft"
+              size="xs"
+              title="Fill the browser viewport with the map"
+              aria-label="Fill the browser viewport with the map"
+              @click="toggleFullscreen"
+            >
+              {{ isFullscreen ? 'Exit full view' : 'Full view' }}
+            </UButton>
+            <MyBoatMapAdvancedTools
+              v-if="showAdvancedTools"
+              :capabilities="toolCapabilities"
+              :can-reset-view="Boolean(savedRegion)"
+              :can-show-heading-line="canShowHeadingLine"
+              :can-show-range-rings="canShowRangeRings"
+              :has-active-indicator="hasActiveIndicator"
+              :map-style="mapStyle"
+              :measure-mode="measureMode"
+              :measure-result="measureResult"
+              :show-heading-line="showHeadingLine"
+              :show-label="true"
+              :show-range-rings="showRangeRings"
+              size="xs"
+              @reset-view="clearRememberedView"
+              @set-map-style="setMapStyle"
+              @toggle-heading-line="toggleHeadingLine"
+              @toggle-measure="toggleMeasureMode"
+              @toggle-range-rings="toggleRangeRings"
+            />
           </div>
         </div>
       </template>
