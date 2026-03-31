@@ -159,10 +159,9 @@ Status: UNLOCKED
 
 ### `/:username`
 
-- captain identity hero
+- compact captain identity strip
 - public vessel cards
-- public map
-- public install readiness section
+- public fleet map (vessel positions only; no passage polylines on this map)
 
 ### `/:username/:vesselSlug`
 

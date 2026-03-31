@@ -250,13 +250,6 @@ async function buildDesktopAudit(page: Playwright.Page) {
           directory,
           captures,
         )
-        await captureNamedLocator(
-          page,
-          page.locator('[data-testid="public-live-readiness"]'),
-          'public-live-readiness',
-          directory,
-          captures,
-        )
       },
     ),
   )

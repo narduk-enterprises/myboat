@@ -50,6 +50,9 @@ const props = withDefaults(
     showLayerToggles?: boolean
     showPinLabels?: boolean
     showStatsRail?: boolean
+    showAdvancedTools?: boolean
+    /** When false, AIS vector overlay stays off until toggles are shown again */
+    defaultTrafficVectors?: boolean
     autoFitKey?: string | null
   }>(),
   {
@@ -70,6 +73,8 @@ const props = withDefaults(
     showLayerToggles: true,
     showPinLabels: true,
     showStatsRail: true,
+    showAdvancedTools: true,
+    defaultTrafficVectors: true,
     autoFitKey: null,
   },
 )
@@ -84,10 +89,46 @@ const showRoutes = shallowRef(true)
 const showWaypoints = shallowRef(true)
 const showMedia = shallowRef(true)
 const localTrafficEnabled = shallowRef(true)
-const showTrafficVectors = shallowRef(true)
+const showTrafficVectors = shallowRef(props.defaultTrafficVectors)
 const trafficInitialized = shallowRef(false)
 const isCompactViewport = useCompactViewport()
 const mapInstance = shallowRef<MapKitMapSurface | null>(null)
+
+/** Debounced visible span (lat/lng delta) for AIS pin scaling */
+const mapSpanForAisScale = shallowRef({ latDelta: 0.018, lngDelta: 0.022 })
+let aisScaleDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleMapRegionChange(region: {
+  latDelta: number
+  lngDelta: number
+  centerLat: number
+  centerLng: number
+}) {
+  if (aisScaleDebounceTimer) {
+    clearTimeout(aisScaleDebounceTimer)
+  }
+
+  aisScaleDebounceTimer = setTimeout(() => {
+    mapSpanForAisScale.value = {
+      latDelta: region.latDelta,
+      lngDelta: region.lngDelta,
+    }
+    aisScaleDebounceTimer = null
+  }, 150)
+}
+
+const aisPinDisplayScale = computed(() => {
+  const span = Math.max(mapSpanForAisScale.value.latDelta, mapSpanForAisScale.value.lngDelta)
+  if (span <= 0.06) return 1
+  if (span <= 0.25) return 0.85
+  if (span <= 0.8) return 0.65
+  return 0.45
+})
+
+const aisAnnotationSize = computed(() => {
+  const dim = Math.round(34 * aisPinDisplayScale.value)
+  return { width: dim, height: dim }
+})
 
 const primaryVessel = computed(() => props.vessel)
 const focusSnapshot = computed(() => props.vessel?.liveSnapshot ?? null)
@@ -440,6 +481,7 @@ function renderAisPin(item: (typeof aisPins.value)[number], isSelected: boolean)
     isCompactViewport: isCompactViewport.value,
     pinCount: aisPins.value.length,
     showLabel: props.showPinLabels,
+    displayScale: aisPinDisplayScale.value,
   })
 }
 
@@ -540,9 +582,14 @@ useMarineAisOverlay({
   createPinElement: renderAisPin,
   renderFingerprint: renderAisFingerprint,
   renderKey: computed(() => (isCompactViewport.value ? 'compact' : 'full')),
+  annotationSize: aisAnnotationSize,
 })
 
 onBeforeUnmount(() => {
+  if (aisScaleDebounceTimer) {
+    clearTimeout(aisScaleDebounceTimer)
+  }
+
   mapInstance.value = null
 })
 </script>
@@ -572,6 +619,7 @@ onBeforeUnmount(() => {
       :clustering-identifier="clusteringIdentifier"
       @map-click="handleToolMapClick"
       @map-ready="handleMapReady"
+      @region-change="handleMapRegionChange"
     >
       <template
         #header="{ clearRememberedView, fitToContent, isFullscreen, savedRegion, toggleFullscreen }"
@@ -640,6 +688,7 @@ onBeforeUnmount(() => {
               {{ isFullscreen ? 'Exit full screen' : 'Full screen' }}
             </UButton>
             <MyBoatMapAdvancedTools
+              v-if="showAdvancedTools"
               :capabilities="toolCapabilities"
               :can-reset-view="Boolean(savedRegion)"
               :can-show-heading-line="canShowHeadingLine"
@@ -725,6 +774,7 @@ onBeforeUnmount(() => {
             @click="toggleFullscreen"
           />
           <MyBoatMapAdvancedTools
+            v-if="showAdvancedTools"
             :capabilities="toolCapabilities"
             :can-reset-view="Boolean(savedRegion)"
             :can-show-heading-line="canShowHeadingLine"

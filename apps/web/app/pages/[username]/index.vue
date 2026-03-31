@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import type { PassageSummary } from '~/types/myboat'
-import { formatRelativeTime } from '~/utils/marine'
-
 definePageMeta({ layout: 'landing' })
 
 const route = useRoute()
@@ -26,13 +23,6 @@ watch(
 
 const profile = computed(() => data.value ?? null)
 const publicVessels = computed(() => store.getPublicProfileEntries(username.value))
-const publicPassages = computed<PassageSummary[]>(() => {
-  return (
-    publicVessels.value
-      .map((vessel) => vessel.latestPassage)
-      .filter((passage): passage is PassageSummary => passage !== null) ?? []
-  )
-})
 
 useSeo({
   title: profile.value ? `@${profile.value.profile.username}` : 'Captain profile',
@@ -53,61 +43,43 @@ useWebPageSchema({
     <template v-if="profile">
       <section
         data-testid="public-profile-hero"
-        class="public-hero px-6 py-10 shadow-overlay sm:px-10"
+        class="public-hero public-hero--compact shadow-overlay rounded-[1.25rem] px-4 py-3.5 sm:px-6 sm:py-4"
       >
-        <div class="relative z-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div class="space-y-4">
-            <div class="marine-kicker w-fit">Public captain log</div>
-            <div>
-              <h1 class="font-display text-5xl text-default">@{{ profile.profile.username }}</h1>
-              <p class="mt-3 max-w-2xl text-lg text-muted">
-                {{
-                  profile.profile.headline ||
-                  'Public window into the vessel, passages, and current reporting posture.'
-                }}
-              </p>
-            </div>
-            <p v-if="profile.profile.bio" class="max-w-2xl text-sm text-muted">
-              {{ profile.profile.bio }}
+        <div
+          class="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+        >
+          <div class="min-w-0 space-y-1">
+            <div class="marine-kicker w-fit scale-90 origin-left">Public captain log</div>
+            <h1 class="truncate font-display text-2xl text-default sm:text-3xl">
+              @{{ profile.profile.username }}
+            </h1>
+            <p
+              v-if="profile.profile.headline"
+              class="line-clamp-2 text-sm leading-snug text-muted sm:max-w-xl"
+            >
+              {{ profile.profile.headline }}
             </p>
           </div>
-
-          <UCard class="chart-surface rounded-[1.75rem]">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Captain</p>
-                <p class="mt-3 font-display text-xl text-default">
-                  {{ profile.profile.captainName }}
-                </p>
-              </div>
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Home port</p>
-                <p class="mt-3 font-display text-xl text-default">
-                  {{ profile.profile.homePort || 'Undisclosed' }}
-                </p>
-              </div>
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Tracked vessels</p>
-                <p class="mt-3 font-display text-xl text-default">{{ profile.vessels.length }}</p>
-              </div>
-              <div class="metric-shell rounded-[1.35rem] p-4">
-                <p class="text-xs uppercase tracking-[0.24em] text-muted">Live installs</p>
-                <p class="mt-3 font-display text-xl text-default">
-                  {{
-                    profile.installations.filter(
-                      (installation) => installation.connectionState === 'live',
-                    ).length
-                  }}
-                </p>
-              </div>
-            </div>
-          </UCard>
+          <div
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted sm:shrink-0 sm:justify-end"
+          >
+            <span class="font-medium text-default">{{ profile.profile.captainName }}</span>
+            <template v-if="profile.profile.homePort">
+              <span class="text-dimmed" aria-hidden="true">·</span>
+              <span>{{ profile.profile.homePort }}</span>
+            </template>
+            <span class="text-dimmed" aria-hidden="true">·</span>
+            <span>
+              {{ profile.vessels.length }}
+              {{ profile.vessels.length === 1 ? 'vessel' : 'vessels' }}
+            </span>
+          </div>
         </div>
       </section>
 
       <MyBoatSurfaceMap
         :vessels="publicVessels"
-        :passages="publicPassages"
+        :passages="[]"
         height-class="h-[20rem] sm:h-[24rem] lg:h-[28rem]"
         :show-focus-panel="false"
         :show-layer-toggles="false"
@@ -115,7 +87,11 @@ useWebPageSchema({
         :show-pin-labels="false"
       />
 
-      <section data-testid="public-vessel-grid" class="grid gap-5 lg:grid-cols-2">
+      <section
+        data-testid="public-vessel-grid"
+        class="grid gap-5"
+        :class="publicVessels.length > 1 ? 'lg:grid-cols-2' : ''"
+      >
         <VesselSummaryCard
           v-for="vessel in publicVessels"
           :key="vessel.id"
@@ -152,46 +128,6 @@ useWebPageSchema({
             :vessel="vessel"
           />
         </div>
-      </UCard>
-
-      <UCard
-        data-testid="public-live-readiness"
-        class="chart-surface rounded-[1.75rem] shadow-card"
-      >
-        <template #header>
-          <div>
-            <h2 class="font-display text-2xl text-default">Live readiness</h2>
-            <p class="mt-1 text-sm text-muted">
-              Public view of install presence and current reporting posture.
-            </p>
-          </div>
-        </template>
-
-        <div v-if="profile.installations.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div
-            v-for="installation in profile.installations"
-            :key="installation.id"
-            class="rounded-2xl border border-default bg-elevated/70 px-4 py-4"
-          >
-            <p class="font-medium text-default">{{ installation.label }}</p>
-            <p class="mt-1 text-sm text-muted">{{ installation.vesselName }}</p>
-            <p class="mt-3 text-xs text-muted">
-              {{
-                installation.lastSeenAt
-                  ? `Last seen ${formatRelativeTime(installation.lastSeenAt)}`
-                  : 'No public telemetry yet'
-              }}
-            </p>
-          </div>
-        </div>
-
-        <MarineEmptyState
-          v-else
-          icon="i-lucide-radio-tower"
-          title="No public install surface yet"
-          description="This captain profile is live, but no installations are currently exposed for public status."
-          compact
-        />
       </UCard>
     </template>
 

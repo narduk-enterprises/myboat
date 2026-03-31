@@ -454,6 +454,15 @@ body {
     url('/images/hero-bg.webp') center/cover;
 }
 
+/* Captain profile strip: less decorative overlay than full marketing heroes */
+.public-hero.public-hero--compact::after {
+  opacity: 0.42;
+}
+
+.dark .public-hero.public-hero--compact::after {
+  opacity: 0.38;
+}
+
 .brand-orbit {
   position: relative;
 }

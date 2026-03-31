@@ -520,10 +520,11 @@ Status: UNLOCKED
 - Purpose:
   - public captain profile and fleet overview
 - Primary sections:
-  - captain hero
-  - fleet map
+  - compact captain strip (handle, optional headline line-clamp, captain name,
+    home port, vessel count — no four-tile stats card, no long bio block)
+  - fleet map (vessel pins only; no passage tracks so the default view centers
+    on live positions)
   - public vessel cards
-  - public install readiness section
 - Primary CTA:
   - open public vessel page
 - Secondary CTA:

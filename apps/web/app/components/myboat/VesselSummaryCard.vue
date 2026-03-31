@@ -33,7 +33,7 @@ defineProps<{
       </div>
     </template>
 
-    <div class="space-y-4">
+    <div class="w-full min-w-0 space-y-4">
       <p class="text-sm text-muted">
         {{
           vessel.summary ||
@@ -41,16 +41,16 @@ defineProps<{
         }}
       </p>
 
-      <div class="grid grid-cols-3 gap-3 text-sm">
-        <div class="metric-shell rounded-2xl px-3 py-2">
+      <div class="grid w-full min-w-0 grid-cols-3 gap-3 text-sm sm:gap-4">
+        <div class="metric-shell min-w-0 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
           <p class="text-xs uppercase tracking-wide text-muted">Passages</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.latestPassage ? '1+' : '0' }}</p>
         </div>
-        <div class="metric-shell rounded-2xl px-3 py-2">
+        <div class="metric-shell min-w-0 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
           <p class="text-xs uppercase tracking-wide text-muted">Media</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.mediaCount }}</p>
         </div>
-        <div class="metric-shell rounded-2xl px-3 py-2">
+        <div class="metric-shell min-w-0 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
           <p class="text-xs uppercase tracking-wide text-muted">Places</p>
           <p class="mt-1 font-semibold text-default">{{ vessel.waypointCount }}</p>
         </div>
@@ -58,7 +58,7 @@ defineProps<{
 
       <div
         v-if="vessel.latestPassage"
-        class="rounded-2xl border border-default bg-elevated/70 px-4 py-3"
+        class="w-full min-w-0 rounded-2xl border border-default bg-elevated/70 px-4 py-3 sm:px-5 sm:py-3.5"
       >
         <p class="text-xs uppercase tracking-wide text-muted">Latest passage</p>
         <p class="mt-1 font-medium text-default">{{ vessel.latestPassage.title }}</p>

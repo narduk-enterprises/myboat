@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapKit JS is provided by Apple's CDN and does not ship usable runtime typings
 declare const mapkit: any
@@ -21,7 +21,7 @@ interface MarineAisOverlayOptions<T extends { id: string; lat: number; lng: numb
   renderFingerprint?: (pin: T, isSelected: boolean) => string
   renderKey?: Readonly<Ref<string | number>>
   movementThresholdMeters?: number
-  annotationSize?: { width: number; height: number }
+  annotationSize?: MaybeRefOrGetter<{ width: number; height: number }>
 }
 
 const DEFAULT_AIS_ANNOTATION_SIZE = { width: 24, height: 24 } as const
@@ -46,7 +46,13 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
   const renderedCoords = new Map<string, { lat: number; lng: number }>()
   const renderedFingerprints = new Map<string, string>()
   const activeMap = shallowRef<MapKitMapSurface | null>(null)
-  const annotationSize = options.annotationSize ?? DEFAULT_AIS_ANNOTATION_SIZE
+  const resolvedAnnotationSize = computed(() => {
+    if (options.annotationSize === undefined) {
+      return DEFAULT_AIS_ANNOTATION_SIZE
+    }
+
+    return toValue(options.annotationSize)
+  })
   const movementThresholdMeters =
     options.movementThresholdMeters ?? DEFAULT_MOVEMENT_THRESHOLD_METERS
   const renderKey = computed(() => options.renderKey?.value ?? 'default')
@@ -76,6 +82,7 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
   }
 
   function createAnnotation(pin: T) {
+    const annotationSize = resolvedAnnotationSize.value
     const annotation = new mapkit.Annotation(
       new mapkit.Coordinate(pin.lat, pin.lng),
       () => {
@@ -213,6 +220,14 @@ export function useMarineAisOverlay<T extends { id: string; lat: number; lng: nu
   watch(renderKey, () => {
     rebuildAll()
   })
+
+  watch(
+    resolvedAnnotationSize,
+    () => {
+      rebuildAll()
+    },
+    { deep: true },
+  )
 
   onBeforeUnmount(() => {
     clearAll(activeMap.value)

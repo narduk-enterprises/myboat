@@ -112,6 +112,14 @@ credentials, and internal telemetry views.
 - one public username per authenticated user
 - public headline, bio, and home port
 - profile becomes the stable public entry point
+- the public captain route (`/:username`) keeps a **compact identity strip**
+  (handle, optional headline, captain name, home port, vessel count) so the map
+  and vessel cards stay above the fold; long-form bio is not repeated in that
+  strip (captain-managed bio remains available in settings and can surface on
+  other public treatments when needed)
+- the fleet map on `/:username` frames **vessel positions only** (no passage
+  polylines) so the default camera centers on the boat rather than distant
+  route geometry
 
 ### 2. Vessel identity
 

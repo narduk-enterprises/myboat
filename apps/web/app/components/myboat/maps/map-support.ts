@@ -859,6 +859,8 @@ interface AisPinRenderOptions {
   isCompactViewport?: boolean
   pinCount?: number
   showLabel?: boolean
+  /** 0.45–1; smaller when the map is zoomed far out */
+  displayScale?: number
 }
 
 export function createAisPinElement(
@@ -873,6 +875,9 @@ export function createAisPinElement(
   const speedKnots = speedMetersPerSecondToKnots(item.sog)
   const ageMinutes = (Date.now() - item.lastUpdateAt) / 60_000
   const markerOpacity = ageMinutes > 10 ? 0.68 : ageMinutes > 4 ? 0.84 : 1
+  const displayScale = Math.min(1, Math.max(0.45, options.displayScale ?? 1))
+  const framePx = Math.round(34 * displayScale)
+  const insetPx = Math.max(1, Math.round(2 * displayScale))
 
   const element = document.createElement('div')
   element.style.cssText = [
@@ -889,8 +894,8 @@ export function createAisPinElement(
   frame.style.cssText = [
     'position:relative',
     'display:flex',
-    'height:34px',
-    'width:34px',
+    `height:${framePx}px`,
+    `width:${framePx}px`,
     'align-items:center',
     'justify-content:center',
     `opacity:${markerOpacity}`,
@@ -903,7 +908,7 @@ export function createAisPinElement(
     const selectionPlate = document.createElement('div')
     selectionPlate.style.cssText = [
       'position:absolute',
-      'inset:2px',
+      `inset:${insetPx}px`,
       'border-radius:12px',
       `background:${withAlpha(category.fill, 0.34)}`,
       `border:1px solid ${withAlpha(freshness, 0.74)}`,
@@ -914,10 +919,11 @@ export function createAisPinElement(
   }
 
   const ship = document.createElement('div')
+  const shipScale = (isSelected ? 1.08 : 1) * displayScale
   ship.style.cssText = [
     'position:relative',
     'z-index:1',
-    `transform:rotate(${movementHeading}deg) scale(${isSelected ? 1.08 : 1})`,
+    `transform:rotate(${movementHeading}deg) scale(${shipScale})`,
     'transition:transform 180ms ease',
     `filter:drop-shadow(0 2px 6px ${withAlpha(freshness, 0.24)})`,
   ].join(';')
@@ -932,8 +938,9 @@ export function createAisPinElement(
   })
   frame.appendChild(ship)
 
-  if (isMoving && speedKnots !== null) {
+  if (isMoving && speedKnots !== null && displayScale >= 0.75) {
     const speedFlag = document.createElement('div')
+    const flagFs = Math.max(6, Math.round(8 * displayScale))
     speedFlag.style.cssText = [
       'position:absolute',
       'right:-1px',
@@ -941,7 +948,7 @@ export function createAisPinElement(
       'border-radius:999px',
       `background:${withAlpha(category.color, 0.96)}`,
       'padding:1px 5px',
-      'font-size:8px',
+      `font-size:${flagFs}px`,
       'font-weight:800',
       'letter-spacing:0.03em',
       'color:rgb(248 250 252)',

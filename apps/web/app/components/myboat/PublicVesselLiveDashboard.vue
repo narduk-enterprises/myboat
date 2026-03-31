@@ -57,6 +57,7 @@ const primaryInstallation = computed<PublicInstallationSummary | null>(
 )
 const liveSnapshot = computed(() => detail.value?.vessel.liveSnapshot ?? null)
 const recentPassages = computed(() => detail.value?.passages.slice(0, 3) ?? [])
+const mapPassages = computed(() => detail.value?.passages.slice(0, 5) ?? [])
 const recentPassageIds = computed(() => new Set(recentPassages.value.map((passage) => passage.id)))
 const recentPassageMedia = computed(() =>
   (detail.value?.media ?? []).filter(
@@ -291,10 +292,10 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
       </div>
     </section>
 
-    <div data-testid="public-vessel-live-map">
+    <div data-testid="public-vessel-live-map" class="space-y-2">
       <MyBoatDetailedMap
         :vessel="detail.vessel"
-        :passages="detail.passages"
+        :passages="mapPassages"
         :waypoints="detail.waypoints"
         :media="mapMedia"
         :installations="detail.installations"
@@ -308,7 +309,15 @@ function toRoundedText(value: number | null | undefined, digits = 1) {
         height-class="h-[22rem] sm:h-[28rem] lg:h-[32rem]"
         :persist-key="`public-vessel:${detail.profile.username}/${detail.vessel.slug}`"
         :show-pin-labels="false"
+        :show-focus-panel="false"
+        :show-layer-toggles="false"
+        :show-stats-rail="false"
+        :show-advanced-tools="false"
+        :default-traffic-vectors="false"
       />
+      <p class="px-1 text-xs text-muted">
+        Chart shows the five most recent public passages. Open all passages for the full route log.
+      </p>
     </div>
 
     <section class="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
