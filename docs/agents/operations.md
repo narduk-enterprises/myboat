@@ -70,11 +70,11 @@ The canary workflow deploys to the `canary` Wrangler environment
 is a **workers.dev-only** deployment — no custom domain or route is set in the
 `canary` env block.
 
-All non-inheritable Wrangler bindings (D1, KV, Durable Objects) are declared
-explicitly inside `env.canary` in `apps/web/wrangler.json` to avoid relying on
-top-level inheritance behaviour.
+All non-inheritable Wrangler bindings (D1, KV, Durable Objects, rate limits)
+and cron behavior are declared explicitly inside `env.canary` in
+`apps/web/wrangler.json` to avoid relying on top-level inheritance behaviour.
 
-The workflow targets the `forgejo-web-canary` runner label (the pilot-specific
+The workflow targets the `myboat-web-canary` runner label (the pilot-specific
 runner provisioned by the infra team for this lane).
 
 Trigger manually via `workflow_dispatch` (`run_migrate: true/false`), or via

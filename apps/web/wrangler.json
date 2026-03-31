@@ -103,6 +103,7 @@
     },
     "canary": {
       "name": "myboat-canary",
+      "workers_dev": true,
       "d1_databases": [
         {
           "binding": "DB",
@@ -124,7 +125,68 @@
           "id": "d8dbd41a19e34995bcabe46b8d8dd9c3",
           "preview_id": "cedfd02fe30a45829086c188937059b0"
         }
-      ]
+      ],
+      "ratelimits": [
+        {
+          "name": "RL_10",
+          "namespace_id": "50110",
+          "simple": {
+            "limit": 10,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_20",
+          "namespace_id": "50120",
+          "simple": {
+            "limit": 20,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_30",
+          "namespace_id": "50130",
+          "simple": {
+            "limit": 30,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_60",
+          "namespace_id": "50160",
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_120",
+          "namespace_id": "50121",
+          "simple": {
+            "limit": 120,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_240",
+          "namespace_id": "50240",
+          "simple": {
+            "limit": 240,
+            "period": 60
+          }
+        },
+        {
+          "name": "RL_300",
+          "namespace_id": "50300",
+          "simple": {
+            "limit": 300,
+            "period": 60
+          }
+        }
+      ],
+      "triggers": {
+        "crons": []
+      }
     }
   },
   "routes": [

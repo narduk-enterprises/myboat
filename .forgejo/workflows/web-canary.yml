@@ -74,10 +74,9 @@ jobs:
   canary:
     name: Web Canary Deploy
     # Target the pilot-specific Forgejo runner provisioned for this lane.
-    # This label must match the runner registered by the infra/platform team
-    # for the Phase 3 canary host.  Do NOT change to "ubuntu-latest" or any
-    # other shared label — this workflow is scoped to the canary runner only.
-    runs-on: forgejo-web-canary
+    # This label must match the pilot-specific runner provisioned by the infra
+    # lane. Do NOT change to "ubuntu-latest" or any other shared label.
+    runs-on: myboat-web-canary
 
     # No repo contents write permission needed — this workflow does not commit
     # or push anything.
@@ -117,8 +116,10 @@ jobs:
         run: pnpm run build
         env:
           # Use the canary public URL if provided, otherwise the build falls
-          # back to the wrangler.json route or the default https://mybo.at.
+          # back to the workers.dev URL for the canary worker.
           SITE_URL: ${{ secrets.CANARY_SITE_URL }}
+          APP_URL: ${{ secrets.CANARY_SITE_URL }}
+          NUXT_SITE_URL: ${{ secrets.CANARY_SITE_URL }}
           NUXT_PUBLIC_SITE_URL: ${{ secrets.CANARY_SITE_URL }}
           NUXT_PUBLIC_APP_URL: ${{ secrets.CANARY_SITE_URL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
