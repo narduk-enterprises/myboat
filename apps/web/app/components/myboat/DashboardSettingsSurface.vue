@@ -55,43 +55,89 @@ const observedDimensions = computed(() => {
 const setupIncomplete = computed(
   () => !props.overview.profile || !primaryVessel.value || !primaryInstallation.value,
 )
+const settingsContextCards = computed(() => [
+  {
+    label: 'Captain',
+    value: props.overview.profile ? `@${props.overview.profile.username}` : 'Pending',
+    note: props.overview.profile?.captainName || 'Finish the captain identity setup.',
+  },
+  {
+    label: 'Primary vessel',
+    value: primaryVessel.value?.name || 'Pending',
+    note:
+      [primaryVessel.value?.vesselType, primaryVessel.value?.homePort]
+        .filter(Boolean)
+        .join(' · ') || 'Complete the vessel profile and home port.',
+  },
+  {
+    label: 'Live source',
+    value: primaryInstallation.value?.label || 'Pending',
+    note: primaryInstallation.value?.lastSeenAt
+      ? `Last seen ${formatRelativeTime(primaryInstallation.value.lastSeenAt)}`
+      : 'No source heartbeat observed yet.',
+  },
+  {
+    label: 'Public posture',
+    value: primaryVessel.value?.sharePublic ? 'Enabled' : 'Private',
+    note: publicProfilePath.value
+      ? 'Public profile route is available.'
+      : 'Set up a public handle before sharing outward.',
+  },
+])
 </script>
 
 <template>
   <div class="space-y-8">
-    <section class="chart-surface-strong rounded-[2rem] px-6 py-8 sm:px-8">
-      <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div class="space-y-4">
-          <div class="marine-kicker w-fit">Captain settings</div>
-          <div>
-            <h1 class="font-display text-4xl tracking-tight text-default sm:text-5xl">
-              One place for captain, vessel, and live-feed decisions
-            </h1>
-            <p class="mt-3 max-w-3xl text-base leading-7 text-muted">
-              This is the canonical settings destination. The older settings subpages stay available
-              as contextual editors, but the dashboard should point here first.
+    <OperatorRouteMasthead
+      eyebrow="Captain settings"
+      title="Captain, vessel, and live-feed decisions"
+      description="Use this control surface for the steady-state profile, source, sharing, and identity decisions that shape the captain workspace."
+    >
+      <template #actions>
+        <UButton to="/dashboard" color="neutral" variant="soft" icon="i-lucide-arrow-left">
+          Dashboard
+        </UButton>
+        <UButton to="/dashboard/map" color="neutral" variant="soft" icon="i-lucide-map">
+          Live map
+        </UButton>
+        <UButton
+          v-if="installationDetailPath"
+          :to="installationDetailPath"
+          color="primary"
+          icon="i-lucide-cpu"
+        >
+          Open live source
+        </UButton>
+        <UButton v-else to="/dashboard/onboarding" color="primary" icon="i-lucide-anchor">
+          Add live source
+        </UButton>
+        <UButton
+          v-if="publicProfilePath"
+          :to="publicProfilePath"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-share-2"
+        >
+          Public profile
+        </UButton>
+      </template>
+
+      <template #meta>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="card in settingsContextCards"
+            :key="card.label"
+            class="rounded-[1.15rem] border border-default/70 bg-elevated/70 px-4 py-3"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
+              {{ card.label }}
             </p>
+            <p class="mt-2 font-display text-lg text-default">{{ card.value }}</p>
+            <p class="mt-1 text-xs text-muted">{{ card.note }}</p>
           </div>
         </div>
-
-        <div class="flex flex-wrap gap-3">
-          <UButton to="/dashboard" color="neutral" variant="soft" icon="i-lucide-arrow-left">
-            Dashboard
-          </UButton>
-          <UButton to="/dashboard/map" color="neutral" variant="soft" icon="i-lucide-map">
-            Live map
-          </UButton>
-          <UButton
-            v-if="publicProfilePath"
-            :to="publicProfilePath"
-            color="primary"
-            icon="i-lucide-share-2"
-          >
-            Public profile
-          </UButton>
-        </div>
-      </div>
-    </section>
+      </template>
+    </OperatorRouteMasthead>
 
     <UAlert
       v-if="setupIncomplete"
@@ -108,6 +154,98 @@ const setupIncomplete = computed(
     </UAlert>
 
     <section class="space-y-6">
+      <UCard class="border-default/80 bg-default/90 shadow-card">
+        <template #header>
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 class="font-display text-2xl text-default">Route shortcuts</h2>
+              <p class="mt-1 text-sm text-muted">
+                Jump directly into the sections that change sharing, identity, and active-source
+                posture.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                to="/dashboard/settings/profile"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-user-round"
+              >
+                Captain profile
+              </UButton>
+              <UButton
+                v-if="installationDetailPath"
+                :to="installationDetailPath"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-cpu"
+              >
+                Live source
+              </UButton>
+              <UButton
+                to="/dashboard/settings/sharing"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-radio-tower"
+              >
+                Sharing
+              </UButton>
+            </div>
+          </div>
+        </template>
+
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Captain</p>
+            <p class="mt-2 font-medium text-default">
+              {{ props.overview.profile?.captainName || 'Pending' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                props.overview.profile
+                  ? `@${props.overview.profile.username}`
+                  : 'Handle not claimed yet.'
+              }}
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Vessel</p>
+            <p class="mt-2 font-medium text-default">{{ primaryVessel?.name || 'Pending' }}</p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                [primaryVessel?.vesselType, primaryVessel?.homePort].filter(Boolean).join(' · ') ||
+                'Primary vessel context appears here after setup.'
+              }}
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Observed identity</p>
+            <p class="mt-2 font-medium text-default">{{ observedIdentity?.mmsi || 'Pending' }}</p>
+            <p class="mt-1 text-xs text-muted">
+              {{
+                observedIdentity?.observedAt
+                  ? `Observed ${formatRelativeTime(observedIdentity.observedAt)}`
+                  : 'Waiting for collector identity discovery.'
+              }}
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-default bg-elevated/60 px-4 py-4">
+            <p class="text-xs uppercase tracking-wide text-muted">Sharing</p>
+            <p class="mt-2 font-medium text-default">
+              {{ primaryVessel?.sharePublic ? 'Public vessel enabled' : 'Private by default' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{ props.overview.followedVessels.length }}
+              buddy boat{{ props.overview.followedVessels.length === 1 ? '' : 's' }} saved.
+            </p>
+          </div>
+        </div>
+      </UCard>
+
       <UCard class="border-default/80 bg-default/90 shadow-card">
         <template #header>
           <div>

@@ -2,6 +2,34 @@
 
 Status: UNLOCKED
 
+## UI foundation lock
+
+- Public landing and shareable public routes can keep the strongest branded hero
+  treatments and wider atmospheric spacing.
+- Auth routes stay branded, but they should remain task-first and compact enough
+  to keep the form and the next action in the first viewport.
+- Admin, settings, passages, buddy-boat, and other operational routes follow a
+  utility-first presentation rule:
+  - compact masthead
+  - one-sentence route framing
+  - tight action cluster
+  - no billboard-style decorative backdrop as the dominant first-view element
+- Operational routes should spend the first viewport on active context and
+  decisions, not promotional copy or oversized ambient chrome.
+- Desktop default for geospatial and history workspaces is split layout:
+  - one large active canvas for map or playback
+  - one adjacent companion area for selection detail, missing-data summary, and
+    next actions
+- Tall stacked sections are not the default for active inspection routes.
+  Favor side-by-side workspace composition before long vertical rails.
+- Large map and playback surfaces must define partial-data behavior:
+  - reduce visual height when data is sparse
+  - keep missing-data summary near the canvas
+  - keep off-map or unavailable items in a structured panel or list, not loose
+    chips detached below the workspace
+- Operational routes must show title, key action, and primary operational
+  context above the fold on desktop.
+
 ## Shell model
 
 - One public shell for marketing and shareable routes.
@@ -9,10 +37,15 @@ Status: UNLOCKED
 - One admin shell for system and moderation work.
 - Public and private vessel pages should feel related, but the private vessel
   page is denser and more operational.
+- Dashboard and admin shells should feel like operator tools first. Decorative
+  framing is subordinate to navigation, current status, and task context.
 - The authenticated shell has one primary navigation model:
   - desktop: persistent left sidebar
   - mobile: bottom nav with the same core destinations
   - top header: brand, account, and context actions only
+- Operator side rails prioritize compact navigation, current route context, and
+  lightweight signed-in status. Large promo-style rail blocks are not the
+  default pattern for utility routes.
 
 ## Route hierarchy
 
@@ -78,6 +111,8 @@ Status: UNLOCKED
   setup is incomplete.
 - Vessel, installation, and settings-subpages should use local in-page
   navigation and action links rather than a second competing global subnav.
+- Operator routes should avoid using the route header as a second marketing
+  surface. Keep the first-view hierarchy tight and task-oriented.
 - Admin routes should have a distinct but minimal nav:
   - `Overview`
   - `Users`
@@ -223,16 +258,20 @@ Status: UNLOCKED
 - Purpose:
   - deep live-ops map for the active vessel
 - Primary sections:
-  - hero
-  - large operational chart
-  - AIS traffic with selected-contact detail
-  - compact diagnostics for "what is wrong right now"
+  - compact operational masthead
+  - split desktop workspace with the operational chart as the primary canvas
+  - adjacent AIS traffic detail and compact diagnostics
   - deeper live metric board than `/dashboard`
 - Primary CTA:
   - open contextual vessel or installation detail
 - Secondary CTA:
   - return to `/dashboard`
   - open settings
+- Behavior:
+  - the route intro stays compact and must not consume most of the first
+    viewport
+  - selected-contact detail and "what is wrong right now" context should stay
+    visible near the chart on desktop
 - Empty:
   - no vessel yet
   - no live source linked yet
@@ -243,20 +282,27 @@ Status: UNLOCKED
 ### `/dashboard/fleet-friends`
 
 - Purpose:
-  - buddy-boat map workspace
+  - buddy-boat tracking workspace
 - Primary sections:
-  - route header
-  - search-and-save controls
-  - map-first search results
-  - saved buddy boats list and saved boats map
+  - compact operational masthead
+  - split desktop workspace with the map as the primary canvas
+  - persistent companion panel for selected buddy-boat details
+  - manage/search controls for saving, refreshing, and removing boats
+  - structured off-map list and missing-coordinate summary
 - Primary CTA:
-  - save a buddy boat
+  - manage buddy boats
 - Secondary CTA:
-  - remove a buddy boat
   - return to dashboard
+- Behavior:
+  - desktop keeps the selected buddy boat, missing-coordinate counts, and
+    manage state visible near the map
+  - sparse map data must read as a partial-state workflow, not a large blank
+    canvas
+  - off-map boats should remain in a structured companion area instead of loose
+    chips detached below the map
 - Empty:
   - no saved buddy boats yet
-  - no AIS matches yet
+  - no mapped boats yet
 - Error:
   - search or workspace failure alert
 
@@ -309,17 +355,21 @@ Status: UNLOCKED
 - Purpose:
   - vessel-scoped captain passage workspace
 - Primary sections:
-  - vessel hero
+  - compact vessel masthead with return to live view
   - local live/passages switcher
-  - dedicated passage workspace
+  - split desktop passage workspace with a large playback/map canvas
+  - always-visible selected-passage summary and readiness context
   - searchable passage rail
-  - route-focused map workspace
-  - playback theater with timeline scrubber, rate controls, and nearby traffic
-  - shared media strip
+  - shared media and linked context
 - Primary CTA:
   - return to live vessel view
 - Secondary CTA:
   - open public vessel page
+- Behavior:
+  - the selected passage, playback readiness, and route context stay visible in
+    the first viewport on desktop
+  - the route should not read as a tiny header above a long undifferentiated
+    vertical stack
 - Empty:
   - no passages
 - Notes:
@@ -335,17 +385,21 @@ Status: UNLOCKED
 - Purpose:
   - dedicated captain passage workspace
 - Primary sections:
-  - hero
+  - compact operational masthead
   - vessel switcher when multiple vessels exist
+  - split desktop workspace with a larger playback/map canvas
+  - always-visible selected-passage summary and route context
   - searchable passage rail
-  - route-focused map workspace
-  - playback theater with timeline scrubber, rate controls, and nearby traffic
-  - passage metrics and note surface
-  - shared media strip
+  - passage metrics and linked media context
 - Primary CTA:
   - open live view for the active vessel
 - Secondary CTA:
   - open public passage log for the active vessel when shared
+- Behavior:
+  - desktop prioritizes the active playback or map workspace over a tall stacked
+    reading flow
+  - the selected passage, playback readiness, and next action must be legible
+    without deep scrolling
 - Empty:
   - no vessel yet
   - no passages yet
@@ -387,7 +441,8 @@ Status: UNLOCKED
 - Purpose:
   - canonical long-form captain settings surface
 - Primary sections:
-  - hero
+  - compact utility masthead
+  - above-the-fold section shortcuts plus current vessel and source context
   - captain profile section
   - captain-managed vessel profile section
   - observed connection identity section
@@ -399,6 +454,11 @@ Status: UNLOCKED
   - open the relevant settings action
 - Secondary CTA:
   - contextual links into legacy settings subpages and installation detail
+- Behavior:
+  - this route reads as a control surface, not a campaign page
+  - the public-profile action stays secondary to settings tasks
+  - section actions should sit close to the section they affect rather than
+    clustering in the masthead
 
 ### `/dashboard/settings/profile`
 
@@ -525,12 +585,18 @@ Status: UNLOCKED
 - Purpose:
   - admin overview and operational triage
 - Primary sections:
-  - system status cards
-  - ingest health summary
-  - moderation or review queue
+  - compact operational masthead
+  - dense KPI row
+  - urgent controls and ingest health summary
   - shortcuts to admin sections
+  - lightweight operator notes or review queue only when relevant
 - Primary CTA:
   - open an admin section
+- Behavior:
+  - the first viewport should show title, key action, and primary operational
+    context without centered dead air
+  - decorative rail or hero treatments must not dominate the route above the
+    KPI and control surfaces
 
 ### `/admin/users`
 
@@ -590,13 +656,18 @@ Status: UNLOCKED
 
 - Public and auth heroes collapse to one column on mobile.
 - Dashboard, vessel, and admin layouts collapse to one column below `xl`.
-- Maps keep a fixed-height container but step down in height on smaller screens.
+- Split workspaces collapse to stacked sections on smaller screens without
+  losing the active selection summary or missing-data context.
+- Maps and playback canvases keep a fixed-height container but step down in
+  height on smaller screens and in sparse-data states.
 - No route should rely on dense tables as the only mobile representation.
 
 ## Shared state rules
 
 - Live telemetry cards should look distinct from historical passage content.
 - Private vessel pages are denser than public vessel pages.
+- Operational routes use compact mastheads and should not spend most of the
+  first viewport on decorative route framing.
 - Empty states must explain what is missing and what action unlocks the feature.
 - Error states should preserve route shell and context where possible.
 - Source-derived vessel identity should be visually distinct from
@@ -605,6 +676,27 @@ Status: UNLOCKED
   from SignalK.
 - AIS and vessel identity cards should preserve last known non-null values when
   live updates are sparse.
+- Sparse map or playback states should remain informative:
+  keep the selected focus, missing-data summary, and next action near the main
+  canvas instead of pushing them below it.
+
+## Verification checkpoints
+
+- Desktop screenshot review:
+  - no operational route should spend the majority of its first viewport on
+    decorative header space
+- Admin and settings:
+  - title, key action, and primary operational context stay visible above the
+    fold
+- Buddy boats:
+  - sparse-coordinate datasets still show selected-vessel context and a clear
+    missing-data summary
+- Passages:
+  - selected passage, playback readiness, and route context stay legible
+    without deep scrolling
+- Mobile:
+  - split-workspace routes collapse cleanly without losing active selection or
+    missing-data explanation
 
 ## Open UI questions
 
