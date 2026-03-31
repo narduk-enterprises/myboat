@@ -38,7 +38,8 @@ pnpm run update-layer -- --from ~/new-code/narduk-nuxt-template
 
 ## Deployment And D1 Migrations
 
-Deployment is local-only via `pnpm run ship`. CI may run quality checks, but it does not deploy.
+Deployment is local-only via `pnpm run ship`. CI may run quality checks, but it
+does not deploy.
 
 Standard flow:
 
@@ -56,38 +57,34 @@ Standard flow:
 Local development migrations still go through the app entrypoint so shared layer
 SQL runs before app-owned SQL.
 
-### Forgejo Canary Deploy (Phase 3 Pilot)
+### Forgejo Production Deploy
 
-`.forgejo/workflows/web-canary.yml` is the **Phase 3 Forgejo web-canary lane
-only**.  It is not a general production deploy trigger.
+`.forgejo/workflows/deploy-main.yml` is the active Forgejo production deploy
+lane for `myboat`. `platform.nard.uk` dispatches this workflow through the
+existing AppOperation route.
 
-**Production / GitHub fallback:** `pnpm run ship` (wraps `tools/ship.ts`) run
-locally or via GitHub Actions remains the production deploy path.
+The workflow does not call `pnpm run ship`, because `ship.ts` includes local git
+commit/push behavior that does not belong inside Actions. Instead, it reuses the
+same deploy semantics directly:
 
-The canary workflow deploys to the `canary` Wrangler environment
-(`name: myboat-canary`, defined in `apps/web/wrangler.json`) without calling
-`ship.ts`, mutating the repo, or running audit/drift/sync/quality checks.  It
-is a **workers.dev-only** deployment — no custom domain or route is set in the
-`canary` env block.
+- `doppler run --config prd -- pnpm install --frozen-lockfile`
+- `doppler run --config prd -- pnpm run build`
+- optional remote D1 migrate when `run_migrate=true`
+- `doppler run --config prd -- pnpm run deploy`
 
-All non-inheritable Wrangler bindings (D1, KV, Durable Objects, rate limits)
-and cron behavior are declared explicitly inside `env.canary` in
-`apps/web/wrangler.json` to avoid relying on top-level inheritance behaviour.
+Before install/build, the workflow fails fast if the production auth/site env is
+missing or wrong, and verifies that `@narduk-enterprises/*` resolves only from
+`https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/`.
 
-The workflow targets the `myboat-web-canary` runner label (the pilot-specific
-runner provisioned by the infra team for this lane).
+The deploy still runs on the pilot runner label `myboat-web-canary` until the
+runner itself is renamed; the label is now production-serving despite the old
+pilot name.
 
-Trigger manually via `workflow_dispatch` (`run_migrate: true/false`), or via
-the Forgejo dispatch API for platform integration.
+Required repo secret:
 
-Required repo secrets for runner setup:
-
-| Secret                 | Purpose                                                     |
-| ---------------------- | ----------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers:Edit + D1:Edit permissions. |
-| `CLOUDFLARE_ACCOUNT_ID`| Cloudflare account ID.                                      |
-| `FORGEJO_TOKEN`        | Forgejo PAT with package read access — installs `@narduk-enterprises/*` from `code.platform.nard.uk`. |
-| `CANARY_SITE_URL`      | _(Optional)_ Public canary URL injected at build time.      |
+| Secret          | Purpose                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `DOPPLER_TOKEN` | Read-only service token for `myboat/prd`, used to inject the full production deploy env. |
 
 ## Secrets And Environment
 
