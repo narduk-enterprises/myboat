@@ -63,14 +63,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          doppler run --config prd -- bash -lc '
-            set -euo pipefail
-            temp_npmrc="$(mktemp)"
-            trap "rm -f \"$temp_npmrc\"" EXIT
-            cp .npmrc "$temp_npmrc"
-            printf "\n//code.platform.nard.uk/api/packages/narduk-enterprises/npm/:_authToken=%s\n" "$FORGEJO_TOKEN" >> "$temp_npmrc"
-            NPM_CONFIG_USERCONFIG="$temp_npmrc" pnpm install --frozen-lockfile
-          '
+          set -euo pipefail
+          temp_npmrc="$(mktemp)"
+          trap 'rm -f "$temp_npmrc"' EXIT
+          cp .npmrc "$temp_npmrc"
+          doppler run --config prd -- bash -lc \
+            "printf '\n//code.platform.nard.uk/api/packages/narduk-enterprises/npm/:_authToken=%s\n' \"\$FORGEJO_TOKEN\" >> \"$temp_npmrc\""
+          doppler run --config prd -- env PATH="$PATH" NPM_CONFIG_USERCONFIG="$temp_npmrc" pnpm install --frozen-lockfile
         working-directory: .
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
