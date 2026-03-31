@@ -67,6 +67,39 @@ const vesselMetaBadges = computed(() => {
     `${props.detail.media.length} media`,
   ]
 })
+const vesselContextCards = computed(() => {
+  if (!props.detail) {
+    return []
+  }
+
+  return [
+    {
+      label: props.activeView === 'passages' ? 'Archive status' : 'Live status',
+      value: postureLabel.value,
+      note:
+        props.activeView === 'passages'
+          ? 'Playback focus, stored routes, and route memory stay in this workspace.'
+          : 'Current telemetry and live vessel context stay visible here.',
+    },
+    {
+      label: 'Public posture',
+      value: publicVesselPath.value ? 'Public route ready' : 'Private only',
+      note: publicVesselPath.value
+        ? 'The public vessel page is available from this route.'
+        : 'Finish the public captain profile before sharing outward.',
+    },
+    {
+      label: 'Installations',
+      value: String(props.detail.installations.length),
+      note: `${props.detail.installations.length} linked live source${props.detail.installations.length === 1 ? '' : 's'}.`,
+    },
+    {
+      label: 'Linked context',
+      value: `${props.detail.waypoints.length} / ${props.detail.media.length}`,
+      note: `${props.detail.waypoints.length} waypoint${props.detail.waypoints.length === 1 ? '' : 's'} and ${props.detail.media.length} media item${props.detail.media.length === 1 ? '' : 's'}.`,
+    },
+  ]
+})
 </script>
 
 <template>
@@ -131,25 +164,26 @@ const vesselMetaBadges = computed(() => {
         </div>
       </section>
 
-      <template v-else>
-        <UPageHero :title="detail.vessel.name" :description="vesselDescription">
-          <template #links>
-            <UButton
-              v-if="publicVesselPath"
-              :to="publicVesselPath"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-share-2"
-            >
-              Public vessel page
-            </UButton>
-          </template>
-        </UPageHero>
+      <OperatorRouteMasthead
+        v-else
+        eyebrow="Vessel workspace"
+        :title="detail.vessel.name"
+        :description="vesselDescription"
+      >
+        <template #actions>
+          <UButton
+            v-if="publicVesselPath"
+            :to="publicVesselPath"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-share-2"
+          >
+            Public vessel page
+          </UButton>
+        </template>
 
-        <section
-          class="rounded-[1.75rem] border border-default/80 bg-default/85 px-4 py-4 shadow-card sm:px-5"
-        >
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <template #meta>
+          <div class="space-y-4">
             <div class="flex flex-wrap gap-2">
               <UButton
                 v-for="item in navigationItems"
@@ -161,17 +195,29 @@ const vesselMetaBadges = computed(() => {
               >
                 {{ item.label }}
               </UButton>
-            </div>
 
-            <div class="flex flex-wrap gap-2 text-sm">
               <UBadge color="primary" variant="soft">{{ postureLabel }}</UBadge>
               <UBadge v-for="badge in vesselMetaBadges" :key="badge" color="neutral" variant="soft">
                 {{ badge }}
               </UBadge>
             </div>
+
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div
+                v-for="card in vesselContextCards"
+                :key="card.label"
+                class="rounded-[1.15rem] border border-default/70 bg-elevated/70 px-4 py-3"
+              >
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted">
+                  {{ card.label }}
+                </p>
+                <p class="mt-2 font-display text-lg text-default">{{ card.value }}</p>
+                <p class="mt-1 text-xs text-muted">{{ card.note }}</p>
+              </div>
+            </div>
           </div>
-        </section>
-      </template>
+        </template>
+      </OperatorRouteMasthead>
 
       <slot />
     </template>
