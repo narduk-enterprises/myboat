@@ -38,7 +38,7 @@ pnpm run update-layer -- --from ~/new-code/narduk-nuxt-template
 
 ## Deployment And D1 Migrations
 
-Deployment is local-only. CI may run quality checks, but it does not deploy.
+Deployment is local-only via `pnpm run ship`. CI may run quality checks, but it does not deploy.
 
 Standard flow:
 
@@ -55,6 +55,39 @@ Standard flow:
 
 Local development migrations still go through the app entrypoint so shared layer
 SQL runs before app-owned SQL.
+
+### Forgejo Canary Deploy (Phase 3 Pilot)
+
+`.forgejo/workflows/web-canary.yml` is the **Phase 3 Forgejo web-canary lane
+only**.  It is not a general production deploy trigger.
+
+**Production / GitHub fallback:** `pnpm run ship` (wraps `tools/ship.ts`) run
+locally or via GitHub Actions remains the production deploy path.
+
+The canary workflow deploys to the `canary` Wrangler environment
+(`name: myboat-canary`, defined in `apps/web/wrangler.json`) without calling
+`ship.ts`, mutating the repo, or running audit/drift/sync/quality checks.  It
+is a **workers.dev-only** deployment — no custom domain or route is set in the
+`canary` env block.
+
+All non-inheritable Wrangler bindings (D1, KV, Durable Objects, rate limits)
+and cron behavior are declared explicitly inside `env.canary` in
+`apps/web/wrangler.json` to avoid relying on top-level inheritance behaviour.
+
+The workflow targets the `myboat-web-canary` runner label (the pilot-specific
+runner provisioned by the infra team for this lane).
+
+Trigger manually via `workflow_dispatch` (`run_migrate: true/false`), or via
+the Forgejo dispatch API for platform integration.
+
+Required repo secrets for runner setup:
+
+| Secret                 | Purpose                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers:Edit + D1:Edit permissions. |
+| `CLOUDFLARE_ACCOUNT_ID`| Cloudflare account ID.                                      |
+| `GH_PACKAGES_TOKEN`    | GitHub PAT with `read:packages` — installs `@narduk-enterprises/*`. |
+| `CANARY_SITE_URL`      | _(Optional)_ Public canary URL injected at build time.      |
 
 ## Secrets And Environment
 
