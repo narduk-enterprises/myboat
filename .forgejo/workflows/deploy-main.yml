@@ -56,7 +56,7 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
       - name: Verify Forgejo package source
-        run: doppler run --config prd -- node ../../tools/verify-forgejo-package-source.mjs
+        run: doppler run --config prd -- node ./tools/verify-forgejo-package-source.mjs
         working-directory: .
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
