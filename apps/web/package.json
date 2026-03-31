@@ -25,6 +25,7 @@
     "pretypecheck": "pnpm --filter @myboat/telemetry-source-policy build",
     "typecheck": "nuxt typecheck",
     "deploy": "wrangler deploy --env=\"\"",
+    "deploy:canary": "wrangler deploy --env canary",
     "prelint": "test -f .nuxt/eslint.config.mjs || nuxt prepare",
     "lint": "eslint . --max-warnings 0",
     "pretest:unit": "pnpm --filter @myboat/telemetry-source-policy build",

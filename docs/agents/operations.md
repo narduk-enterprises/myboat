@@ -38,10 +38,9 @@ pnpm run update-layer -- --from ~/new-code/narduk-nuxt-template
 
 ## Deployment And D1 Migrations
 
-The canonical deploy path is `pnpm run ship` (wraps `tools/ship.ts`).  It can
-be triggered locally or via the Forgejo workflow described below.
+Deployment is local-only via `pnpm run ship`. CI may run quality checks, but it does not deploy.
 
-Standard local flow:
+Standard flow:
 
 1. Keep the working tree clean.
 2. Run remote D1 migrations if the app uses D1:
@@ -57,20 +56,30 @@ Standard local flow:
 Local development migrations still go through the app entrypoint so shared layer
 SQL runs before app-owned SQL.
 
-### Forgejo Workflow (Phase 3 Pilot)
+### Forgejo Canary Deploy (Phase 3 Pilot)
 
-`.forgejo/workflows/ship.yml` provides a runner-executable version of the same
-deploy path.  It is triggered manually via `workflow_dispatch`.  Required repo
-secrets:
+`.forgejo/workflows/web-canary.yml` provides a runner-executable canary deploy
+contract for `apps/web`.  It deploys to the `canary` Wrangler environment
+(`name: myboat-canary`, defined in `apps/web/wrangler.json`) without calling
+`ship.ts`, mutating the repo, or running audit/drift/sync/quality checks.
 
-| Secret               | Purpose                                                     |
-| -------------------- | ----------------------------------------------------------- |
-| `DOPPLER_TOKEN`      | Doppler service token (prd config) — ship.ts uses this to fetch all production secrets at runtime. |
-| `GH_PACKAGES_TOKEN`  | GitHub PAT with `read:packages` — installs `@narduk-enterprises/*` from GitHub Packages. |
-| `SHIP_GIT_TOKEN`     | _(Optional)_ PAT with repo write access. Falls back to the built-in workflow token when absent. |
+The `canary` Wrangler env entry sets only `name`; all other bindings
+(`d1_databases`, `kv_namespaces`, routes, etc.) are inherited from the
+top-level `wrangler.json` config.  To point the canary at a dedicated D1
+database or separate custom domain, add an explicit `d1_databases` or `routes`
+block inside `env.canary` in `apps/web/wrangler.json`.
 
-The GitHub Actions fallback path (`.github/workflows/ci.yml`) is unchanged
-during the pilot.
+Trigger manually via `workflow_dispatch` (`run_migrate: true/false`), or via
+the Forgejo dispatch API for platform integration.
+
+Required repo secrets for runner setup:
+
+| Secret                 | Purpose                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers:Edit + D1:Edit permissions. |
+| `CLOUDFLARE_ACCOUNT_ID`| Cloudflare account ID.                                      |
+| `GH_PACKAGES_TOKEN`    | GitHub PAT with `read:packages` — installs `@narduk-enterprises/*`. |
+| `CANARY_SITE_URL`      | _(Optional)_ Public canary URL injected at build time.      |
 
 ## Secrets And Environment
 

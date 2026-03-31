@@ -1,0 +1,133 @@
+# .forgejo/workflows/web-canary.yml
+#
+# Forgejo-native web canary deploy — Phase 3 pilot
+#
+# Runs a clean build + optional D1 migration + Cloudflare Workers canary deploy
+# for apps/web.  Does NOT call ship.ts, does NOT mutate the repo, and does NOT
+# run audit/drift/sync/full quality checks in the deploy lane.
+#
+# The canary Cloudflare Workers environment is defined in
+# apps/web/wrangler.json under `env.canary` (name: "myboat-canary").
+#
+# ─── Required repo secrets ────────────────────────────────────────────────────
+#
+#   CLOUDFLARE_API_TOKEN   — Cloudflare API token with Workers:Edit and D1:Edit
+#                            permissions, scoped to the myboat account.
+#
+#   CLOUDFLARE_ACCOUNT_ID  — Cloudflare account ID.
+#
+#   GH_PACKAGES_TOKEN      — GitHub PAT with read:packages scope.
+#                            Required to install @narduk-enterprises/* from
+#                            https://npm.pkg.github.com.
+#
+# ─── Optional repo secrets ────────────────────────────────────────────────────
+#
+#   CANARY_SITE_URL        — Public URL of the canary worker (used as SITE_URL
+#                            and NUXT_PUBLIC_SITE_URL at build time).
+#                            Defaults to the workers.dev subdomain when absent.
+#
+# ─── Platform dispatch integration note ───────────────────────────────────────
+#
+#   Trigger this workflow from the platform dispatch layer via the Forgejo API:
+#
+#     POST /api/v1/repos/{owner}/{repo}/actions/workflows/web-canary.yml/dispatches
+#     Authorization: token <PAT>
+#     Content-Type: application/json
+#
+#     { "ref": "main", "inputs": { "run_migrate": "true" } }
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Web Canary Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_migrate:
+        description: >
+          Run remote D1 migrations before deploying.
+          Set to "true" only when this deployment includes schema changes.
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+# Never cancel an in-flight canary deploy; queue instead.
+concurrency:
+  group: web-canary-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Web Canary Deploy
+    runs-on: ubuntu-latest
+
+    # No repo contents write permission needed — this workflow does not commit
+    # or push anything.
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Keep in sync with the `packageManager` field in package.json.
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          # Configures .npmrc so that NODE_AUTH_TOKEN authenticates against
+          # https://npm.pkg.github.com for @narduk-enterprises/* packages.
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+
+      - name: Build
+        run: pnpm run build
+        env:
+          # Use the canary public URL if provided, otherwise the build falls
+          # back to the wrangler.json route or the default https://mybo.at.
+          SITE_URL: ${{ secrets.CANARY_SITE_URL }}
+          NUXT_PUBLIC_SITE_URL: ${{ secrets.CANARY_SITE_URL }}
+          NUXT_PUBLIC_APP_URL: ${{ secrets.CANARY_SITE_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Migrate (remote D1)
+        if: ${{ inputs.run_migrate == 'true' }}
+        # Runs the tracked migration runner against the production D1 database.
+        # Database name "myboat-db" matches d1_databases[0].database_name in
+        # apps/web/wrangler.json.  The canary Wrangler env inherits the
+        # top-level D1 binding (same database_id), so no separate canary DB is
+        # needed for the pilot.  Add an explicit `canary.d1_databases` entry in
+        # wrangler.json if a dedicated canary database is required later.
+        run: >
+          bash ../../tools/db-migrate.sh myboat-db --remote
+          --dir node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle
+          --dir drizzle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy canary
+        # Deploys to the `canary` Wrangler environment (name: myboat-canary).
+        # Uses the deploy:canary script defined in apps/web/package.json.
+        run: pnpm run deploy:canary
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
