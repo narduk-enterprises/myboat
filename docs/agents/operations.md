@@ -60,8 +60,8 @@ SQL runs before app-owned SQL.
 ### Forgejo Production Deploy
 
 `.forgejo/workflows/deploy-main.yml` is the active Forgejo production deploy
-lane for `myboat`. `platform.nard.uk` dispatches this workflow through the
-existing AppOperation route.
+lane for `myboat`. It auto-runs on pushes to `main`, and `platform.nard.uk` can
+also dispatch it through the existing AppOperation route.
 
 The workflow does not call `pnpm run ship`, because `ship.ts` includes local git
 commit/push behavior that does not belong inside Actions. Instead, it reuses the
