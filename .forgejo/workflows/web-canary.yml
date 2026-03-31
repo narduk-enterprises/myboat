@@ -27,9 +27,9 @@
 #
 #   CLOUDFLARE_ACCOUNT_ID  — Cloudflare account ID.
 #
-#   GH_PACKAGES_TOKEN      — GitHub PAT with read:packages scope.
+#   FORGEJO_TOKEN          — Forgejo PAT with package read access.
 #                            Required to install @narduk-enterprises/* from
-#                            https://npm.pkg.github.com.
+#                            https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/.
 #
 # ─── Optional repo secrets ────────────────────────────────────────────────────
 #
@@ -93,24 +93,21 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          # Keep in sync with the `packageManager` field in package.json.
-          version: 10
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: pnpm
-          # Configures .npmrc so that NODE_AUTH_TOKEN authenticates against
-          # https://npm.pkg.github.com for @narduk-enterprises/* packages.
-          registry-url: 'https://npm.pkg.github.com'
+          # Configures .npmrc so that NODE_AUTH_TOKEN authenticates against the
+          # platform Forgejo npm registry for @narduk-enterprises/* packages.
+          registry-url: 'https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: .
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
 
       - name: Build
         run: pnpm run build

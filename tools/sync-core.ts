@@ -1105,7 +1105,8 @@ function ensureGitHooksPath(
 
 function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => void): boolean {
   const npmrcPath = join(appDir, '.npmrc')
-  const defaultContent = ['@narduk-enterprises:registry=https://npm.pkg.github.com', ''].join('\n')
+  const forgejoRegistry = 'https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/'
+  const defaultContent = [`@narduk-enterprises:registry=${forgejoRegistry}`, ''].join('\n')
 
   if (!existsSync(npmrcPath)) {
     log('  ADD: .npmrc')
@@ -1118,8 +1119,15 @@ function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => v
   let content = readFileSync(npmrcPath, 'utf-8')
   const original = content
 
-  if (!content.includes('@narduk-enterprises:registry=https://npm.pkg.github.com')) {
-    content = `@narduk-enterprises:registry=https://npm.pkg.github.com\n${content.trimStart()}`
+  if (content.includes('@narduk-enterprises:registry=https://npm.pkg.github.com')) {
+    content = content.replaceAll(
+      '@narduk-enterprises:registry=https://npm.pkg.github.com',
+      `@narduk-enterprises:registry=${forgejoRegistry}`,
+    )
+  }
+
+  if (!content.includes(`@narduk-enterprises:registry=${forgejoRegistry}`)) {
+    content = `@narduk-enterprises:registry=${forgejoRegistry}\n${content.trimStart()}`
     if (!content.endsWith('\n')) {
       content += '\n'
     }
@@ -1132,6 +1140,7 @@ function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => v
   const sanitizedLines = content
     .split('\n')
     .filter((line) => !line.includes('//npm.pkg.github.com/:_authToken='))
+    .filter((line) => !line.includes('//code.platform.nard.uk/api/packages/narduk-enterprises/npm/:_authToken='))
     .filter((line) => !line.includes('Auth token injected via CI env'))
   content = sanitizedLines.join('\n')
 

@@ -86,7 +86,7 @@ Required repo secrets for runner setup:
 | ---------------------- | ----------------------------------------------------------- |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers:Edit + D1:Edit permissions. |
 | `CLOUDFLARE_ACCOUNT_ID`| Cloudflare account ID.                                      |
-| `GH_PACKAGES_TOKEN`    | GitHub PAT with `read:packages` — installs `@narduk-enterprises/*`. |
+| `FORGEJO_TOKEN`        | Forgejo PAT with package read access — installs `@narduk-enterprises/*` from `code.platform.nard.uk`. |
 | `CANARY_SITE_URL`      | _(Optional)_ Public canary URL injected at build time.      |
 
 ## Secrets And Environment
