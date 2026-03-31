@@ -58,16 +58,24 @@ SQL runs before app-owned SQL.
 
 ### Forgejo Canary Deploy (Phase 3 Pilot)
 
-`.forgejo/workflows/web-canary.yml` provides a runner-executable canary deploy
-contract for `apps/web`.  It deploys to the `canary` Wrangler environment
-(`name: myboat-canary`, defined in `apps/web/wrangler.json`) without calling
-`ship.ts`, mutating the repo, or running audit/drift/sync/quality checks.
+`.forgejo/workflows/web-canary.yml` is the **Phase 3 Forgejo web-canary lane
+only**.  It is not a general production deploy trigger.
 
-The `canary` Wrangler env entry sets only `name`; all other bindings
-(`d1_databases`, `kv_namespaces`, routes, etc.) are inherited from the
-top-level `wrangler.json` config.  To point the canary at a dedicated D1
-database or separate custom domain, add an explicit `d1_databases` or `routes`
-block inside `env.canary` in `apps/web/wrangler.json`.
+**Production / GitHub fallback:** `pnpm run ship` (wraps `tools/ship.ts`) run
+locally or via GitHub Actions remains the production deploy path.
+
+The canary workflow deploys to the `canary` Wrangler environment
+(`name: myboat-canary`, defined in `apps/web/wrangler.json`) without calling
+`ship.ts`, mutating the repo, or running audit/drift/sync/quality checks.  It
+is a **workers.dev-only** deployment — no custom domain or route is set in the
+`canary` env block.
+
+All non-inheritable Wrangler bindings (D1, KV, Durable Objects) are declared
+explicitly inside `env.canary` in `apps/web/wrangler.json` to avoid relying on
+top-level inheritance behaviour.
+
+The workflow targets the `forgejo-web-canary` runner label (the pilot-specific
+runner provisioned by the infra team for this lane).
 
 Trigger manually via `workflow_dispatch` (`run_migrate: true/false`), or via
 the Forgejo dispatch API for platform integration.

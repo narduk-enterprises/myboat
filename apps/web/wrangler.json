@@ -102,7 +102,29 @@
       ]
     },
     "canary": {
-      "name": "myboat-canary"
+      "name": "myboat-canary",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "myboat-db",
+          "database_id": "c56bed08-5796-4f2f-9cc9-9d9b43502f22"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "VESSEL_LIVE_BROKER",
+            "class_name": "VesselLiveBroker"
+          }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "d8dbd41a19e34995bcabe46b8d8dd9c3",
+          "preview_id": "cedfd02fe30a45829086c188937059b0"
+        }
+      ]
     }
   },
   "routes": [

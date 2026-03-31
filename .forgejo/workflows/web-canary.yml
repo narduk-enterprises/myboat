@@ -8,6 +8,17 @@
 #
 # The canary Cloudflare Workers environment is defined in
 # apps/web/wrangler.json under `env.canary` (name: "myboat-canary").
+# It is a workers.dev-only deployment — no custom domain/route is set in the
+# canary env.  All non-inheritable bindings (D1, KV, Durable Objects) are
+# declared explicitly inside env.canary rather than relying on top-level
+# inheritance.
+#
+# ─── Production / GitHub fallback ─────────────────────────────────────────────
+#
+#   The human-facing production deploy path remains `pnpm run ship` (wraps
+#   tools/ship.ts) run locally or via GitHub Actions.  This workflow is the
+#   Phase 3 Forgejo web-canary lane ONLY and must not be used as a general
+#   production deploy trigger.
 #
 # ─── Required repo secrets ────────────────────────────────────────────────────
 #
@@ -62,7 +73,11 @@ concurrency:
 jobs:
   canary:
     name: Web Canary Deploy
-    runs-on: ubuntu-latest
+    # Target the pilot-specific Forgejo runner provisioned for this lane.
+    # This label must match the runner registered by the infra/platform team
+    # for the Phase 3 canary host.  Do NOT change to "ubuntu-latest" or any
+    # other shared label — this workflow is scoped to the canary runner only.
+    runs-on: forgejo-web-canary
 
     # No repo contents write permission needed — this workflow does not commit
     # or push anything.
@@ -112,10 +127,7 @@ jobs:
         if: ${{ inputs.run_migrate == 'true' }}
         # Runs the tracked migration runner against the production D1 database.
         # Database name "myboat-db" matches d1_databases[0].database_name in
-        # apps/web/wrangler.json.  The canary Wrangler env inherits the
-        # top-level D1 binding (same database_id), so no separate canary DB is
-        # needed for the pilot.  Add an explicit `canary.d1_databases` entry in
-        # wrangler.json if a dedicated canary database is required later.
+        # apps/web/wrangler.json and is re-declared explicitly in env.canary.
         run: >
           bash ../../tools/db-migrate.sh myboat-db --remote
           --dir node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle
