@@ -52,6 +52,9 @@
 name: Web Canary Deploy
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       run_migrate:
@@ -59,11 +62,11 @@ on:
           Run remote D1 migrations before deploying.
           Set to "true" only when this deployment includes schema changes.
         required: false
-        default: 'false'
+        default: "false"
         type: choice
         options:
-          - 'false'
-          - 'true'
+          - "false"
+          - "true"
 
 # Never cancel an in-flight canary deploy; queue instead.
 concurrency:
@@ -97,18 +100,21 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: pnpm
           # Limit the Forgejo registry override to the private @narduk-enterprises
           # scope so public npm packages still resolve from the default registry.
-          registry-url: 'https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/'
-          scope: '@narduk-enterprises'
+          registry-url: "https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/"
+          scope: "@narduk-enterprises"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: .
         env:
           NODE_AUTH_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          npm_config_fetch_retries: "0"
+          npm_config_fetch_retry_mintimeout: "1"
+          npm_config_fetch_retry_maxtimeout: "1"
 
       - name: Build
         run: pnpm run build
