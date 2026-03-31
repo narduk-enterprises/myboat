@@ -11,6 +11,8 @@ import {
 
 const isoTimestamp = () => new Date().toISOString()
 
+export * from '#server/database/auth-bridge-schema'
+
 export const publicProfiles = sqliteTable(
   'public_profiles',
   {

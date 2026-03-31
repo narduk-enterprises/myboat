@@ -23,6 +23,7 @@ const authBackend =
       ? 'supabase'
       : 'local'
 const authAuthorityUrl = process.env.AUTH_AUTHORITY_URL || ''
+const appOrmTablesEntry = './server/database/app-schema.ts'
 
 function parseAuthProviders(value: string | undefined) {
   return (value || 'apple,email')
@@ -37,6 +38,10 @@ const authProviders =
 export default defineNuxtConfig({
   // Extend the published Narduk Nuxt Layer
   extends: ['@narduk-enterprises/narduk-nuxt-template-layer'],
+
+  alias: {
+    '#server/app-orm-tables': fileURLToPath(new URL(appOrmTablesEntry, import.meta.url)),
+  },
 
   // The app references its local components without directory prefixes
   // (AppBrandMark, AuthDock, OnboardingForm, MyBoatSurfaceMap, etc.), so

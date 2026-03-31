@@ -1,7 +1,12 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import {
+  INHERITED_AGENTIC_WORKFLOW_DIRECTORIES,
+  INHERITED_AGENTIC_WORKFLOW_FILES,
+} from './agentic-workflow-manifest'
 
 export const VERBATIM_SYNC_FILES = [
+  '.dockerignore',
   'doppler.template.yaml',
   'config/fleet-sync-repos.json',
   'config/fleet-app-dir-overrides.json',
@@ -17,10 +22,16 @@ export const VERBATIM_SYNC_FILES = [
   'tools/check-guardrails.ts',
   'tools/sync-template.ts',
   'tools/sync-core.ts',
+  'tools/fleet-git.ts',
+  'tools/package-registry.ts',
+  'tools/mirror-fleet-to-forgejo.ts',
+  'tools/agentic-workflow-manifest.ts',
   'tools/sync-manifest.ts',
   'tools/check-drift-ci.ts',
   'tools/check-sync-health.ts',
   'tools/generate-favicons.ts',
+  'tools/sync-github-skills.ts',
+  'tools/web-deploy.cjs',
   'tools/tail.ts',
   'tools/ship.ts',
   'tools/db-migrate.sh',
@@ -32,6 +43,7 @@ export const VERBATIM_SYNC_FILES = [
   'renovate.json',
   '.github/copilot-instructions.md',
   '.github/prompts/ui-ux-pro-max/PROMPT.md',
+  ...INHERITED_AGENTIC_WORKFLOW_FILES,
   '.cursor/rules/user-global-skills.mdc',
   'apps/web/.nuxtrc',
   'apps/web/.npmrc',
@@ -47,6 +59,7 @@ export const AUTH_BRIDGE_SYNC_FILES = [
   'apps/web/app/components/AuthRegisterCard.vue',
   'apps/web/app/composables/useAuth.ts',
   'apps/web/app/composables/useAuthApi.ts',
+  'apps/web/app/composables/useManagedSupabase.ts',
   'apps/web/app/middleware/auth.ts',
   'apps/web/app/middleware/guest.ts',
   'apps/web/app/layouts/auth.vue',
@@ -66,10 +79,15 @@ export const AUTH_BRIDGE_SYNC_FILES = [
   'apps/web/server/api/auth/mfa/verify.post.ts',
   'apps/web/server/api/auth/oauth/start.post.ts',
   'apps/web/server/api/auth/password/reset.post.ts',
+  'apps/web/server/api/auth/session/exchange.get.ts',
   'apps/web/server/api/auth/register.post.ts',
   'apps/web/server/api/auth/session/exchange.post.ts',
+  'apps/web/server/database/auth-bridge-pg-schema.ts',
   'apps/web/server/database/auth-bridge-schema.ts',
+  'apps/web/server/database/pg-app-schema.ts',
+  'apps/web/server/database/pg-schema.ts',
   'apps/web/server/utils/app-auth.ts',
+  'apps/web/server/utils/supabase.ts',
   'apps/web/drizzle/0001_auth_bridge.sql',
 ] as const
 
@@ -88,6 +106,9 @@ export const REFERENCE_BASELINE_FILES = [
 ] as const
 
 export const RECURSIVE_SYNC_DIRECTORIES = [
+  ...INHERITED_AGENTIC_WORKFLOW_DIRECTORIES,
+  '.github/skills',
+  'deploy/preview',
   'packages/eslint-config',
   'tools/guardrails',
   '.agents/workflows',
@@ -97,7 +118,6 @@ export const RECURSIVE_SYNC_DIRECTORIES = [
 export const STALE_SYNC_PATHS = [
   '.agents/skills',
   '.agents/.DS_Store',
-  '.github/skills',
   '.github/workflows/publish-layer.yml',
   '.github/workflows/deploy-showcase.yml',
   '.github/workflows/deploy.yml',
@@ -133,6 +153,7 @@ export const FLEET_ROOT_SCRIPT_PATCHES: Readonly<Record<string, string>> = {
   preship:
     'node tools/check-setup.cjs && pnpm install --frozen-lockfile && pnpm audit --audit-level=critical && pnpm exec tsx tools/check-drift-ci.ts && pnpm exec tsx tools/check-sync-health.ts && pnpm run quality:check',
   ship: 'pnpm exec tsx tools/ship.ts',
+  'sync:github-skills': 'pnpm exec tsx tools/sync-github-skills.ts',
   validate: 'pnpm exec tsx tools/validate.ts',
   'sync-template': 'pnpm exec tsx tools/sync-template.ts .',
   'update-layer': 'pnpm exec tsx tools/update-layer.ts',
@@ -159,6 +180,7 @@ export const FLEET_ROOT_SCRIPT_PATCHES: Readonly<Record<string, string>> = {
 export const FLEET_WEB_SCRIPT_PATCHES: Readonly<Record<string, string>> = {
   predev: 'pnpm run db:ready',
   dev: '(doppler run -- nuxt dev || nuxt dev)',
+  deploy: 'node ../../tools/web-deploy.cjs',
   lint: 'eslint . --max-warnings 0',
   quality: "echo 'Turbo dependsOn handles lint + typecheck + format:check'",
 }
@@ -181,7 +203,7 @@ concurrency:
   cancel-in-progress: true
 
 # CI is disabled (workflow_dispatch only) to conserve GitHub Actions minutes.
-# Deploy is done locally via \`pnpm run deploy\` (wrangler deploy).
+# Deploy is done locally via \`pnpm ship\`.
 # See .agents/workflows/deploy.md for the local deploy workflow.
 
 jobs:
@@ -190,6 +212,7 @@ jobs:
     secrets:
       DOPPLER_TOKEN: \${{ secrets.DOPPLER_TOKEN }}
       GH_PACKAGES_TOKEN: \${{ secrets.GH_PACKAGES_TOKEN }}
+      FORGEJO_TOKEN: \${{ secrets.FORGEJO_TOKEN }}
 `
 }
 
