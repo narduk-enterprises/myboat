@@ -129,9 +129,10 @@ export default defineNuxtConfig({
         secure: true,
       },
     },
-    appleTeamId: process.env.APPLE_TEAM_ID || '',
+    appleTeamId: process.env.APPLE_TEAM_ID || process.env.APPLE_DEVELOPER_ID || '',
     appleKeyId: process.env.APPLE_KEY_ID || '',
     appleSecretKey: process.env.APPLE_PRIVATE_KEY || process.env.APPLE_SECRET_KEY || '',
+    appleMapServicesId: process.env.APPLE_MAPS_SERVICES_ID || '',
     mapkitServerApiKey: process.env.MAPKIT_SERVER_API_KEY || '',
     public: {
       mapkitToken: process.env.APPLE_MAPKIT_TOKEN || process.env.MAPKIT_TOKEN || '',
@@ -140,7 +141,7 @@ export default defineNuxtConfig({
           process.env.MAPKIT_TOKEN ||
           (
             (process.env.APPLE_PRIVATE_KEY || process.env.APPLE_SECRET_KEY) &&
-            process.env.APPLE_TEAM_ID &&
+            (process.env.APPLE_TEAM_ID || process.env.APPLE_DEVELOPER_ID) &&
             process.env.APPLE_KEY_ID
           ),
       ),
