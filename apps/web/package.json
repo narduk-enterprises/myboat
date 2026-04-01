@@ -5,7 +5,7 @@
   "version": "1.17.2",
   "scripts": {
     "prebuild": "pnpm --filter @myboat/telemetry-source-policy build",
-    "build": "nuxt build",
+    "build": "node ../../tools/run-with-platform-secrets.mjs --app myboat --environment prd --profile build -- sh -c 'nuxt build'",
     "db:ready": "pnpm run db:migrate && pnpm run db:seed",
     "dev": "sh -c 'if command -v doppler >/dev/null 2>&1; then doppler run -- pnpm run dev:inner; else pnpm run dev:inner; fi'",
     "dev:inner": "pnpm run db:ready && pnpm run dev:bindings && pnpm run dev:broker-port && pnpm run dev:port && pnpm exec concurrently -k -n broker,web -c blue,green \"pnpm run dev:broker\" \"pnpm run dev:nuxt\"",
