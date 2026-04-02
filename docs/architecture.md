@@ -110,9 +110,9 @@ flowchart TB
 - Selection happens after leaf expansion, so object-valued paths such as
   `navigation.position` are expanded to leaf paths before ranking, then grouped
   by `(context, canonicalPath)`.
-- Sticky winners are retained by path family with freshness windows of `15s`
-  for fast nav/wind/current/depth, `60s` for electrical/tanks/propulsion/
-  steering, and `6h` for static identity, design, and AIS dimensions.
+- Sticky winners are retained by path family with freshness windows of `15s` for
+  fast nav/wind/current/depth, `60s` for electrical/tanks/propulsion/ steering,
+  and `6h` for static identity, design, and AIS dimensions.
 - D1 is the operational store for:
   - users, vessels, and installations
   - sharing controls
@@ -204,8 +204,8 @@ Local boat flow:
   - owner routes can read `core` plus owner-only `detail`
 - Owner diagnostics route:
   - `GET /api/app/vessels/[vesselSlug]/telemetry/sources`
-  - returns latest source inventory, duplicate hotspots, current winners,
-    policy version, primary-install timestamps, and `shadowPublisherSeen`
+  - returns latest source inventory, duplicate hotspots, current winners, policy
+    version, primary-install timestamps, and `shadowPublisherSeen`
 - `electrical.switches.bank.*` remains debug-only. The operator-facing switch
   surface is `electrical.switches.leopard.*`.
 - Retention posture for the current POC:
@@ -231,8 +231,8 @@ Local boat flow:
 - Bee shadow canaries must identify themselves to MyBoat as
   `publisherRole=shadow`; the live primary Bee publisher remains
   `publisherRole=primary`.
-- Controlled shadow publishing is opt-in only. If enabled for a test window,
-  the shadow collector must target `/api/ingest/v1/delta`,
+- Controlled shadow publishing is opt-in only. If enabled for a test window, the
+  shadow collector must target `/api/ingest/v1/delta`,
   `/api/ingest/v1/identity`, and `/api/ingest/v1/sources` with
   `MYBOAT_PUBLISHER_ROLE=shadow`, and success means diagnostics record the
   shadow publisher without displacing current primary winners.

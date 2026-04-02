@@ -1,6 +1,4 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'auth' })
-
 useSeo({
   title: 'Finishing Sign In',
   description: 'Completing your authentication callback.',
@@ -13,7 +11,7 @@ useWebPageSchema({
 </script>
 
 <template>
-  <div class="flex w-full items-center justify-center px-4 py-12">
+  <div class="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
     <AuthExchangePanel />
   </div>
 </template>

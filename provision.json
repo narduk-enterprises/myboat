@@ -4,5 +4,9 @@
   "description": "Marine platform for vessel identity, live telemetry, passages, media, and edge installs.",
   "url": "https://mybo.at",
   "provisionedAt": "2026-03-25T14:46:54.774Z",
-  "shortDescription": "Marine platform for vessel identity, live telemetry, passages, media, and edge installs."
+  "shortDescription": "Marine platform for vessel identity, live telemetry, passages, media, and edge installs.",
+  "templateLayer": {
+    "mode": "bundled",
+    "bundles": ["auth", "analytics", "maps"]
+  }
 }

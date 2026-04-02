@@ -20,8 +20,8 @@ Status: UNLOCKED
   - one large active canvas for map or playback
   - one adjacent companion area for selection detail, missing-data summary, and
     next actions
-- Tall stacked sections are not the default for active inspection routes.
-  Favor side-by-side workspace composition before long vertical rails.
+- Tall stacked sections are not the default for active inspection routes. Favor
+  side-by-side workspace composition before long vertical rails.
 - Large map and playback surfaces must define partial-data behavior:
   - reduce visual height when data is sparse
   - keep missing-data summary near the canvas
@@ -294,8 +294,8 @@ Status: UNLOCKED
 - Secondary CTA:
   - return to dashboard
 - Behavior:
-  - desktop keeps the selected buddy boat, missing-coordinate counts, and
-    manage state visible near the map
+  - desktop keeps the selected buddy boat, missing-coordinate counts, and manage
+    state visible near the map
   - sparse map data must read as a partial-state workflow, not a large blank
     canvas
   - off-map boats should remain in a structured companion area instead of loose
@@ -596,8 +596,8 @@ Status: UNLOCKED
 - Behavior:
   - the first viewport should show title, key action, and primary operational
     context without centered dead air
-  - decorative rail or hero treatments must not dominate the route above the
-    KPI and control surfaces
+  - decorative rail or hero treatments must not dominate the route above the KPI
+    and control surfaces
 
 ### `/admin/users`
 
@@ -677,9 +677,9 @@ Status: UNLOCKED
   from SignalK.
 - AIS and vessel identity cards should preserve last known non-null values when
   live updates are sparse.
-- Sparse map or playback states should remain informative:
-  keep the selected focus, missing-data summary, and next action near the main
-  canvas instead of pushing them below it.
+- Sparse map or playback states should remain informative: keep the selected
+  focus, missing-data summary, and next action near the main canvas instead of
+  pushing them below it.
 
 ## Verification checkpoints
 
@@ -693,8 +693,8 @@ Status: UNLOCKED
   - sparse-coordinate datasets still show selected-vessel context and a clear
     missing-data summary
 - Passages:
-  - selected passage, playback readiness, and route context stay legible
-    without deep scrolling
+  - selected passage, playback readiness, and route context stay legible without
+    deep scrolling
 - Mobile:
   - split-workspace routes collapse cleanly without losing active selection or
     missing-data explanation
