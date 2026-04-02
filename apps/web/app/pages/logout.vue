@@ -2,8 +2,6 @@
 const config = useRuntimeConfig()
 const { logout } = useAuth()
 
-definePageMeta({ layout: 'auth' })
-
 useSeo({
   title: 'Signing Out',
   description: 'Clearing your app session.',
@@ -21,7 +19,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex w-full items-center justify-center px-4 py-12">
+  <div class="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
     <UCard class="w-full max-w-md text-center">
       <div class="space-y-3 py-4">
         <UIcon name="i-lucide-loader-circle" class="mx-auto size-8 animate-spin text-primary" />

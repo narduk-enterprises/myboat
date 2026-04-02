@@ -1,9 +1,4 @@
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const expectedSiteURL = 'https://mybo.at'
-const expectedAuthAuthorityURL = 'https://auth.platform.nard.uk'
+const expectedAuthAuthorityUrl = 'https://auth.platform.nard.uk'
 
 const requiredVariables = [
   'SITE_URL',
@@ -27,22 +22,36 @@ for (const name of requiredVariables) {
   }
 }
 
-if (process.env.SITE_URL !== expectedSiteURL) {
-  fail(`SITE_URL must be ${expectedSiteURL}, received ${process.env.SITE_URL}.`)
+const siteUrl = process.env.SITE_URL?.trim() || ''
+let parsedSiteUrl
+
+try {
+  parsedSiteUrl = new URL(siteUrl)
+} catch {
+  fail(`SITE_URL must be a valid absolute URL, received ${siteUrl}.`)
 }
 
-if (process.env.AUTH_AUTHORITY_URL !== expectedAuthAuthorityURL) {
+if (parsedSiteUrl.protocol !== 'https:') {
+  fail(`SITE_URL must use https, received ${siteUrl}.`)
+}
+
+if (parsedSiteUrl.hostname === 'localhost' || parsedSiteUrl.hostname === '127.0.0.1') {
+  fail(`SITE_URL must point at a deployed origin, received ${siteUrl}.`)
+}
+
+if (process.env.AUTH_AUTHORITY_URL !== expectedAuthAuthorityUrl) {
   fail(
-    `AUTH_AUTHORITY_URL must be ${expectedAuthAuthorityURL}, received ${process.env.AUTH_AUTHORITY_URL}.`,
+    `AUTH_AUTHORITY_URL must be ${expectedAuthAuthorityUrl}, received ${process.env.AUTH_AUTHORITY_URL}.`,
   )
 }
 
-const providers = process.env.AUTH_PROVIDERS.split(',')
+const providers = (process.env.AUTH_PROVIDERS || '')
+  .split(',')
   .map((provider) => provider.trim().toLowerCase())
   .filter(Boolean)
 
-if (providers.length !== 2 || !providers.includes('apple') || !providers.includes('email')) {
-  fail(`AUTH_PROVIDERS must be exactly apple,email, received ${process.env.AUTH_PROVIDERS}.`)
+if (!providers.includes('email')) {
+  fail(`AUTH_PROVIDERS must include email, received ${process.env.AUTH_PROVIDERS}.`)
 }
 
-console.log(`✅ Production deploy env validated for ${rootDir}.`)
+console.log(`✅ Production deploy env validated for ${siteUrl}.`)

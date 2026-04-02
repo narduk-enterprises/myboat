@@ -118,8 +118,8 @@ credentials, and internal telemetry views.
   strip (captain-managed bio remains available in settings and can surface on
   other public treatments when needed)
 - the fleet map on `/:username` frames **vessel positions only** (no passage
-  polylines) so the default camera centers on the boat rather than distant
-  route geometry
+  polylines) so the default camera centers on the boat rather than distant route
+  geometry
 
 ### 2. Vessel identity
 
@@ -231,8 +231,7 @@ credentials, and internal telemetry views.
   - `venus.com.victronenergy.*`
   - plugin-owned domains such as Leopard switches and engine-hours runtime
 - precedence is explicit instead of inferred from SignalK's current winner:
-  - `electrical.switches.leopard.*` prefers
-    `signalk-leopard-empirbus-switches`
+  - `electrical.switches.leopard.*` prefers `signalk-leopard-empirbus-switches`
   - `propulsion.*.runTime*` prefers `signalk-engine-hours.*`
   - speed and wind averaging paths prefer `signalk-speed-wind-averaging`
   - `notifications.server.*` prefers `signalk-server`

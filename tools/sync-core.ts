@@ -10,10 +10,16 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
 import { runCommand } from './command'
+import {
+  buildPackageRegistryLine,
+  getPackageRegistryConfig,
+  patchPackageRegistryNpmrcContent,
+} from './package-registry'
 import {
   AUTH_BRIDGE_SYNC_FILES,
   BOOTSTRAP_SYNC_FILES,
@@ -27,6 +33,17 @@ import {
   getCanonicalCiContent,
   isIgnoredManagedPath,
 } from './sync-manifest'
+import {
+  COMPAT_LAYER_PACKAGE_NAME,
+  LAYER_BUNDLE_MANIFEST,
+  getLayerBundleByPackageName,
+  listLayerBundleDefinitions,
+  normalizeTemplateLayerSelection,
+  resolveRequiredAppDependencies,
+  resolveSelectedLayerPackageNames,
+  type TemplateLayerSelection,
+} from './layer-bundle-manifest'
+import { resolveRepoTemplateLayerSelection } from './template-layer-selection'
 
 export interface RunAppSyncOptions {
   appDir: string
@@ -35,9 +52,11 @@ export interface RunAppSyncOptions {
   dryRun?: boolean
   strict?: boolean
   skipQuality?: boolean
+  skipInstall?: boolean
   allowDirtyApp?: boolean
   allowDirtyTemplate?: boolean
   skipRewriteRepo?: boolean
+  templateLayerSelection?: TemplateLayerSelection | null
   log?: (message: string) => void
 }
 
@@ -49,6 +68,71 @@ interface SyncCounters {
 
 function createCounters(): SyncCounters {
   return { copied: 0, skipped: 0, removed: 0 }
+}
+
+const COMPAT_LAYER_DIRECTORY = 'layers/narduk-nuxt-layer'
+const RECURSIVE_SOURCE_SKIP_DIRECTORIES = new Set([
+  '.data',
+  '.nitro',
+  '.nuxt',
+  '.output',
+  '.turbo',
+  '.wrangler',
+  'node_modules',
+])
+
+function readLayerPackageVersion(templateDir: string): string {
+  try {
+    const layerPackage = JSON.parse(
+      readFileSync(join(templateDir, COMPAT_LAYER_DIRECTORY, 'package.json'), 'utf-8'),
+    ) as { version?: string }
+    return layerPackage.version || '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+function resolveSyncTemplateLayerSelection(
+  appDir: string,
+  selection: TemplateLayerSelection | null | undefined,
+): TemplateLayerSelection {
+  if (selection) {
+    return normalizeTemplateLayerSelection(selection)
+  }
+
+  return resolveRepoTemplateLayerSelection(appDir)
+}
+
+function usesBundledLayers(selection: TemplateLayerSelection): boolean {
+  return normalizeTemplateLayerSelection(selection).mode === 'bundled'
+}
+
+function resolveLayerDrizzleDirsForSelection(selection: TemplateLayerSelection): string[] {
+  const normalized = normalizeTemplateLayerSelection(selection)
+  if (normalized.mode === 'legacy-full') {
+    return [`node_modules/${COMPAT_LAYER_PACKAGE_NAME}/drizzle`]
+  }
+
+  return resolveSelectedLayerPackageNames(normalized)
+    .filter(
+      (packageName) =>
+        (getLayerBundleByPackageName(packageName)?.ownedMigrationPaths.length ?? 0) > 0,
+    )
+    .map((packageName) => `node_modules/${packageName}/drizzle`)
+}
+
+function getSeedLayerPackageName(selection: TemplateLayerSelection): string {
+  const normalized = normalizeTemplateLayerSelection(selection)
+  if (normalized.mode === 'legacy-full') {
+    return COMPAT_LAYER_PACKAGE_NAME
+  }
+
+  return resolveSelectedLayerPackageNames(normalized)[0] || COMPAT_LAYER_PACKAGE_NAME
+}
+
+function buildExpectedExtendsLiteral(selection: TemplateLayerSelection): string {
+  const packageNames = resolveSelectedLayerPackageNames(selection)
+  return `  extends: [${packageNames.map((packageName) => `'${packageName}'`).join(', ')}],`
 }
 
 function run(command: string, args: string[], cwd: string) {
@@ -103,6 +187,31 @@ function getTrackedTemplatePaths(templateDir: string): Set<string> | null {
 
 function ensureDir(filePath: string) {
   mkdirSync(dirname(filePath), { recursive: true })
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function walkFiles(rootDir: string, visitor: (filePath: string) => void) {
+  if (!existsSync(rootDir)) return
+
+  for (const entry of readdirSync(rootDir)) {
+    if (RECURSIVE_SOURCE_SKIP_DIRECTORIES.has(entry)) {
+      continue
+    }
+
+    const absolutePath = join(rootDir, entry)
+    const stat = lstatSync(absolutePath)
+    if (stat.isDirectory()) {
+      walkFiles(absolutePath, visitor)
+      continue
+    }
+
+    if (stat.isFile()) {
+      visitor(absolutePath)
+    }
+  }
 }
 
 function pathOccupied(filePath: string): boolean {
@@ -412,6 +521,7 @@ function syncManagedFiles(
   counters: SyncCounters,
   dryRun: boolean,
   mode: 'full' | 'layer',
+  templateLayerSelection: TemplateLayerSelection,
   log: (message: string) => void,
 ) {
   const trackedPaths = getTrackedTemplatePaths(templateDir)
@@ -441,7 +551,12 @@ function syncManagedFiles(
   }
 
   const directories =
-    mode === 'full' ? RECURSIVE_SYNC_DIRECTORIES : (['layers/narduk-nuxt-layer'] as const)
+    mode === 'full'
+      ? RECURSIVE_SYNC_DIRECTORIES.filter(
+          (directory) =>
+            !(usesBundledLayers(templateLayerSelection) && directory === COMPAT_LAYER_DIRECTORY),
+        )
+      : ([COMPAT_LAYER_DIRECTORY] as const)
   for (const directory of directories) {
     if (trackedPaths) {
       syncTrackedDirectory(directory, templateDir, appDir, trackedPaths, counters, dryRun, log)
@@ -554,6 +669,7 @@ function patchRootPackage(
           'build:showcase',
           'deploy:showcase',
           'test:e2e:showcase',
+          'test:e2e:ui',
           'test:e2e:mapkit',
           'quality:fleet',
           'sync:fleet',
@@ -712,6 +828,7 @@ function patchWebNuxtConfig(
   appDir: string,
   dryRun: boolean,
   mode: 'full' | 'layer',
+  templateLayerSelection: TemplateLayerSelection,
   log: (message: string) => void,
 ): boolean {
   if (mode !== 'full') return false
@@ -722,18 +839,97 @@ function patchWebNuxtConfig(
   let content = readFileSync(nuxtConfigPath, 'utf-8')
   const original = content
 
+  if (content.includes('fileURLToPath(') && !content.includes("from 'node:url'")) {
+    const lines = content.split('\n')
+    const firstImportIndex = lines.findIndex((line) => line.startsWith('import '))
+    const importLine = "import { fileURLToPath } from 'node:url'"
+
+    if (firstImportIndex >= 0) {
+      lines.splice(firstImportIndex, 0, importLine)
+    } else {
+      let insertAt = 0
+      while (insertAt < lines.length && lines[insertAt].startsWith('//')) {
+        insertAt += 1
+      }
+      lines.splice(insertAt, 0, importLine, '')
+    }
+
+    content = lines.join('\n')
+  }
+
+  const configuredAuthBackendAnchor = 'const configuredAuthBackend = process.env.AUTH_BACKEND'
+  const preludeBlocks = [
+    {
+      anchor: 'const appBackendPreset =',
+      lines: [
+        'const appBackendPreset =',
+        "  process.env.APP_BACKEND_PRESET === 'managed-supabase' ? 'managed-supabase' : 'default'",
+      ],
+    },
+    {
+      anchor: 'const supabaseUrl =',
+      lines: [
+        "const supabaseUrl = process.env.AUTH_AUTHORITY_URL || process.env.SUPABASE_URL || ''",
+      ],
+    },
+    {
+      anchor: 'const supabasePublishableKey =',
+      lines: [
+        'const supabasePublishableKey =',
+        '  process.env.SUPABASE_PUBLISHABLE_KEY ||',
+        '  process.env.SUPABASE_ANON_KEY ||',
+        '  process.env.SUPABASE_AUTH_ANON_KEY ||',
+        "  ''",
+      ],
+    },
+    {
+      anchor: 'const supabaseServiceRoleKey =',
+      lines: [
+        'const supabaseServiceRoleKey =',
+        "  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || ''",
+      ],
+    },
+  ]
+  const missingPreludeBlocks = preludeBlocks
+    .filter(({ anchor }) => !content.includes(anchor))
+    .flatMap(({ lines }) => lines)
+
+  if (missingPreludeBlocks.length > 0 && content.includes(configuredAuthBackendAnchor)) {
+    content = content.replace(
+      configuredAuthBackendAnchor,
+      `${missingPreludeBlocks.join('\n')}\n${configuredAuthBackendAnchor}`,
+    )
+  }
+
+  if (!content.includes('const appOrmTablesEntry =')) {
+    const appOrmTablesBlock = [
+      'const appOrmTablesEntry =',
+      "  process.env.NUXT_DATABASE_BACKEND === 'postgres'",
+      "    ? './server/database/pg-app-schema.ts'",
+      "    : './server/database/app-schema.ts'",
+      '',
+    ].join('\n')
+
+    if (content.includes('function parseAuthProviders(value: string | undefined)')) {
+      content = content.replace(
+        'function parseAuthProviders(value: string | undefined) {',
+        `${appOrmTablesBlock}function parseAuthProviders(value: string | undefined) {`,
+      )
+    } else {
+      const anchor = '// https://nuxt.com/docs/api/configuration/nuxt-config'
+      const exportDefaultAnchor = 'export default defineNuxtConfig({'
+      if (content.includes(anchor)) {
+        content = content.replace(anchor, `${appOrmTablesBlock}${anchor}`)
+      } else if (content.includes(exportDefaultAnchor)) {
+        content = content.replace(exportDefaultAnchor, `${appOrmTablesBlock}${exportDefaultAnchor}`)
+      }
+    }
+  }
+
   if (!content.includes('function parseAuthProviders(value: string | undefined)')) {
     const anchor = '// https://nuxt.com/docs/api/configuration/nuxt-config'
+    const exportDefaultAnchor = 'export default defineNuxtConfig({'
     const authSetupBlock = [
-      'const configuredAuthBackend = process.env.AUTH_BACKEND',
-      'const authBackend =',
-      "  configuredAuthBackend === 'supabase' || configuredAuthBackend === 'local'",
-      '    ? configuredAuthBackend',
-      '    : process.env.AUTH_AUTHORITY_URL && process.env.SUPABASE_AUTH_ANON_KEY',
-      "      ? 'supabase'",
-      "      : 'local'",
-      "const authAuthorityUrl = process.env.AUTH_AUTHORITY_URL || ''",
-      '',
       'function parseAuthProviders(value: string | undefined) {',
       "  return (value || 'apple,email')",
       "    .split(',')",
@@ -748,44 +944,270 @@ function patchWebNuxtConfig(
 
     if (content.includes(anchor)) {
       content = content.replace(anchor, `${authSetupBlock}${anchor}`)
+    } else if (content.includes(exportDefaultAnchor)) {
+      content = content.replace(exportDefaultAnchor, `${authSetupBlock}${exportDefaultAnchor}`)
     }
   }
 
-  if (!content.includes('authBackend,')) {
+  content = content.replace(
+    ': process.env.AUTH_AUTHORITY_URL && process.env.SUPABASE_AUTH_ANON_KEY',
+    ': supabaseUrl && supabasePublishableKey',
+  )
+  content = content.replace(
+    "const authAuthorityUrl = process.env.AUTH_AUTHORITY_URL || ''",
+    'const authAuthorityUrl = supabaseUrl',
+  )
+
+  const expectedExtendsLiteral = buildExpectedExtendsLiteral(templateLayerSelection)
+  if (/^\s*extends:\s*\[[^\]]*\],/m.test(content)) {
+    content = content.replace(/^\s*extends:\s*\[[^\]]*\],/m, expectedExtendsLiteral)
+  } else {
     content = content.replace(
-      '  runtimeConfig: {\n',
-      [
-        '  runtimeConfig: {',
-        '    authBackend,',
-        '    authAuthorityUrl,',
-        "    authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',",
-        "    authServiceRoleKey: process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || '',",
-        "    authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',",
-        "    turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',",
-      ].join('\n') + '\n',
+      'export default defineNuxtConfig({',
+      `export default defineNuxtConfig({\n${expectedExtendsLiteral}`,
     )
   }
 
-  if (!content.includes('authLoginPath:')) {
-    content = content.replace(
-      '    public: {\n',
-      [
-        '    public: {',
-        '      authBackend,',
-        '      authAuthorityUrl,',
-        "      authLoginPath: '/login',",
-        "      authRegisterPath: '/register',",
-        "      authCallbackPath: '/auth/callback',",
-        "      authConfirmPath: '/auth/confirm',",
-        "      authResetPath: '/reset-password',",
-        "      authLogoutPath: '/logout',",
-        "      authRedirectPath: '/dashboard/',",
-        '      authProviders,',
-        "      authPublicSignup: process.env.AUTH_PUBLIC_SIGNUP !== 'false',",
-        "      authRequireMfa: process.env.AUTH_REQUIRE_MFA === 'true',",
-        "      authTurnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '',",
-      ].join('\n') + '\n',
-    )
+  if (!content.includes("'#server/app-orm-tables'")) {
+    const aliasLine =
+      "    '#server/app-orm-tables': fileURLToPath(new URL(appOrmTablesEntry, import.meta.url)),"
+    if (/^  alias: \{\n/m.test(content)) {
+      content = content.replace(/^  alias: \{\n/m, `  alias: {\n${aliasLine}\n`)
+    } else {
+      const aliasBlock = ['  alias: {', aliasLine, '  },', ''].join('\n')
+      if (/^\s*extends:\s*\[[^\]]*\],\n/m.test(content)) {
+        content = content.replace(
+          /^\s*extends:\s*\[[^\]]*\],\n/m,
+          (match) => `${match}\n${aliasBlock}`,
+        )
+      } else {
+        content = content.replace(
+          'export default defineNuxtConfig({',
+          `export default defineNuxtConfig({\n${aliasBlock}`,
+        )
+      }
+    }
+  }
+
+  const findPropertyLine = (body: string, prefixes: string[]): string | null => {
+    const line = body.split('\n').find((candidate) => {
+      const trimmed = candidate.trimStart()
+      return prefixes.some((prefix) => trimmed.startsWith(prefix))
+    })
+
+    return line ? line.trim() : null
+  }
+
+  const buildPropertyLine = (
+    body: string,
+    prefixes: string[],
+    fallback: string,
+    indent: string,
+  ): string => `${indent}${findPropertyLine(body, prefixes) ?? fallback}`
+
+  const runtimeStart = content.indexOf('  runtimeConfig: {\n')
+  const publicStart = content.indexOf('    public: {\n', runtimeStart)
+  if (runtimeStart !== -1 && publicStart !== -1) {
+    const runtimeBodyStart = runtimeStart + '  runtimeConfig: {\n'.length
+    const runtimeBody = content.slice(runtimeBodyStart, publicStart)
+    const runtimePrefixes = [
+      'appBackendPreset,',
+      'authBackend,',
+      'authBackend:',
+      'authAuthorityUrl,',
+      'authAuthorityUrl:',
+      'authAnonKey,',
+      'authAnonKey:',
+      'authServiceRoleKey,',
+      'authServiceRoleKey:',
+      'authStorageKey:',
+      'turnstileSecretKey:',
+      'supabaseUrl,',
+      'supabaseUrl:',
+      'supabasePublishableKey,',
+      'supabasePublishableKey:',
+      'supabaseServiceRoleKey,',
+      'supabaseServiceRoleKey:',
+    ]
+    const normalizedRuntimeBody = runtimeBody
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trimStart()
+        return !runtimePrefixes.some((prefix) => trimmed.startsWith(prefix))
+      })
+      .join('\n')
+      .replace(/^\n+/, '')
+
+    const runtimeAuthBlock = [
+      buildPropertyLine(runtimeBody, ['appBackendPreset,'], 'appBackendPreset,', '    '),
+      buildPropertyLine(runtimeBody, ['authBackend,', 'authBackend:'], 'authBackend,', '    '),
+      buildPropertyLine(
+        runtimeBody,
+        ['authAuthorityUrl,', 'authAuthorityUrl:'],
+        'authAuthorityUrl,',
+        '    ',
+      ),
+      buildPropertyLine(
+        runtimeBody,
+        ['authAnonKey,', 'authAnonKey:'],
+        'authAnonKey: supabasePublishableKey,',
+        '    ',
+      ),
+      buildPropertyLine(
+        runtimeBody,
+        ['authServiceRoleKey,', 'authServiceRoleKey:'],
+        'authServiceRoleKey: supabaseServiceRoleKey,',
+        '    ',
+      ),
+      buildPropertyLine(
+        runtimeBody,
+        ['authStorageKey:'],
+        "authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',",
+        '    ',
+      ),
+      buildPropertyLine(
+        runtimeBody,
+        ['turnstileSecretKey:'],
+        "turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',",
+        '    ',
+      ),
+      buildPropertyLine(runtimeBody, ['supabaseUrl,', 'supabaseUrl:'], 'supabaseUrl,', '    '),
+      buildPropertyLine(
+        runtimeBody,
+        ['supabasePublishableKey,', 'supabasePublishableKey:'],
+        'supabasePublishableKey,',
+        '    ',
+      ),
+      buildPropertyLine(
+        runtimeBody,
+        ['supabaseServiceRoleKey,', 'supabaseServiceRoleKey:'],
+        'supabaseServiceRoleKey,',
+        '    ',
+      ),
+    ].join('\n')
+
+    content =
+      content.slice(0, runtimeBodyStart) +
+      `${runtimeAuthBlock}\n${normalizedRuntimeBody}` +
+      content.slice(publicStart)
+  }
+
+  const publicBlockStart = content.indexOf('    public: {\n')
+  const publicBlockBodyStart = publicBlockStart + '    public: {\n'.length
+  const publicBlockEnd =
+    publicBlockStart === -1 ? -1 : content.indexOf('\n    },', publicBlockBodyStart)
+  if (publicBlockStart !== -1 && publicBlockEnd !== -1) {
+    const publicBody = content.slice(publicBlockBodyStart, publicBlockEnd)
+    const publicPrefixes = [
+      'appBackendPreset,',
+      'authBackend,',
+      'authBackend:',
+      'authAuthorityUrl,',
+      'authAuthorityUrl:',
+      'authLoginPath:',
+      'authRegisterPath:',
+      'authCallbackPath:',
+      'authConfirmPath:',
+      'authResetPath:',
+      'authLogoutPath:',
+      'authRedirectPath:',
+      'authProviders,',
+      'authProviders:',
+      'authPublicSignup:',
+      'authRequireMfa:',
+      'authTurnstileSiteKey:',
+      'supabaseUrl,',
+      'supabaseUrl:',
+      'supabasePublishableKey,',
+      'supabasePublishableKey:',
+    ]
+    const normalizedPublicBody = publicBody
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trimStart()
+        return !publicPrefixes.some((prefix) => trimmed.startsWith(prefix))
+      })
+      .join('\n')
+      .replace(/^\n+/, '')
+
+    const publicAuthBlock = [
+      buildPropertyLine(publicBody, ['appBackendPreset,'], 'appBackendPreset,', '      '),
+      buildPropertyLine(publicBody, ['authBackend,', 'authBackend:'], 'authBackend,', '      '),
+      buildPropertyLine(
+        publicBody,
+        ['authAuthorityUrl,', 'authAuthorityUrl:'],
+        'authAuthorityUrl,',
+        '      ',
+      ),
+      buildPropertyLine(publicBody, ['authLoginPath:'], "authLoginPath: '/login',", '      '),
+      buildPropertyLine(
+        publicBody,
+        ['authRegisterPath:'],
+        "authRegisterPath: '/register',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authCallbackPath:'],
+        "authCallbackPath: '/auth/callback',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authConfirmPath:'],
+        "authConfirmPath: '/auth/confirm',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authResetPath:'],
+        "authResetPath: '/reset-password',",
+        '      ',
+      ),
+      buildPropertyLine(publicBody, ['authLogoutPath:'], "authLogoutPath: '/logout',", '      '),
+      buildPropertyLine(
+        publicBody,
+        ['authRedirectPath:'],
+        "authRedirectPath: '/dashboard/',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authProviders,', 'authProviders:'],
+        'authProviders,',
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authPublicSignup:'],
+        "authPublicSignup: process.env.AUTH_PUBLIC_SIGNUP !== 'false',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authRequireMfa:'],
+        "authRequireMfa: process.env.AUTH_REQUIRE_MFA === 'true',",
+        '      ',
+      ),
+      buildPropertyLine(
+        publicBody,
+        ['authTurnstileSiteKey:'],
+        "authTurnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '',",
+        '      ',
+      ),
+      buildPropertyLine(publicBody, ['supabaseUrl,', 'supabaseUrl:'], 'supabaseUrl,', '      '),
+      buildPropertyLine(
+        publicBody,
+        ['supabasePublishableKey,', 'supabasePublishableKey:'],
+        'supabasePublishableKey,',
+        '      ',
+      ),
+    ].join('\n')
+
+    content =
+      content.slice(0, publicBlockBodyStart) +
+      `${publicAuthBlock}\n${normalizedPublicBody}` +
+      content.slice(publicBlockEnd)
   }
 
   if (content === original) return false
@@ -826,6 +1248,8 @@ function patchWebDatabaseSchema(
       "export * from '#layer/server/database/schema'",
       ["export * from '#layer/server/database/schema'", bridgeExport].join('\n'),
     )
+  } else if (content.includes('export const ')) {
+    updated = `${content.trimEnd()}\n\n${bridgeExport}\n`
   }
 
   if (updated === content) return false
@@ -835,6 +1259,100 @@ function patchWebDatabaseSchema(
     writeFileSync(schemaPath, updated, 'utf-8')
   }
   return true
+}
+
+function patchWebAppOrmSchemaFiles(
+  appDir: string,
+  dryRun: boolean,
+  mode: 'full' | 'layer',
+  log: (message: string) => void,
+): boolean {
+  if (mode !== 'full') return false
+
+  const schemaTargets = [
+    {
+      label: 'apps/web/server/database/app-schema.ts',
+      path: join(appDir, 'apps/web/server/database/app-schema.ts'),
+      bridgeExport: "export * from '#server/database/auth-bridge-schema'",
+      defaultContent: [
+        '/**',
+        ' * D1/default app-owned schema bridge.',
+        ' *',
+        ' * Legacy downstream apps may still define product tables directly in',
+        ' * schema.ts. Keep this bridge file present so #server/app-orm-tables',
+        ' * resolves consistently for auth helpers and runtime queries.',
+        ' */',
+        "export * from '#server/database/auth-bridge-schema'",
+        "export * from './schema'",
+        '',
+      ].join('\n'),
+    },
+    {
+      label: 'apps/web/server/database/pg-app-schema.ts',
+      path: join(appDir, 'apps/web/server/database/pg-app-schema.ts'),
+      bridgeExport: "export * from '#server/database/auth-bridge-pg-schema'",
+      defaultContent: [
+        '/**',
+        ' * PostgreSQL app-owned schema mirror.',
+        ' */',
+        "export * from '#server/database/auth-bridge-pg-schema'",
+        '',
+      ].join('\n'),
+    },
+  ]
+
+  let changed = false
+
+  for (const target of schemaTargets) {
+    if (!existsSync(target.path)) {
+      log(`  ADD: ${target.label}`)
+      if (!dryRun) {
+        ensureDir(target.path)
+        writeFileSync(target.path, target.defaultContent, 'utf-8')
+      }
+      changed = true
+      continue
+    }
+
+    const content = readFileSync(target.path, 'utf-8')
+    if (content.includes(target.bridgeExport)) continue
+
+    const lines = content.split('\n')
+    let insertionIndex = 0
+    let sawImport = false
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const trimmed = lines[index].trim()
+      if (trimmed.startsWith('import ')) {
+        insertionIndex = index + 1
+        sawImport = true
+      } else if (sawImport && trimmed) {
+        break
+      }
+    }
+
+    const insertAt = sawImport ? insertionIndex : 0
+    const updatedLines = [...lines]
+    updatedLines.splice(
+      insertAt,
+      0,
+      ...(sawImport ? ['', target.bridgeExport] : [target.bridgeExport, '']),
+    )
+    const updated = `${updatedLines
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trimEnd()}\n`
+
+    if (updated === content) continue
+
+    log(`  UPDATE: ${target.label}`)
+    if (!dryRun) {
+      writeFileSync(target.path, updated, 'utf-8')
+    }
+    changed = true
+  }
+
+  return changed
 }
 
 /**
@@ -858,21 +1376,41 @@ function ensureWebDatabaseUtils(
   if (!authContent.includes("from '#server/utils/database'")) return
 
   const canonical = [
-    "import * as schema from '#server/database/schema'",
+    "import * as d1Schema from '#server/database/schema'",
+    "import * as pgSchema from '#server/database/pg-schema'",
     "import { createAppDatabase } from '#layer/server/utils/database'",
     '',
-    'export const useAppDatabase = createAppDatabase(schema)',
+    '/** Cloudflare D1 maximum bound parameters per query. */',
+    'export const D1_MAX_BOUND_PARAMETERS_PER_QUERY = 100',
+    '',
+    'export const useAppDatabase = createAppDatabase({',
+    '  d1: d1Schema,',
+    '  pg: pgSchema,',
+    '})',
     '',
   ].join('\n')
 
   if (existsSync(utilPath)) {
     const existing = readFileSync(utilPath, 'utf-8')
-    if (existing.includes('useAppDatabase') && existing.includes('createAppDatabase')) {
+    if (existing === canonical) {
+      return
+    }
+
+    if (
+      existing.includes('useAppDatabase') &&
+      existing.includes('createAppDatabase') &&
+      (existing.includes("import * as schema from '#server/database/schema'") ||
+        existing.includes("import * as d1Schema from '#server/database/schema'"))
+    ) {
+      log('  UPDATE: apps/web/server/utils/database.ts (backend-aware auth bridge helper)')
+      if (!dryRun) {
+        writeFileSync(utilPath, canonical, 'utf-8')
+      }
       return
     }
 
     log(
-      '  WARN: apps/web/server/utils/database.ts exists but is not the auth-bridge helper; fix manually so useAppDatabase wraps createAppDatabase(schema).',
+      '  WARN: apps/web/server/utils/database.ts exists but is not the managed auth bridge helper; fix manually so useAppDatabase wraps createAppDatabase({ d1, pg }).',
     )
     return
   }
@@ -885,11 +1423,39 @@ function ensureWebDatabaseUtils(
   counters.copied += 1
 }
 
+export interface AuthBridgeCompanionPatchResult {
+  schemaPatched: boolean
+  databaseHelperCreated: boolean
+}
+
+export function applyAuthBridgeCompanionPatches(
+  appDir: string,
+  options: {
+    dryRun?: boolean
+    log?: (message: string) => void
+  } = {},
+): AuthBridgeCompanionPatchResult {
+  const counters = createCounters()
+  const dryRun = options.dryRun ?? false
+  const log = options.log ?? console.log
+  const schemaPatched =
+    patchWebDatabaseSchema(appDir, dryRun, 'full', log) ||
+    patchWebAppOrmSchemaFiles(appDir, dryRun, 'full', log)
+  const copiedBefore = counters.copied
+  ensureWebDatabaseUtils(appDir, counters, dryRun, 'full', log)
+
+  return {
+    schemaPatched,
+    databaseHelperCreated: counters.copied > copiedBefore,
+  }
+}
+
 function patchWebPackage(
   appDir: string,
   templateDir: string,
   dryRun: boolean,
   mode: 'full' | 'layer',
+  templateLayerSelection: TemplateLayerSelection,
   log: (message: string) => void,
 ): boolean {
   const webPackagePath = join(appDir, 'apps/web/package.json')
@@ -906,6 +1472,14 @@ function patchWebPackage(
     ? readFileSync(drizzleConfigPath, 'utf-8')
     : ''
   const usesPostgresDrizzle = /\bdialect:\s*['"]postgres(?:ql)?['"]/.test(drizzleConfig)
+  const normalizedSelection = normalizeTemplateLayerSelection(templateLayerSelection)
+  const layerVersion = readLayerPackageVersion(templateDir)
+  const selectedLayerPackages = resolveSelectedLayerPackageNames(normalizedSelection)
+  const requiredAppDependencies = resolveRequiredAppDependencies(normalizedSelection)
+  const removableLayerPackages = listLayerBundleDefinitions().map((bundle) => bundle.packageName)
+  const removableAppDependencies = new Set(
+    listLayerBundleDefinitions().flatMap((bundle) => bundle.requiredAppDependencies),
+  )
 
   let touched = false
   patchJsonFile<Record<string, any>>(
@@ -939,23 +1513,19 @@ function patchWebPackage(
         }
         const databaseName = wrangler.d1_databases?.[0]?.database_name
         if (databaseName) {
-          const layerDrizzleDir =
-            'node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle'
-          const expectedMigrate = `bash ../../tools/db-migrate.sh ${databaseName} --local --dir ${layerDrizzleDir} --dir drizzle`
-          const appSeedPath = join(appDir, 'apps/web/drizzle/seed.sql')
-          const expectedSeedCommands = [
-            `wrangler d1 execute ${databaseName} --local --file=node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle/seed.sql`,
-          ]
-          if (existsSync(appSeedPath)) {
-            expectedSeedCommands.push(
-              `wrangler d1 execute ${databaseName} --local --file=drizzle/seed.sql`,
-            )
-          }
-          const expectedSeed = expectedSeedCommands.join(' && ')
-          const expectedReset = `bash ../../tools/db-migrate.sh ${databaseName} --local --dir ${layerDrizzleDir} --dir drizzle --reset && pnpm run db:seed`
+          const layerDrizzleDirs = resolveLayerDrizzleDirsForSelection(normalizedSelection)
+          const seedPackageName = getSeedLayerPackageName(normalizedSelection)
+          const expectedMigrate = [
+            'bash ../../tools/db-migrate.sh',
+            databaseName,
+            '--local',
+            ...layerDrizzleDirs.flatMap((dir) => ['--dir', dir]),
+            '--dir drizzle',
+          ].join(' ')
+          const expectedSeed = `wrangler d1 execute ${databaseName} --local --file=node_modules/${seedPackageName}/drizzle/seed.sql`
+          const expectedReset = `${expectedMigrate} --reset && pnpm run db:seed`
           const expectedReady = 'pnpm run db:migrate && pnpm run db:seed'
-          const expectedVerify =
-            'node node_modules/@narduk-enterprises/narduk-nuxt-template-layer/testing/verify-local-db.mjs .'
+          const expectedVerify = `node node_modules/${seedPackageName}/testing/verify-local-db.mjs .`
           const expectedPredev = 'pnpm run db:ready'
           const expectedDev = '(doppler run -- nuxt dev || nuxt dev)'
 
@@ -999,6 +1569,26 @@ function patchWebPackage(
       if (mode === 'full') {
         pkg.dependencies = pkg.dependencies || {}
         pkg.devDependencies = pkg.devDependencies || {}
+
+        for (const dependency of removableLayerPackages) {
+          if (dependency in pkg.dependencies) {
+            delete pkg.dependencies[dependency]
+            changed = true
+          }
+          if (dependency in pkg.devDependencies) {
+            delete pkg.devDependencies[dependency]
+            changed = true
+          }
+        }
+
+        for (const packageName of selectedLayerPackages) {
+          const expectedVersion = `^${layerVersion}`
+          if (pkg.dependencies[packageName] !== expectedVersion) {
+            pkg.dependencies[packageName] = expectedVersion
+            changed = true
+          }
+        }
+
         const eslintPkgPath = join(templateDir, 'packages/eslint-config/package.json')
         const templateEslintVersion =
           templateWebPackage.dependencies?.['@narduk-enterprises/eslint-config'] ??
@@ -1026,7 +1616,18 @@ function patchWebPackage(
           changed = true
         }
 
-        for (const dependency of ['@supabase/auth-js', '@supabase/supabase-js']) {
+        for (const dependency of removableAppDependencies) {
+          if (!requiredAppDependencies.includes(dependency) && dependency in pkg.dependencies) {
+            delete pkg.dependencies[dependency]
+            changed = true
+          }
+          if (!requiredAppDependencies.includes(dependency) && dependency in pkg.devDependencies) {
+            delete pkg.devDependencies[dependency]
+            changed = true
+          }
+        }
+
+        for (const dependency of requiredAppDependencies) {
           const version = templateWebPackage.dependencies?.[dependency]
           if (version && pkg.dependencies[dependency] !== version) {
             pkg.dependencies[dependency] = version
@@ -1043,6 +1644,38 @@ function patchWebPackage(
 
   if (touched) {
     log('  UPDATE: apps/web/package.json')
+  }
+
+  return touched
+}
+
+function patchProvisionJsonTemplateLayer(
+  appDir: string,
+  dryRun: boolean,
+  templateLayerSelection: TemplateLayerSelection,
+  log: (message: string) => void,
+): boolean {
+  const provisionPath = join(appDir, 'provision.json')
+  if (!existsSync(provisionPath)) return false
+
+  const normalizedSelection = normalizeTemplateLayerSelection(templateLayerSelection)
+  let touched = false
+  patchJsonFile<Record<string, any>>(
+    provisionPath,
+    (provision) => {
+      if (JSON.stringify(provision.templateLayer ?? null) === JSON.stringify(normalizedSelection)) {
+        return false
+      }
+
+      provision.templateLayer = normalizedSelection
+      touched = true
+      return true
+    },
+    dryRun,
+  )
+
+  if (touched) {
+    log('  UPDATE: provision.json templateLayer')
   }
 
   return touched
@@ -1105,8 +1738,8 @@ function ensureGitHooksPath(
 
 function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => void): boolean {
   const npmrcPath = join(appDir, '.npmrc')
-  const forgejoRegistry = 'https://code.platform.nard.uk/api/packages/narduk-enterprises/npm/'
-  const defaultContent = [`@narduk-enterprises:registry=${forgejoRegistry}`, ''].join('\n')
+  const registryConfig = getPackageRegistryConfig()
+  const defaultContent = `${buildPackageRegistryLine(registryConfig)}\n`
 
   if (!existsSync(npmrcPath)) {
     log('  ADD: .npmrc')
@@ -1116,44 +1749,8 @@ function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => v
     return true
   }
 
-  let content = readFileSync(npmrcPath, 'utf-8')
-  const original = content
-
-  if (content.includes('@narduk-enterprises:registry=https://npm.pkg.github.com')) {
-    content = content.replaceAll(
-      '@narduk-enterprises:registry=https://npm.pkg.github.com',
-      `@narduk-enterprises:registry=${forgejoRegistry}`,
-    )
-  }
-
-  if (!content.includes(`@narduk-enterprises:registry=${forgejoRegistry}`)) {
-    content = `@narduk-enterprises:registry=${forgejoRegistry}\n${content.trimStart()}`
-    if (!content.endsWith('\n')) {
-      content += '\n'
-    }
-  }
-
-  if (content.includes('@loganrenz:registry')) {
-    content = content.replace(/@loganrenz:registry/g, '@narduk-enterprises:registry')
-  }
-
-  const sanitizedLines = content
-    .split('\n')
-    .filter((line) => !line.includes('//npm.pkg.github.com/:_authToken='))
-    .filter((line) => !line.includes('//code.platform.nard.uk/api/packages/narduk-enterprises/npm/:_authToken='))
-    .filter((line) => !line.includes('Auth token injected via CI env'))
-  content = sanitizedLines.join('\n')
-
-  content = `${content
-    .split('\n')
-    .reduce<string[]>((lines, line) => {
-      const previous = lines[lines.length - 1]
-      if (line === '' && previous === '') return lines
-      lines.push(line)
-      return lines
-    }, [])
-    .join('\n')
-    .trimEnd()}\n`
+  const original = readFileSync(npmrcPath, 'utf-8')
+  const content = patchPackageRegistryNpmrcContent(original)
 
   if (content === original) return false
 
@@ -1162,6 +1759,93 @@ function patchNpmrc(appDir: string, dryRun: boolean, log: (message: string) => v
     writeFileSync(npmrcPath, content, 'utf-8')
   }
   return true
+}
+
+function patchBundledLayerInternalImports(
+  appDir: string,
+  dryRun: boolean,
+  templateLayerSelection: TemplateLayerSelection,
+  log: (message: string) => void,
+): boolean {
+  if (!usesBundledLayers(templateLayerSelection)) {
+    return false
+  }
+
+  const normalizedSelection = normalizeTemplateLayerSelection(templateLayerSelection)
+  if (normalizedSelection.mode !== 'bundled') {
+    return false
+  }
+
+  const replacements = new Map<string, string>()
+  for (const bundleId of normalizedSelection.bundles) {
+    switch (bundleId) {
+      case 'analytics':
+        replacements.set(
+          '#layer/server/utils/google',
+          `${LAYER_BUNDLE_MANIFEST.analytics.packageName}/server/utils/google`,
+        )
+        replacements.set(
+          '#layer/server/utils/indexNow',
+          `${LAYER_BUNDLE_MANIFEST.analytics.packageName}/server/utils/indexNow`,
+        )
+        break
+      case 'maps':
+        replacements.set(
+          '#layer/server/utils/apple-maps',
+          `${LAYER_BUNDLE_MANIFEST.maps.packageName}/server/utils/apple-maps`,
+        )
+        replacements.set(
+          '#layer/server/utils/appleMapToken',
+          `${LAYER_BUNDLE_MANIFEST.maps.packageName}/server/utils/appleMapToken`,
+        )
+        break
+      case 'uploads':
+        replacements.set(
+          '#layer/server/utils/r2',
+          `${LAYER_BUNDLE_MANIFEST.uploads.packageName}/server/utils/r2`,
+        )
+        replacements.set(
+          '#layer/server/utils/upload',
+          `${LAYER_BUNDLE_MANIFEST.uploads.packageName}/server/utils/upload`,
+        )
+        break
+      default:
+        break
+    }
+  }
+
+  if (replacements.size === 0) {
+    return false
+  }
+
+  let touched = false
+  walkFiles(join(appDir, 'apps/web'), (filePath) => {
+    if (!/\.(?:ts|mts|js|mjs|vue)$/u.test(filePath)) {
+      return
+    }
+
+    const original = readFileSync(filePath, 'utf-8')
+    let updated = original
+
+    for (const [legacySpecifier, packageSpecifier] of replacements) {
+      const pattern = new RegExp(`(['"])${escapeRegExp(legacySpecifier)}\\1`, 'g')
+      updated = updated.replace(pattern, (_match, quote: string) => {
+        return `${quote}${packageSpecifier}${quote}`
+      })
+    }
+
+    if (updated === original) {
+      return
+    }
+
+    touched = true
+    log(`  UPDATE: ${relative(appDir, filePath)}`)
+    if (!dryRun) {
+      writeFileSync(filePath, updated, 'utf-8')
+    }
+  })
+
+  return touched
 }
 
 function warnIfBootstrapArtifactsMissing(appDir: string, log: (message: string) => void): void {
@@ -1183,8 +1867,13 @@ function warnIfBootstrapArtifactsMissing(appDir: string, log: (message: string) 
 function rewriteLayerRepository(
   appDir: string,
   dryRun: boolean,
+  templateLayerSelection: TemplateLayerSelection,
   log: (message: string) => void,
 ): boolean {
+  if (usesBundledLayers(templateLayerSelection)) {
+    return false
+  }
+
   const layerPackagePath = join(appDir, 'layers/narduk-nuxt-layer/package.json')
   if (!existsSync(layerPackagePath)) return false
 
@@ -1227,6 +1916,30 @@ function rewriteLayerRepository(
   return touched
 }
 
+function removeVendoredCompatLayer(
+  appDir: string,
+  counters: SyncCounters,
+  dryRun: boolean,
+  templateLayerSelection: TemplateLayerSelection,
+  log: (message: string) => void,
+): boolean {
+  if (!usesBundledLayers(templateLayerSelection)) {
+    return false
+  }
+
+  const compatLayerPath = join(appDir, COMPAT_LAYER_DIRECTORY)
+  if (!existsSync(compatLayerPath)) {
+    return false
+  }
+
+  log(`  DELETE: ${COMPAT_LAYER_DIRECTORY}`)
+  if (!dryRun) {
+    rmSync(compatLayerPath, { recursive: true, force: true })
+  }
+  counters.removed += 1
+  return true
+}
+
 function writeTemplateVersion(
   appDir: string,
   templateSha: string,
@@ -1255,9 +1968,37 @@ function writeTemplateVersion(
   return true
 }
 
+function replaceLegacyGithubSkillsSymlink(
+  appDir: string,
+  dryRun: boolean,
+  counters: SyncCounters,
+  log: (message: string) => void,
+): boolean {
+  const skillsPath = join(appDir, '.github', 'skills')
+  let stat
+  try {
+    stat = lstatSync(skillsPath)
+  } catch {
+    return false
+  }
+
+  if (!stat.isSymbolicLink()) {
+    return false
+  }
+
+  log('  REPLACE: .github/skills symlink -> managed directory')
+  if (!dryRun) {
+    unlinkSync(skillsPath)
+    mkdirSync(skillsPath, { recursive: true })
+  }
+  counters.removed += 1
+  return true
+}
+
 function runInstallAndQuality(
   appDir: string,
   dryRun: boolean,
+  skipInstall: boolean,
   skipQuality: boolean,
   log: (message: string) => void,
 ) {
@@ -1267,17 +2008,21 @@ function runInstallAndQuality(
     return
   }
 
-  log('')
-  log('Phase 5: Installing dependencies...')
-  run('pnpm', ['install', '--no-frozen-lockfile'], appDir)
-
-  if (skipQuality) {
+  if (skipInstall) {
     log('')
+    log('Skipping dependency install (--skip-install).')
+  } else {
+    log('')
+    log('Phase 5: Installing dependencies...')
+    run('pnpm', ['install', '--no-frozen-lockfile'], appDir)
+  }
+
+  log('')
+  if (skipQuality) {
     log('Skipping quality gate (--skip-quality).')
     return
   }
 
-  log('')
   log('Phase 6: Running quality gate...')
   run('pnpm', ['run', 'quality:check'], appDir)
 }
@@ -1285,6 +2030,7 @@ function runInstallAndQuality(
 export async function runAppSync(options: RunAppSyncOptions) {
   const mode = options.mode ?? 'full'
   const dryRun = options.dryRun ?? false
+  const skipInstall = options.skipInstall ?? false
   const skipQuality = options.skipQuality ?? false
   const strict = options.strict ?? false
   const allowDirtyApp = options.allowDirtyApp ?? false
@@ -1292,6 +2038,10 @@ export async function runAppSync(options: RunAppSyncOptions) {
   const skipRewriteRepo = options.skipRewriteRepo ?? false
   const log = options.log ?? console.log
   const counters = createCounters()
+  const templateLayerSelection = resolveSyncTemplateLayerSelection(
+    options.appDir,
+    options.templateLayerSelection,
+  )
 
   ensureTemplateState(options.templateDir, allowDirtyTemplate, dryRun, log)
 
@@ -1305,12 +2055,23 @@ export async function runAppSync(options: RunAppSyncOptions) {
   log('═══════════════════════════════════════════════════════════════')
   log(`  App:      ${options.appDir}`)
   log(`  Template: ${options.templateDir}`)
+  log(`  Layers:   ${JSON.stringify(templateLayerSelection)}`)
   if (templateSha) {
     log(`  SHA:      ${templateSha.slice(0, 12)}`)
   }
   log('')
 
-  syncManagedFiles(options.templateDir, options.appDir, counters, dryRun, mode, log)
+  replaceLegacyGithubSkillsSymlink(options.appDir, dryRun, counters, log)
+
+  syncManagedFiles(
+    options.templateDir,
+    options.appDir,
+    counters,
+    dryRun,
+    mode,
+    templateLayerSelection,
+    log,
+  )
   syncGeneratedFiles(options.appDir, counters, dryRun, mode, log)
   removeStalePaths(options.appDir, counters, dryRun, mode, log)
 
@@ -1320,10 +2081,16 @@ export async function runAppSync(options: RunAppSyncOptions) {
   )
 
   const packageTouched = patchRootPackage(options.appDir, options.templateDir, dryRun, mode, log)
-  patchWebPackage(options.appDir, options.templateDir, dryRun, mode, log)
-  patchWebNuxtConfig(options.appDir, dryRun, mode, log)
-  patchWebDatabaseSchema(options.appDir, dryRun, mode, log)
-  ensureWebDatabaseUtils(options.appDir, counters, dryRun, mode, log)
+  patchWebPackage(options.appDir, options.templateDir, dryRun, mode, templateLayerSelection, log)
+  patchWebNuxtConfig(options.appDir, dryRun, mode, templateLayerSelection, log)
+  patchBundledLayerInternalImports(options.appDir, dryRun, templateLayerSelection, log)
+  patchProvisionJsonTemplateLayer(options.appDir, dryRun, templateLayerSelection, log)
+  if (mode === 'full') {
+    const authBridgePatches = applyAuthBridgeCompanionPatches(options.appDir, { dryRun, log })
+    if (authBridgePatches.databaseHelperCreated) {
+      counters.copied += 1
+    }
+  }
   patchDopplerTemplate(options.appDir, dryRun, mode, log)
   mergeWebWranglerKvBinding(options.appDir, options.templateDir, dryRun, mode, log)
   if (mode === 'full') {
@@ -1340,14 +2107,15 @@ export async function runAppSync(options: RunAppSyncOptions) {
   }
 
   if (!skipRewriteRepo) {
-    rewriteLayerRepository(options.appDir, dryRun, log)
+    rewriteLayerRepository(options.appDir, dryRun, templateLayerSelection, log)
   }
+  removeVendoredCompatLayer(options.appDir, counters, dryRun, templateLayerSelection, log)
 
   if (!packageTouched && mode === 'layer') {
     log('  Root pnpm config already current.')
   }
 
-  runInstallAndQuality(options.appDir, dryRun, skipQuality, log)
+  runInstallAndQuality(options.appDir, dryRun, skipInstall, skipQuality, log)
 
   if (!dryRun && strict && mode === 'full') {
     log('')

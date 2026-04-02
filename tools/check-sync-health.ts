@@ -3,7 +3,17 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  getProvisionDisplayName,
+  getProvisionShortName,
+  readProvisionMetadata,
+} from './provision-metadata'
 import { REFERENCE_BASELINE_FILES } from './sync-manifest'
+import {
+  repoUsesBundledLayers,
+  resolveRepoLayerPackageDirs,
+  resolveRepoLayerPublicDir,
+} from './template-layer-selection'
 
 interface CheckResult {
   status: 'pass' | 'fail' | 'warn'
@@ -31,10 +41,9 @@ const rootArg = process.argv
   ?.slice('--root='.length)
 const ROOT_DIR = rootArg ? rootArg : join(__dirname, '..')
 const ROOT_PACKAGE_PATH = join(ROOT_DIR, 'package.json')
-const LAYER_PACKAGE_PATH = join(ROOT_DIR, 'layers', 'narduk-nuxt-layer', 'package.json')
+const APP_CONFIG_PATH = join(ROOT_DIR, 'apps', 'web', 'app', 'app.config.ts')
 const APP_NUXT_CONFIG_PATH = join(ROOT_DIR, 'apps', 'web', 'nuxt.config.ts')
 const PUBLIC_DIR = join(ROOT_DIR, 'apps', 'web', 'public')
-const LAYER_PUBLIC_DIR = join(ROOT_DIR, 'layers', 'narduk-nuxt-layer', 'public')
 
 /** Paths referenced by `layers/narduk-nuxt-layer/nuxt.config.ts` `app.head.link`. */
 const LAYER_HEAD_ASSET_FILES = [
@@ -62,6 +71,11 @@ const CONTROL_PLANE_REPO_DIR_HINTS = [
 function readJson<T>(path: string): T | null {
   if (!existsSync(path)) return null
   return JSON.parse(readFileSync(path, 'utf8')) as T
+}
+
+function isAuthoringWorkspace(): boolean {
+  const rootPackage = readJson<{ name?: string }>(ROOT_PACKAGE_PATH)
+  return rootPackage?.name === 'narduk-nuxt-template'
 }
 
 function firstExistingPath(candidates: Array<string | undefined>): string | null {
@@ -111,6 +125,64 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+function extractNamedObjectLiteral(source: string, propertyName: string): string | null {
+  const propertyPattern = new RegExp(`\\b${escapeRegExp(propertyName)}\\s*:`, 'g')
+
+  for (const match of source.matchAll(propertyPattern)) {
+    const propertyEnd = (match.index ?? 0) + match[0].length
+    let objectStart = propertyEnd
+    while (objectStart < source.length && /\s/.test(source[objectStart] ?? '')) {
+      objectStart += 1
+    }
+
+    if (source[objectStart] !== '{') continue
+
+    let depth = 0
+    let inString: '"' | "'" | '`' | null = null
+    let escaped = false
+
+    for (let index = objectStart; index < source.length; index += 1) {
+      const character = source[index] ?? ''
+
+      if (inString) {
+        if (escaped) {
+          escaped = false
+          continue
+        }
+
+        if (character === '\\') {
+          escaped = true
+          continue
+        }
+
+        if (character === inString) {
+          inString = null
+        }
+        continue
+      }
+
+      if (character === '"' || character === "'" || character === '`') {
+        inString = character
+        continue
+      }
+
+      if (character === '{') {
+        depth += 1
+        continue
+      }
+
+      if (character === '}') {
+        depth -= 1
+        if (depth === 0) {
+          return source.slice(objectStart + 1, index)
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 function listVirtualStoreVersions(packageName: string): string[] {
   if (!existsSync(PNPM_VIRTUAL_STORE_DIR)) return []
 
@@ -157,6 +229,13 @@ function findDsStore(dir: string, base = dir): string[] {
   }
 
   return matches
+}
+
+function listGoogleVerificationFiles(publicDir: string): string[] {
+  if (!existsSync(publicDir)) return []
+  return readdirSync(publicDir)
+    .filter((name) => /^google[a-z0-9]+\.html$/i.test(name))
+    .sort()
 }
 
 function checkFontsCompatibility(rootPkg: PackageJson, layerPkg: PackageJson | null): CheckResult {
@@ -248,6 +327,47 @@ function checkOgImageConfig(): CheckResult {
   }
 }
 
+function checkAppConfigUiShape(): CheckResult {
+  if (!existsSync(APP_CONFIG_PATH)) {
+    return {
+      status: 'warn',
+      summary: 'apps/web/app/app.config.ts not found',
+    }
+  }
+
+  const content = readFileSync(APP_CONFIG_PATH, 'utf8')
+  const uiObject = extractNamedObjectLiteral(content, 'ui')
+  if (!uiObject) {
+    return {
+      status: 'pass',
+      summary: 'apps/web/app/app.config.ts inherits layer ui.colors defaults',
+    }
+  }
+
+  if (/\bcolors\s*:\s*\{/.test(uiObject)) {
+    return {
+      status: 'pass',
+      summary: 'apps/web/app/app.config.ts uses Nuxt UI v4 ui.colors shape',
+    }
+  }
+
+  if (/\bprimary\s*:/.test(uiObject) || /\bneutral\s*:/.test(uiObject)) {
+    return {
+      status: 'fail',
+      summary: 'apps/web/app/app.config.ts still uses legacy flat ui.primary/ui.neutral keys',
+      detail:
+        'Replace flat ui.primary/ui.neutral with ui.colors.primary/ui.colors.neutral before exporting starters or syncing fleet apps.',
+    }
+  }
+
+  return {
+    status: 'warn',
+    summary: 'apps/web/app/app.config.ts overrides ui without declaring ui.colors',
+    detail:
+      'Prefer explicit ui.colors keys so downstream theming edits follow the Nuxt UI v4 contract.',
+  }
+}
+
 function checkPublicJunk(): CheckResult {
   const junk = findDsStore(PUBLIC_DIR)
   if (junk.length === 0) {
@@ -289,32 +409,43 @@ function manifestIconPathsMissing(publicDir: string): string[] {
 }
 
 function checkLayerHeadPublicAssets(): CheckResult {
-  if (!existsSync(LAYER_PUBLIC_DIR)) {
+  const layerPublicDir = resolveRepoLayerPublicDir(ROOT_DIR)
+  if (!layerPublicDir) {
     return {
       status: 'warn',
-      summary: 'layer public directory not found',
+      summary: repoUsesBundledLayers(ROOT_DIR)
+        ? 'core layer package public directory not found (run pnpm install to hydrate node_modules)'
+        : 'layer public directory not found',
     }
   }
 
   const missingHead = LAYER_HEAD_ASSET_FILES.filter(
-    (name) => !existsSync(join(LAYER_PUBLIC_DIR, name)),
+    (name) => !existsSync(join(layerPublicDir, name)),
   )
-  const missingManifest = manifestIconPathsMissing(LAYER_PUBLIC_DIR)
+  const missingManifest = manifestIconPathsMissing(layerPublicDir)
 
   const allMissing = [...new Set([...missingHead, ...missingManifest])]
   if (allMissing.length === 0) {
     return {
       status: 'pass',
-      summary: 'layer public assets match nuxt head + webmanifest icon paths',
+      summary: repoUsesBundledLayers(ROOT_DIR)
+        ? 'core layer package public assets match nuxt head + webmanifest icon paths'
+        : 'layer public assets match nuxt head + webmanifest icon paths',
     }
   }
+
+  const detailPrefix = layerPublicDir.startsWith(ROOT_DIR)
+    ? layerPublicDir.slice(ROOT_DIR.length + 1)
+    : layerPublicDir
 
   return {
     status: 'fail',
     summary: `${allMissing.length} missing layer public file(s) for head/manifest`,
     detail: [
-      ...allMissing.map((f) => `layers/narduk-nuxt-layer/public/${f}`),
-      'Run: pnpm run generate:favicons -- --target=layers/narduk-nuxt-layer/public',
+      ...allMissing.map((f) => `${detailPrefix}/${f}`),
+      repoUsesBundledLayers(ROOT_DIR)
+        ? 'Reinstall layer packages or republish the core bundle if public assets are missing.'
+        : 'Run: pnpm run generate:favicons -- --target=layers/narduk-nuxt-layer/public',
     ].join('\n'),
   }
 }
@@ -339,6 +470,73 @@ function checkAppWebmanifestIcons(): CheckResult {
     status: 'fail',
     summary: 'apps/web site.webmanifest references missing files',
     detail: missing.map((f) => `apps/web/public/${f}`).join('\n'),
+  }
+}
+
+function checkProvisionManifestMetadata(): CheckResult {
+  const provision = readProvisionMetadata(ROOT_DIR)
+  const expectedName = provision.displayName || provision.name
+  const manifestPath = join(PUBLIC_DIR, 'site.webmanifest')
+  if (!expectedName || !existsSync(manifestPath)) {
+    return {
+      status: 'pass',
+      summary: 'provision.json manifest parity not applicable in this checkout',
+    }
+  }
+
+  const manifest = readJson<{ name?: string; short_name?: string }>(manifestPath)
+  const actualName = typeof manifest?.name === 'string' ? manifest.name.trim() : ''
+  const actualShortName = typeof manifest?.short_name === 'string' ? manifest.short_name.trim() : ''
+  const expectedDisplayName = getProvisionDisplayName(provision, expectedName)
+  const expectedShortName = getProvisionShortName(provision, expectedName)
+  const mismatches: string[] = []
+
+  if (actualName !== expectedDisplayName) {
+    mismatches.push(
+      `site.webmanifest name is "${actualName || '(missing)'}" but provision.json expects "${expectedDisplayName}"`,
+    )
+  }
+
+  if (actualShortName && actualShortName !== expectedShortName) {
+    mismatches.push(
+      `site.webmanifest short_name is "${actualShortName}" but provision.json expects "${expectedShortName}"`,
+    )
+  }
+
+  if (mismatches.length === 0) {
+    return {
+      status: 'pass',
+      summary: 'apps/web site.webmanifest naming matches provision.json',
+    }
+  }
+
+  return {
+    status: 'fail',
+    summary: 'apps/web site.webmanifest naming drifts from provision.json',
+    detail: mismatches.join('\n'),
+  }
+}
+
+function checkAuthoringWorkspaceGoogleVerificationFiles(): CheckResult {
+  if (!isAuthoringWorkspace()) {
+    return {
+      status: 'pass',
+      summary: 'template-only Google verification guard not applicable in this checkout',
+    }
+  }
+
+  const matches = listGoogleVerificationFiles(PUBLIC_DIR)
+  if (matches.length === 0) {
+    return {
+      status: 'pass',
+      summary: 'template public assets do not ship Google verification files',
+    }
+  }
+
+  return {
+    status: 'fail',
+    summary: 'template public assets include property-specific Google verification files',
+    detail: matches.map((name) => `apps/web/public/${name}`).join('\n'),
   }
 }
 
@@ -479,15 +677,21 @@ async function main() {
     process.exit(1)
   }
 
-  const layerPkg = readJson<PackageJson>(LAYER_PACKAGE_PATH)
+  const primaryLayerPackageDir = resolveRepoLayerPackageDirs(ROOT_DIR)[0] || null
+  const layerPkg = primaryLayerPackageDir
+    ? readJson<PackageJson>(join(primaryLayerPackageDir, 'package.json'))
+    : null
   const checks: Array<[string, CheckResult]> = [
     ['fonts', checkFontsCompatibility(rootPkg, layerPkg)],
     ['nuxt-og-image install', checkNuxtOgImageInstall(rootPkg)],
     ['pnpm lockfile', checkLockfileState(rootPkg)],
+    ['app config ui shape', checkAppConfigUiShape()],
     ['og-image config', checkOgImageConfig()],
     ['public junk', checkPublicJunk()],
     ['layer head public assets', checkLayerHeadPublicAssets()],
     ['app webmanifest icons', checkAppWebmanifestIcons()],
+    ['provision manifest parity', checkProvisionManifestMetadata()],
+    ['google verification files', checkAuthoringWorkspaceGoogleVerificationFiles()],
     ['reference baselines', checkReferenceBaselines()],
     ['fleet manifest parity', await checkFleetManifestParity()],
   ]

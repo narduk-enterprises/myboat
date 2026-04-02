@@ -15,14 +15,24 @@ const cloudflareDevConfigPath = existsSync(localCloudflareDevConfigPath)
   : resolve(__dirname, 'wrangler.json')
 const cloudflareDevPersistDir = resolve(__dirname, '.wrangler/state/v3')
 
+const appBackendPreset =
+  process.env.APP_BACKEND_PRESET === 'managed-supabase' ? 'managed-supabase' : 'default'
+const supabaseUrl = process.env.AUTH_AUTHORITY_URL || process.env.SUPABASE_URL || ''
+const supabasePublishableKey =
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_AUTH_ANON_KEY ||
+  ''
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || ''
 const configuredAuthBackend = process.env.AUTH_BACKEND
 const authBackend =
   configuredAuthBackend === 'supabase' || configuredAuthBackend === 'local'
     ? configuredAuthBackend
-    : process.env.AUTH_AUTHORITY_URL && process.env.SUPABASE_AUTH_ANON_KEY
+    : supabaseUrl && supabasePublishableKey
       ? 'supabase'
       : 'local'
-const authAuthorityUrl = process.env.AUTH_AUTHORITY_URL || ''
+const authAuthorityUrl = supabaseUrl
 const appOrmTablesEntry = './server/database/app-schema.ts'
 
 function parseAuthProviders(value: string | undefined) {
@@ -37,7 +47,12 @@ const authProviders =
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   // Extend the published Narduk Nuxt Layer
-  extends: ['@narduk-enterprises/narduk-nuxt-template-layer'],
+  extends: [
+    '@narduk-enterprises/narduk-nuxt-template-layer-core',
+    '@narduk-enterprises/narduk-nuxt-template-layer-auth',
+    '@narduk-enterprises/narduk-nuxt-template-layer-analytics',
+    '@narduk-enterprises/narduk-nuxt-template-layer-maps',
+  ],
 
   alias: {
     '#server/app-orm-tables': fileURLToPath(new URL(appOrmTablesEntry, import.meta.url)),
@@ -73,14 +88,19 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    // AIS Hub uses the `username` query param in its API URL; the canonical
-    // Doppler secret name for that credential is `AIS_HUB_KEY`.
-    aisHubKey: process.env.AIS_HUB_KEY || '',
+    appBackendPreset,
     authBackend,
     authAuthorityUrl,
     authAnonKey: process.env.SUPABASE_AUTH_ANON_KEY || '',
     authServiceRoleKey: process.env.SUPABASE_AUTH_SERVICE_ROLE_KEY || '',
     authStorageKey: process.env.AUTH_STORAGE_KEY || 'web-auth',
+    turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
+    supabaseUrl,
+    supabasePublishableKey,
+    supabaseServiceRoleKey,
+    // AIS Hub uses the `username` query param in its API URL; the canonical
+    // Doppler secret name for that credential is `AIS_HUB_KEY`.
+    aisHubKey: process.env.AIS_HUB_KEY || '',
     historyOwnerFreeMaxDays: Number(process.env.MYBOAT_HISTORY_OWNER_FREE_MAX_DAYS || 7),
     historyOwnerPaidMaxDays: Number(process.env.MYBOAT_HISTORY_OWNER_PAID_MAX_DAYS || 90),
     historyPaidUserIds: process.env.MYBOAT_HISTORY_PAID_USER_IDS || '',
@@ -106,7 +126,6 @@ export default defineNuxtConfig({
     localBoatHostname: process.env.LOCAL_BOAT_HOSTNAME || 'myboat.local',
     localBrokerOrigin: process.env.MYBOAT_LOCAL_BROKER_ORIGIN || '',
     signalKHttpUrl: process.env.SIGNALK_HTTP_URL || '',
-    turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || '',
     posthogOwnerDistinctId: process.env.POSTHOG_OWNER_DISTINCT_ID || '',
     // Server-only (admin API routes)
     googleServiceAccountKey: process.env.GSC_SERVICE_ACCOUNT_JSON || '',
@@ -114,6 +133,7 @@ export default defineNuxtConfig({
     gaPropertyId: process.env.GA_PROPERTY_ID || '',
     posthogProjectId: process.env.POSTHOG_PROJECT_ID || '',
     public: {
+      appBackendPreset,
       authBackend,
       authAuthorityUrl,
       authLoginPath: '/login',
@@ -127,6 +147,8 @@ export default defineNuxtConfig({
       authPublicSignup: process.env.AUTH_PUBLIC_SIGNUP !== 'false',
       authRequireMfa: process.env.AUTH_REQUIRE_MFA === 'true',
       authTurnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '',
+      supabaseUrl,
+      supabasePublishableKey,
       appUrl: publicAppUrl,
       appName: process.env.APP_NAME || 'MyBoat',
       // Analytics (client-side tracking)

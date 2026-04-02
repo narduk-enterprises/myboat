@@ -42,16 +42,16 @@ This repo does not include the template authoring workspace's `apps/showcase/`.
 Before adding a new file in `apps/web/`, check whether the layer already
 provides it.
 
-| Category      | Provided by layer                                                       |
-| ------------- | ----------------------------------------------------------------------- |
-| Modules       | `@nuxt/ui`, `@nuxt/fonts`, `@nuxt/image`, `@nuxtjs/seo`, `@nuxt/eslint` |
+| Category      | Provided by layer                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| Modules       | `@nuxt/ui`, `@nuxt/fonts`, `@nuxt/image`, `@nuxtjs/seo`, `@nuxt/eslint`                              |
 | App shell     | `app/app.vue`, `LayerAppShell`, `LayerChromelessShell`, `app/app.config.ts`, branded `app/error.vue` |
-| SEO           | `useSeo`, `useSchemaOrg`, OG image components                           |
-| UI helpers    | `AppTabs`, `usePersistentTab`, base CSS utilities                       |
-| Analytics     | `gtag.client.ts`, `posthog.client.ts`, `usePosthog`                     |
-| Security      | CORS, CSRF, security headers, per-isolate rate limiter                  |
-| Data and auth | D1 helpers, Drizzle schema, auth helpers, KV and R2 helpers             |
-| Server routes | `/api/health`, IndexNow routes, admin GA and GSC routes                 |
+| SEO           | `useSeo`, `useSchemaOrg`, OG image components                                                        |
+| UI helpers    | `AppTabs`, `usePersistentTab`, base CSS utilities                                                    |
+| Analytics     | `gtag.client.ts`, `posthog.client.ts`, `usePosthog`                                                  |
+| Security      | CORS, CSRF, security headers, per-isolate rate limiter                                               |
+| Data and auth | D1 helpers, Drizzle schema, auth helpers, KV and R2 helpers                                          |
+| Server routes | `/api/health`, IndexNow routes, admin GA and GSC routes                                              |
 
 If the feature belongs in every downstream app, add it to the layer. If it
 belongs only to this application, keep it in `apps/web/`.

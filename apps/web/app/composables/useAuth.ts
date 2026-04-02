@@ -1,5 +1,13 @@
 import type { AuthMutationResult, AuthUser } from './useAuthApi'
 
+type EmailVerificationType =
+  | 'signup'
+  | 'invite'
+  | 'magiclink'
+  | 'recovery'
+  | 'email_change'
+  | 'email'
+
 export function useAuth() {
   const { loggedIn, user, fetch: fetchSession, clear } = useUserSession()
   const api = useAuthApi()
@@ -8,14 +16,6 @@ export function useAuth() {
 
   async function login(payload: { email: string; password: string; captchaToken?: string }) {
     const result = (await api.login(payload)) as AuthMutationResult
-    if (result.user) {
-      await fetchSession()
-    }
-    return result
-  }
-
-  async function loginAsTestUser() {
-    const result = (await api.loginAsTestUser()) as AuthMutationResult
     if (result.user) {
       await fetchSession()
     }
@@ -46,7 +46,11 @@ export function useAuth() {
     return api.startOAuth(payload)
   }
 
-  async function exchangeSession(payload: { code: string; next?: string }) {
+  async function exchangeSession(
+    payload:
+      | { code: string; next?: string }
+      | { tokenHash: string; verificationType: EmailVerificationType; next?: string },
+  ) {
     const result = await api.exchangeSession(payload)
     if (result.user) {
       await fetchSession()
@@ -62,6 +66,13 @@ export function useAuth() {
 
   async function changePassword(payload: { currentPassword?: string; newPassword: string }) {
     const result = await api.changePassword(payload)
+    await fetchSession()
+    return result
+  }
+
+  async function deleteAccount(payload: { currentPassword?: string }) {
+    const result = await api.deleteAccount(payload)
+    await clear()
     await fetchSession()
     return result
   }
@@ -86,7 +97,6 @@ export function useAuth() {
     loggedIn: isAuthenticated,
     fetchUser: fetchSession,
     login,
-    loginAsTestUser,
     register,
     signup: register,
     logout,
@@ -94,6 +104,7 @@ export function useAuth() {
     exchangeSession,
     updateProfile,
     changePassword,
+    deleteAccount,
     requestPasswordReset,
     enrollMfa,
     verifyMfa,

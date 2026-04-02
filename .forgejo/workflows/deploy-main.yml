@@ -19,12 +19,12 @@ on:
 
 concurrency:
   group: deploy-main-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Production Deploy
-    runs-on: myboat-web-canary
+    runs-on: deploy
 
     permissions:
       contents: read
@@ -51,7 +51,14 @@ jobs:
         working-directory: .
 
       - name: Validate production env
-        run: doppler run --config prd -- node ../../tools/validate-production-env.mjs
+        run: doppler run --config prd -- node ./tools/validate-production-env.mjs
+        working-directory: .
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Repair Forgejo lockfile package source
+        run: doppler run --config prd -- node ./tools/repair-forgejo-lockfile.mjs
+        working-directory: .
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
@@ -81,13 +88,11 @@ jobs:
         run: doppler run --config prd -- pnpm run build
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          NODE_OPTIONS: --max-old-space-size=3072
 
       - name: Migrate (remote D1)
         if: ${{ inputs.run_migrate == 'true' }}
-        run: >
-          doppler run --config prd -- bash ../../tools/db-migrate.sh myboat-db --remote
-          --dir node_modules/@narduk-enterprises/narduk-nuxt-template-layer/drizzle
-          --dir drizzle
+        run: doppler run --config prd -- node ./tools/run-remote-d1-migrate.mjs
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
@@ -95,3 +100,4 @@ jobs:
         run: doppler run --config prd -- pnpm run deploy
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          NARDUK_SHIP_ACTIVE: "1"

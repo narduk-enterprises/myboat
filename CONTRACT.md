@@ -219,8 +219,8 @@ Status: UNLOCKED
 - collector and cloud ingest both run the same canonical source-selection
   policy; the collector is the load-reduction point and cloud ingest is the
   safety gate
-- owner and public history reads go through the MyBoat history routes and
-  series catalog routes instead of raw browser Flux
+- owner and public history reads go through the MyBoat history routes and series
+  catalog routes instead of raw browser Flux
 - owner source diagnostics go through
   `GET /api/app/vessels/[vesselSlug]/telemetry/sources`
 - local boat deployments may read onboard telemetry directly, but they must
@@ -253,9 +253,9 @@ Status: UNLOCKED
   curated `core` history, or curated `detail` history.
 - Duplicate losers are retained only in short-lived debug telemetry and source
   diagnostics.
-- Owner source diagnostics return `latestSourceInventory`,
-  `duplicateHotspots`, `currentWinners`, `policyVersion`,
-  `primaryInstallation`, and `shadowPublisherSeen`.
+- Owner source diagnostics return `latestSourceInventory`, `duplicateHotspots`,
+  `currentWinners`, `policyVersion`, `primaryInstallation`, and
+  `shadowPublisherSeen`.
 - Shadow publishers must never replace a fresh primary winner in canonical
   output.
 - media items can attach to passages or remain general vessel media.
