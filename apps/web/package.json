@@ -5,7 +5,7 @@
   "version": "1.17.2",
   "scripts": {
     "prebuild": "pnpm --filter @myboat/telemetry-source-policy build",
-    "build": "node ../../tools/run-with-platform-secrets.mjs --app myboat --environment prd --profile build -- sh -c 'nuxt build'",
+    "build": "nuxt build",
     "db:ready": "pnpm run db:migrate && pnpm run db:seed",
     "dev": "(doppler run -- nuxt dev || nuxt dev)",
     "dev:inner": "pnpm run db:ready && pnpm run dev:bindings && pnpm run dev:broker-port && pnpm run dev:port && pnpm exec concurrently -k -n broker,web -c blue,green \"pnpm run dev:broker\" \"pnpm run dev:nuxt\"",
@@ -24,7 +24,7 @@
     "preview": "nuxt preview",
     "pretypecheck": "pnpm --filter @myboat/telemetry-source-policy build",
     "typecheck": "nuxt typecheck",
-    "deploy": "node ../../tools/web-deploy.cjs",
+    "deploy": "pnpm exec wrangler deploy --env=\"\"",
     "deploy:canary": "wrangler deploy --env canary",
     "prelint": "test -f .nuxt/eslint.config.mjs || nuxt prepare",
     "lint": "eslint . --max-warnings 0",
