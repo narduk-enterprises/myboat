@@ -14,6 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
+import { REMAPPED_INHERITED_AGENTIC_WORKFLOW_FILES } from './agentic-workflow-manifest'
 import { runCommand } from './command'
 import {
   buildPackageRegistryLine,
@@ -31,6 +32,7 @@ import {
   STALE_SYNC_PATHS,
   VERBATIM_SYNC_FILES,
   getCanonicalCiContent,
+  getCanonicalDeployMainContent,
   isIgnoredManagedPath,
 } from './sync-manifest'
 import {
@@ -43,6 +45,7 @@ import {
   resolveSelectedLayerPackageNames,
   type TemplateLayerSelection,
 } from './layer-bundle-manifest'
+import { readProvisionMetadata } from './provision-metadata'
 import { resolveRepoTemplateLayerSelection } from './template-layer-selection'
 
 export interface RunAppSyncOptions {
@@ -532,6 +535,25 @@ function syncManagedFiles(
       if (trackedPaths && !trackedPaths.has(file) && !existsSync(join(templateDir, file))) continue
       syncFile(join(templateDir, file), join(appDir, file), templateDir, counters, dryRun, log)
     }
+    for (const entry of REMAPPED_INHERITED_AGENTIC_WORKFLOW_FILES) {
+      if (
+        trackedPaths &&
+        !trackedPaths.has(entry.source) &&
+        !existsSync(join(templateDir, entry.source))
+      ) {
+        continue
+      }
+
+      syncFile(
+        join(templateDir, entry.source),
+        join(appDir, entry.target),
+        templateDir,
+        counters,
+        dryRun,
+        log,
+        entry.target,
+      )
+    }
     for (const file of AUTH_BRIDGE_SYNC_FILES) {
       if (trackedPaths && !trackedPaths.has(file) && !existsSync(join(templateDir, file))) continue
       syncFile(join(templateDir, file), join(appDir, file), templateDir, counters, dryRun, log)
@@ -592,6 +614,19 @@ function syncGeneratedFiles(
   for (const file of GENERATED_SYNC_FILES) {
     if (file === '.github/workflows/ci.yml') {
       writeTextFile(join(appDir, file), getCanonicalCiContent(), counters, dryRun, file, log)
+      continue
+    }
+
+    if (file === '.forgejo/workflows/deploy-main.yml') {
+      const appName = readProvisionMetadata(appDir).name || basename(appDir)
+      writeTextFile(
+        join(appDir, file),
+        getCanonicalDeployMainContent().replace(/__APP_NAME__/g, appName),
+        counters,
+        dryRun,
+        file,
+        log,
+      )
     }
   }
 }
@@ -671,7 +706,10 @@ function patchRootPackage(
           'test:e2e:showcase',
           'test:e2e:ui',
           'test:e2e:mapkit',
+          'ship',
           'quality:fleet',
+          'mirror:fleet:forgejo',
+          'mirror:fleet:forgejo:dry',
           'sync:fleet',
           'sync:fleet:fast',
           'sync:fleet:dry',
@@ -1995,6 +2033,31 @@ function replaceLegacyGithubSkillsSymlink(
   return true
 }
 
+function removeLegacyAuthApiComposableCasing(
+  appDir: string,
+  dryRun: boolean,
+  counters: SyncCounters,
+  log: (message: string) => void,
+): boolean {
+  const composablesDir = join(appDir, 'apps', 'web', 'app', 'composables')
+  if (!existsSync(composablesDir)) {
+    return false
+  }
+
+  const entries = readdirSync(composablesDir)
+  if (!entries.includes('useAuthAPI.ts')) {
+    return false
+  }
+
+  const legacyPath = join(composablesDir, 'useAuthAPI.ts')
+  log('  DELETE: apps/web/app/composables/useAuthAPI.ts (legacy casing)')
+  if (!dryRun) {
+    rmSync(legacyPath, { force: true })
+  }
+  counters.removed += 1
+  return true
+}
+
 function runInstallAndQuality(
   appDir: string,
   dryRun: boolean,
@@ -2062,6 +2125,7 @@ export async function runAppSync(options: RunAppSyncOptions) {
   log('')
 
   replaceLegacyGithubSkillsSymlink(options.appDir, dryRun, counters, log)
+  removeLegacyAuthApiComposableCasing(options.appDir, dryRun, counters, log)
 
   syncManagedFiles(
     options.templateDir,
